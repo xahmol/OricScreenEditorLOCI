@@ -102,6 +102,17 @@ void ORIC_Exit(void)
 {
 	setflags(SCREEN);
 	clrscr();
+
+	// Rewind tape so program can be run again with CLOAD"
+	TAP.cmd = TAP_CMD_REW;
+
+	// Set boot options
+	mia_set_ax(0x80 | 2);
+
+	// Call boot MIA operation
+	VIA.ier = 0x7F; // Disable VIA interrupts
+	mia_call_int_errno(MIA_OP_BOOT);
+	VIA.ier = 0xC0; // Enable VIA interrupts
 }
 
 unsigned int ORIC_RowColToAddress(unsigned char row, unsigned char col)

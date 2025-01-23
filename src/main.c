@@ -134,7 +134,7 @@ unsigned char visualchar[80] =
         0x45, 0x3A, 0x44, 0x38, 0x47, 0x3B, 0x46, 0x39, 0x3E, 0x4D, 0x31, 0x42, 0x23, 0x35, 0x4A, 0x20,
         0x60, 0x61, 0x62, 0x63, 0x64, 0x65, 0x66, 0x67, 0x68, 0x69, 0x6A, 0x6B, 0x6C, 0x6D, 0x6E, 0x6F};
 
-/* General screen functions */
+// Generic routines
 void wait(unsigned int wait_cycles)
 // Function to wait for the specified number of cycles
 // Input: wait_cycles = numnber of cycles to wait
@@ -276,8 +276,7 @@ unsigned int screenmap_screenaddr(unsigned char row, unsigned char col, unsigned
     return SCREENMAPBASE + (row * width) + col;
 }
 
-// Generic routines
-int textInput(unsigned char xpos, unsigned char ypos, char *str, unsigned char size, unsigned char validation)
+signed int textInput(unsigned char xpos, unsigned char ypos, unsigned char width, char *str, unsigned char size, unsigned char validation)
 {
 
     /**
@@ -296,50 +295,76 @@ int textInput(unsigned char xpos, unsigned char ypos, char *str, unsigned char s
     //                          +   2   Also alphabet allowed (lower and uppercase)
     //                          +   4   Also wildcards * and ? allowed
     //                          Add numbers to combine or 0 for no validation
+    //              width:      =   width of input viewport, can be less than size
 
-    register unsigned char c;
-    register unsigned char idx = strlen(str);
-    register unsigned char valid = 0;
-    ;
+    unsigned char c;
+    unsigned char idx = strlen(str);
+    unsigned char len;
+    unsigned char valid = 0;
+    unsigned char offs = 0;
 
-    cputsxy(xpos, ypos, str);
-    cputc(CH_INVSPACE);
-
+    // Loop for input from keyboard
     while (1)
     {
+        // Calculate offset for viewing long string in viewport based on cursor pos
+        if (idx + 1 > width)
+        {
+            offs = idx + 1 - width;
+        }
+        else
+        {
+            offs = 0;
+        }
+        len = strlen(str);
+
+        // Clear viewport
+        gotoxy(xpos, ypos);
+        cclear(width);
+
+        // Print viweable part of string
+        gotoxy(xpos, ypos);
+        cprintf("%.*s", width - 1, str + offs);
+
+        // Print cursor
+        gotoxy(xpos + idx - offs, ypos);
+        cputc((str[idx] ? 128 + str[idx] : CH_INVSPACE));
+
+        // Debug
+        //gotoxy(2, 2);
+        //cprintf("I:%3u W:%3u L:%3u O:%3u S:%3u", idx, width, len, offs, size);
+
+        // Get key value
         c = getkey(ijk_present,1);
+
+        // Do action based on key pressed
         switch (c)
         {
         case CH_ESC:
+            // ESC: Cancel input and return -1
             return -1;
 
         case CH_ENTER:
-            idx = strlen(str);
-            str[idx] = 0;
+            // ENTER: Finish input and returns length plus changed string
             gotoxy(xpos, ypos);
-            cspaces(size + 1);
-            cputsxy(xpos, ypos, str);
-            return idx;
+            cclear(width);
+            gotoxy(xpos, ypos);
+            cprintf("%.*s", width - 1, str);
+            return len;
 
         case CH_DEL:
+            // DEL: Delete prev char
             if (idx)
             {
                 --idx;
-                cputcxy(xpos + idx, ypos, CH_SPACE);
                 for (c = idx; 1; ++c)
                 {
                     unsigned char b = str[c + 1];
                     str[c] = b;
-                    cputcxy(xpos + c, ypos, b ? b : CH_SPACE);
                     if (b == 0)
                     {
                         break;
                     }
                 }
-                gotoxy(xpos + idx, ypos);
-                cputc(str[idx] ? 128 + str[idx] : CH_INVSPACE);
-                cputc(str[idx + 1] ? str[idx + 1] : CH_SPACE);
-                gotoxy(xpos + idx, ypos);
             }
             break;
 
@@ -347,10 +372,6 @@ int textInput(unsigned char xpos, unsigned char ypos, char *str, unsigned char s
             if (idx)
             {
                 --idx;
-                gotoxy(xpos + idx, ypos);
-                cputc(str[idx] ? 128 + str[idx] : CH_INVSPACE);
-                cputc(str[idx + 1] ? str[idx + 1] : CH_SPACE);
-                gotoxy(xpos + idx, ypos);
             }
             break;
 
@@ -358,10 +379,6 @@ int textInput(unsigned char xpos, unsigned char ypos, char *str, unsigned char s
             if (idx < strlen(str) && idx < size)
             {
                 ++idx;
-                gotoxy(xpos + idx - 1, ypos);
-                cputc(str[idx - 1]);
-                cputc(str[idx] ? 128 + str[idx] : CH_INVSPACE);
-                gotoxy(xpos + idx, ypos);
             }
             break;
 
@@ -391,12 +408,11 @@ int textInput(unsigned char xpos, unsigned char ypos, char *str, unsigned char s
             {
                 unsigned char flag = (str[idx] == 0);
                 str[idx] = c;
-                cputcxy(xpos + idx++, ypos, c);
-                cputc(CH_INVSPACE);
                 if (flag)
                 {
                     str[idx + 1] = 0;
                 }
+                idx++;
                 break;
             }
             break;
@@ -2178,7 +2194,7 @@ void chareditor()
         // Hex edit
         case 'h':
             sprintf(buffer, "%2x", char_present[ypos]);
-            textInput(30, ypos + 3, buffer, 2, 3);
+            textInput(30, ypos + 3, 2, buffer, 2, 3);
             char_present[ypos] = (unsigned char)strtol(buffer, &ptrend, 16);
             enable_overlay_ram();
             POKE(char_address + ypos, char_present[ypos]);
@@ -2295,7 +2311,7 @@ void resizewidth()
     cputsxy(4, 8, "Enter new width:");
 
     sprintf(buffer, "%i", screenwidth);
-    textInput(4, 9, buffer, 4, 1);
+    textInput(4, 9, 4, buffer, 4, 1);
     newwidth = (unsigned int)strtol(buffer, &ptrend, 10);
 
     if ((newwidth * screenheight) > maxsize || newwidth < 40)
@@ -2375,7 +2391,7 @@ void resizeheight()
     cputsxy(4, 8, "Enter new height:");
 
     sprintf(buffer, "%i", screenheight);
-    textInput(4, 9, buffer, 4, 1);
+    textInput(4, 9, 4, buffer, 4, 1);
     newheight = (unsigned int)strtol(buffer, &ptrend, 10);
 
     if ((newheight * screenwidth) > maxsize || newheight < 27)
@@ -2466,7 +2482,7 @@ int chooseidandfilename(char *headertext, unsigned char maxlen, unsigned char va
     cputsxy(4, 6, headertext);
 
     cputsxy(4, 8, "Choose filename:            ");
-    valid = textInput(4, 9, filename, maxlen, validation);
+    valid = textInput(4, 9, 35, filename, maxlen, validation);
     return valid;
 }
 
@@ -2675,12 +2691,12 @@ void loadscreenmap(unsigned char combined)
 
     cputsxy(4, 10, "Enter screen width:");
     sprintf(buffer, "%i", screenwidth);
-    textInput(4, 11, buffer, 4, 1);
+    textInput(4, 11, 4, buffer, 4, 1);
     newwidth = (unsigned int)strtol(buffer, &ptrend, 10);
 
     cputsxy(4, 12, "Enter screen height:");
     sprintf(buffer, "%i", screenheight);
-    textInput(4, 13, buffer, 4, 1);
+    textInput(4, 13, 4, buffer, 4, 1);
     newheight = (unsigned int)strtol(buffer, &ptrend, 10);
 
     if ((newwidth * newheight) > maxsize || newwidth < 40 || newheight < 27)
@@ -3178,7 +3194,7 @@ void main()
     {
         cprintf("Path to OSE too long. Press key.");
         getkey(ijk_present,1);
-        exit(1);
+        ORIC_Exit();
     }
     ijk_detect();
 
