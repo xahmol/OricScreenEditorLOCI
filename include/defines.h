@@ -1,16 +1,38 @@
 #ifndef __DEFINES_H_
 #define __DEFINES_H_
 
+/*
+Memory map:
+
+RAM Area	        StartHex	EndHex	SizeHex	StartDec	EndDec	SizeDec		
+ORIC main RAM								
+ProgramMain		    400		    B400	B000	 1024       46080	45056		
+CharSwap            B500	    B800	0300	46336	    47104	  768
+CharStd             BB80	    BFE0	0460	48000	    49120	 1120		
+Screen			    BB80	    BFE0	0460	48000       49120	 1120	28	lines of 40 chars
+Free			    BFE0	    C000	0020	49120       49152	   32		
+ORIC overlay RAM								
+Screenmap		    C000	    F4FF	3500	49152	    62719	13568		
+Window			    F500	    FCFF	0800	62720	    64767	 2048		
+Charset Swap	    FD00	    FFFF	0300	64768	    65535	  768   96	chars
+LOCI XRAM								
+Directory entries	8000	    8BFF	0C00	32768	    35839	 3072		
+Undo			    8C00	    9FFF	1400	35840	    40959	 5120		
+
+*/
+
 /* Memory addresses mapping */
-#define SCREENMAPBASE       0x9000      // Base address for screen map
-#define MEMORYLIMIT         0xA9FF      // Upper memory limit address for screen map
-#define WINDOWBASEADDRESS   0xAA00      // Base address for windows system data, 2k reserved
-#define CHARSET_SWAP        0xB100      // Base address for system character set
+#define SCREENMAPBASE       0xC000      // Base address for screen map
+#define MEMORYLIMIT         0xF4FF      // Upper memory limit address for screen map
+#define WINDOWBASEADDRESS   0xF500      // Base address for windows system data, 2k reserved
+#define CHARSET_SWAP        0xFD00      // Base address for system character set
 #define CHARSET_STD         0xB500      // Base address for redefined charset
 #define CHARSET_ALT         0xB900      // Base address for redefined charset
 #define SCREENMEMORY        0xBB80      // Screen memory base address
-#define OVERLAYBASE         0xBFE0      // Base address to save memory overlays
 #define CHARSETROM          0xFC78      // ROM address of default standard charset
+#define DIRBASE             0x8000      // Base address for directory enties in LOCI XRAM
+#define UNDOBASE            0x8C00      // Base address for undo buffer in LOCI XRAM
+#define UNDOLIMIT           0x9FFF      // Upper limit address for undo buffer in LOCI XRAM
 
 /* Global variables */
 
@@ -67,6 +89,8 @@ extern unsigned char visualmap;
 extern unsigned char favourites[10];
 extern char buffer[81];
 extern char version[22];
+extern char pathbuffer[256];
+extern char homedir[256];
 
 extern unsigned char visualchar[80];
 
@@ -107,7 +131,9 @@ extern unsigned char bootdevice;
 /* Defines for versioning */
 /* Version number */
 #define VERSION_MAJOR 0
-#define VERSION_MINOR 99
+#define VERSION_MINOR 1
+#define VERSION_PATCH 0
+
 /* Build year */
 #define BUILD_YEAR_CH0 (__DATE__[ 7])
 #define BUILD_YEAR_CH1 (__DATE__[ 8])

@@ -33,16 +33,7 @@
 #include "osdklib.h"
 #include "defines.h"
 #include "oric_core.h"
-
-// Disk parse function
-void ORIC_DIRParse_start(unsigned char xpos, unsigned char ypos, unsigned char ymax, unsigned char xmax)
-{
-	ORIC_DIRParse_Xpos = xpos;
-	ORIC_DIRParse_Ypos = ypos;
-	ORIC_DIRParse_Ymax = ymax;
-	ORIC_DIRParse_Xmax = xmax;
-	ORIC_DIRParse_start_core();
-}
+#include "loci.h"
 
 // Generic screen and scroll routines
 
@@ -52,13 +43,15 @@ void ORIC_HChar(unsigned char row, unsigned char col, unsigned char character, u
 	// Input: row and column of start position (left end of line), screencode of character to draw line with,
 	//		  length in number of character positions, attribute color value
 
-	unsigned int startaddress = ORIC_RowColToAddress(row,col);
-	ORIC_addrh = (startaddress>>8) & 0xff;	// Obtain high byte of start address
-	ORIC_addrl = startaddress & 0xff;		// Obtain low byte of start address
-	ORIC_tmp1 = character;					// Obtain character value
-	ORIC_tmp2 = length;					    // Obtain length value
+	unsigned int startaddress = ORIC_RowColToAddress(row, col);
+	ORIC_addrh = (startaddress >> 8) & 0xff; // Obtain high byte of start address
+	ORIC_addrl = startaddress & 0xff;		 // Obtain low byte of start address
+	ORIC_tmp1 = character;					 // Obtain character value
+	ORIC_tmp2 = length;						 // Obtain length value
 
+	enable_overlay_ram();
 	ORIC_HChar_core();
+	disable_overlay_ram();
 }
 
 void ORIC_VChar(unsigned char row, unsigned char col, unsigned char character, unsigned char length)
@@ -67,13 +60,15 @@ void ORIC_VChar(unsigned char row, unsigned char col, unsigned char character, u
 	// Input: row and column of start position (top end of line), screencode of character to draw line with,
 	//		  length in number of character positions, attribute color value
 
-	unsigned int startaddress = ORIC_RowColToAddress(row,col);
-	ORIC_addrh = (startaddress>>8) & 0xff;	// Obtain high byte of start address
-	ORIC_addrl = startaddress & 0xff;		// Obtain low byte of start address
-	ORIC_tmp1 = character;					// Obtain character value
-	ORIC_tmp2 = length;						// Obtain length value
+	unsigned int startaddress = ORIC_RowColToAddress(row, col);
+	ORIC_addrh = (startaddress >> 8) & 0xff; // Obtain high byte of start address
+	ORIC_addrl = startaddress & 0xff;		 // Obtain low byte of start address
+	ORIC_tmp1 = character;					 // Obtain character value
+	ORIC_tmp2 = length;						 // Obtain length value
 
+	enable_overlay_ram();
 	ORIC_VChar_core();
+	disable_overlay_ram();
 }
 
 void ORIC_FillArea(unsigned char row, unsigned char col, unsigned char character, unsigned char length, unsigned char height)
@@ -82,23 +77,25 @@ void ORIC_FillArea(unsigned char row, unsigned char col, unsigned char character
 	// Input: row and column of start position (topleft), screencode of character to draw line with,
 	//		  length and height in number of character positions, attribute color value
 
-	unsigned int startaddress = ORIC_RowColToAddress(row,col);
-	ORIC_addrh = (startaddress>>8) & 0xff;	// Obtain high byte of start address
-	ORIC_addrl = startaddress & 0xff;		// Obtain low byte of start address
-	ORIC_tmp1 = character;					// Obtain character value
-	ORIC_tmp2 = length;						// Obtain length value
-	ORIC_tmp4 = height;						// Obtain number of lines
+	unsigned int startaddress = ORIC_RowColToAddress(row, col);
+	ORIC_addrh = (startaddress >> 8) & 0xff; // Obtain high byte of start address
+	ORIC_addrl = startaddress & 0xff;		 // Obtain low byte of start address
+	ORIC_tmp1 = character;					 // Obtain character value
+	ORIC_tmp2 = length;						 // Obtain length value
+	ORIC_tmp4 = height;						 // Obtain number of lines
 
+	enable_overlay_ram();
 	ORIC_FillArea_core();
+	disable_overlay_ram();
 }
 
 void ORIC_Init(void)
 {
 	// Init screen
-	setflags(SCREEN+NOKEYCLICK);
-    bgcolor(COLOR_BLACK);
-    textcolor(COLOR_WHITE);
-    clrscr();
+	setflags(SCREEN + NOKEYCLICK);
+	bgcolor(COLOR_BLACK);
+	textcolor(COLOR_WHITE);
+	clrscr();
 }
 
 void ORIC_Exit(void)
@@ -128,12 +125,12 @@ unsigned int ORIC_RowColToAddress(unsigned char row, unsigned char col)
 unsigned char ORIC_CharAttribute(unsigned char charset, unsigned char doublesize, unsigned char blink)
 {
 	// Function to return serial attribute code for the charset modifiers
-    // Input: Charset (0=standard, 1=alternate), doublesize (0=off, 1=on), blink (0=off, 1=on)
+	// Input: Charset (0=standard, 1=alternate), doublesize (0=off, 1=on), blink (0=off, 1=on)
 
-    return 8+charset+(2*doublesize)+(4*blink);
+	return 8 + charset + (2 * doublesize) + (4 * blink);
 }
 
-void ORIC_CopyViewPort(unsigned int sourcebase, unsigned int sourcewidth, unsigned int sourcexoffset, unsigned int sourceyoffset, unsigned char xcoord, unsigned char ycoord, unsigned char viewwidth, unsigned char viewheight )
+void ORIC_CopyViewPort(unsigned int sourcebase, unsigned int sourcewidth, unsigned int sourcexoffset, unsigned int sourceyoffset, unsigned char xcoord, unsigned char ycoord, unsigned char viewwidth, unsigned char viewheight)
 {
 	// Function to copy a viewport on the source screen map to the visible screen
 	// Input:
@@ -148,20 +145,22 @@ void ORIC_CopyViewPort(unsigned int sourcebase, unsigned int sourcewidth, unsign
 	//				viewheight			= height of viewport in number of lines
 
 	unsigned int stride = sourcewidth;
-	unsigned int Screenbase = ORIC_RowColToAddress(ycoord,xcoord);
+	unsigned int Screenbase = ORIC_RowColToAddress(ycoord, xcoord);
 
-	sourcebase += (sourceyoffset * sourcewidth ) + sourcexoffset;
+	sourcebase += (sourceyoffset * sourcewidth) + sourcexoffset;
 
-	ORIC_addrh = (sourcebase>>8) & 0xff;				// Obtain high byte of source address
-	ORIC_addrl = sourcebase & 0xff;						// Obtain low byte of source address
-	ORIC_desth = (Screenbase>>8) & 0xff;				// Obtain high byte of destination address
-	ORIC_destl = Screenbase & 0xff;						// Obtain low byte of destination address
-	ORIC_strideh = (stride>>8) & 0xff;					// Obtain high byte of stride
-	ORIC_stridel = stride & 0xff;						// Obtain low byte of stride
-	ORIC_tmp1 = viewheight;								// Obtain number of lines to copy
-	ORIC_tmp2 = viewwidth;								// Obtain length of lines to copy
+	ORIC_addrh = (sourcebase >> 8) & 0xff; // Obtain high byte of source address
+	ORIC_addrl = sourcebase & 0xff;		   // Obtain low byte of source address
+	ORIC_desth = (Screenbase >> 8) & 0xff; // Obtain high byte of destination address
+	ORIC_destl = Screenbase & 0xff;		   // Obtain low byte of destination address
+	ORIC_strideh = (stride >> 8) & 0xff;   // Obtain high byte of stride
+	ORIC_stridel = stride & 0xff;		   // Obtain low byte of stride
+	ORIC_tmp1 = viewheight;				   // Obtain number of lines to copy
+	ORIC_tmp2 = viewwidth;				   // Obtain length of lines to copy
 
+	enable_overlay_ram();
 	ORIC_CopyViewPort_core();
+	disable_overlay_ram();
 }
 
 void ORIC_ScrollCopy(unsigned int sourcebase, unsigned int sourcewidth, unsigned int sourcexoffset, unsigned int sourceyoffset, unsigned char xcoord, unsigned char ycoord, unsigned char viewwidth, unsigned char viewheight, unsigned char direction)
@@ -183,9 +182,8 @@ void ORIC_ScrollCopy(unsigned int sourcebase, unsigned int sourcewidth, unsigned
 	//									  bit 5 set ($04): down
 	//									  bit 4 set ($08): up
 
-
 	// First perform scroll
-	ORIC_ScrollMove(xcoord,ycoord,viewwidth,viewheight,direction,0);
+	ORIC_ScrollMove(xcoord, ycoord, viewwidth, viewheight, direction, 0);
 
 	// Finally add the new line or column
 	switch (direction)
@@ -211,11 +209,11 @@ void ORIC_ScrollCopy(unsigned int sourcebase, unsigned int sourcewidth, unsigned
 		ycoord += --viewheight;
 		viewheight = 1;
 		break;
-	
+
 	default:
 		break;
 	}
-	ORIC_CopyViewPort(sourcebase,sourcewidth,sourcexoffset,sourceyoffset,xcoord,ycoord,viewwidth,viewheight);
+	ORIC_CopyViewPort(sourcebase, sourcewidth, sourcexoffset, sourceyoffset, xcoord, ycoord, viewwidth, viewheight);
 }
 
 void ORIC_ScrollMove(unsigned char xcoord, unsigned char ycoord, unsigned char viewwidth, unsigned char viewheight, unsigned char direction, unsigned char clear)
@@ -233,69 +231,87 @@ void ORIC_ScrollMove(unsigned char xcoord, unsigned char ycoord, unsigned char v
 	//									  bit 4 set ($08): up
 	// - Clear:							= 1 for clear scrolled out area
 
-	unsigned int sourceaddr = ORIC_RowColToAddress(ycoord,xcoord);
+	unsigned int sourceaddr = ORIC_RowColToAddress(ycoord, xcoord);
 
 	// Set input for core routines
-	ORIC_tmp1 = viewheight;				// Obtain number of lines to copy
-	ORIC_tmp2 = viewwidth;				// Obtain length of lines to copy
+	ORIC_tmp1 = viewheight; // Obtain number of lines to copy
+	ORIC_tmp2 = viewwidth;	// Obtain length of lines to copy
+
+	enable_overlay_ram();
 
 	// Scroll in desired direction
 	switch (direction)
 	{
 	case SCROLL_LEFT:
-		ORIC_addrh = (sourceaddr>>8) & 0xff;	// Obtain high byte of source address
-		ORIC_addrl = sourceaddr & 0xff;			// Obtain low byte of source address
+		ORIC_addrh = (sourceaddr >> 8) & 0xff; // Obtain high byte of source address
+		ORIC_addrl = sourceaddr & 0xff;		   // Obtain low byte of source address
 		ORIC_Scroll_left_core();
-		if(clear) { ORIC_FillArea(ycoord,xcoord+viewwidth-1,CH_SPACE,1,viewheight); }
+		if (clear)
+		{
+			ORIC_FillArea(ycoord, xcoord + viewwidth - 1, CH_SPACE, 1, viewheight);
+		}
 		break;
 
 	case SCROLL_RIGHT:
-		ORIC_addrh = (sourceaddr>>8) & 0xff;	// Obtain high byte of source address
-		ORIC_addrl = sourceaddr & 0xff;			// Obtain low byte of source address
+		ORIC_addrh = (sourceaddr >> 8) & 0xff; // Obtain high byte of source address
+		ORIC_addrl = sourceaddr & 0xff;		   // Obtain low byte of source address
 		ORIC_Scroll_right_core();
-		if(clear) { ORIC_FillArea(ycoord,xcoord,CH_SPACE,1,viewheight); }
+		if (clear)
+		{
+			ORIC_FillArea(ycoord, xcoord, CH_SPACE, 1, viewheight);
+		}
 		break;
 
 	case SCROLL_DOWN:
-		sourceaddr += (viewheight-2)*40;
-		ORIC_addrh = (sourceaddr>>8) & 0xff;	// Obtain high byte of source address
-		ORIC_addrl = sourceaddr & 0xff;			// Obtain low byte of source address
+		sourceaddr += (viewheight - 2) * 40;
+		ORIC_addrh = (sourceaddr >> 8) & 0xff; // Obtain high byte of source address
+		ORIC_addrl = sourceaddr & 0xff;		   // Obtain low byte of source address
 		ORIC_Scroll_down_core();
-		if(clear) { ORIC_FillArea(ycoord,xcoord,CH_SPACE,viewwidth,1); }
+		if (clear)
+		{
+			ORIC_FillArea(ycoord, xcoord, CH_SPACE, viewwidth, 1);
+		}
 		break;
 
 	case SCROLL_UP:
 		sourceaddr += 40;
-		ORIC_addrh = (sourceaddr>>8) & 0xff;	// Obtain high byte of source address
-		ORIC_addrl = sourceaddr & 0xff;			// Obtain low byte of source address
+		ORIC_addrh = (sourceaddr >> 8) & 0xff; // Obtain high byte of source address
+		ORIC_addrl = sourceaddr & 0xff;		   // Obtain low byte of source address
 		ORIC_Scroll_up_core();
-		if(clear) { ORIC_FillArea(ycoord+viewheight-1,xcoord,CH_SPACE,viewwidth,1); }
+		if (clear)
+		{
+			ORIC_FillArea(ycoord + viewheight - 1, xcoord, CH_SPACE, viewwidth, 1);
+		}
 		break;
-	
+
 	default:
 		break;
 	}
+
+	disable_overlay_ram();
 }
 
 void ORIC_ScreenmapFill(unsigned int sourcebase, unsigned int sourcewidth, unsigned int sourceheight, unsigned char ink, unsigned char paper, unsigned char character)
 {
-    // Function to clear screenmap memory area, filling screenmap with default paper and ink in first to columns,
-    // rest attribute for standard charset
+	// Function to clear screenmap memory area, filling screenmap with default paper and ink in first to columns,
+	// rest attribute for standard charset
 
-    // First: Fill whole area with serial attribute for standard charset
-    memset((void*)sourcebase,character,sourcewidth*sourceheight);
+	// First: Fill whole area with serial attribute for standard charset
+	enable_overlay_ram();
+	memset((void *)sourcebase, character, sourcewidth * sourceheight);
+	disable_overlay_ram();
 
-    // Second: Plot paper color in first column
-	ORIC_addrh = (sourcebase>>8) & 0xff;	// Obtain high byte of start address
-	ORIC_addrl = sourcebase & 0xff;		    // Obtain low byte of start address
-	ORIC_tmp1 = 16+paper;					// Obtain paper attribute value
-	ORIC_tmp2 = sourceheight;				// Obtain length value = source height
+	// Second: Plot paper color in first column
+	ORIC_addrh = (sourcebase >> 8) & 0xff; // Obtain high byte of start address
+	ORIC_addrl = sourcebase & 0xff;		   // Obtain low byte of start address
+	ORIC_tmp1 = 16 + paper;				   // Obtain paper attribute value
+	ORIC_tmp2 = sourceheight;			   // Obtain length value = source height
 	ORIC_VChar_core();
 
-    // Second: Plot ink color in second column
-	ORIC_addrh = (++sourcebase>>8) & 0xff;	// Obtain high byte of start address + 1 for second column
-	ORIC_addrl = sourcebase & 0xff;		    // Obtain low byte of start address
-	ORIC_tmp1 = ink;					    // Obtain ink attribute value
-	ORIC_tmp2 = sourceheight;				// Obtain length value = source height
+	// Second: Plot ink color in second column
+	ORIC_addrh = (++sourcebase >> 8) & 0xff; // Obtain high byte of start address + 1 for second column
+	ORIC_addrl = sourcebase & 0xff;			 // Obtain low byte of start address
+	ORIC_tmp1 = ink;						 // Obtain ink attribute value
+	ORIC_tmp2 = sourceheight;				 // Obtain length value = source height
 	ORIC_VChar_core();
 }

@@ -1,9 +1,10 @@
-# Oric Screen Editor
-# Screen editor for the Oric Atmos
-# Written in 2022 by Xander Mol
-# Based on VDC Screen Editor for the C128
+# Oric Screen Editor - LOCI version
+# Screen editor for the Oric Atmos, specific version for LOCI devices
+# Written in 2025 by Xander Mol
+# Based on VDC Screen Editor for the C128 and
+# the standard version of the Oric Screen Editor
 # 
-# https://github.com/xahmol/OricScreenEditor
+# https://github.com/xahmol/OricScreenEditorLOCI
 # https://www.idreamtin8bits.com/
 
 # For full credits: see src/main.c
@@ -15,21 +16,30 @@
 # Path tp OSDK install. Edit for local dir
 # Installation instructions for Linux: #https://forum.defence-force.org/viewtopic.php?p=25396#p25396
 OSDK := /home/xahmol/OSDK-build/pc/tools/osdk/main/osdk-linux/bin/
-# Path tp HxC Floppy Emulator command line tool: edit for local dir
-# SVN repository: svn checkout https://svn.code.sf.net/p/hxcfloppyemu/code/ hxcfloppyemu-code
-# Build with  HxCFloppyEmulator/build/make 
-HXCFE := /home/xahmol/hxcfloppyemu-cod/HxCFloppyEmulator/HxCFloppyEmulator_cmdline/trunk/build/
 # Emulator path: edit for location of emulator to use
 EMUL_DIR := /home/xahmol/oricutron/
 # Makefile full path
 mkfile_path := $(shell dirname $(realpath $(firstword $(MAKEFILE_LIST))))
 
 ## Project name
-PROJECT      := OSE
+PROJECT      := OSEforLOCI
 PROJECT_DIR  := $(shell pwd)
-PROGRAM      := BUILD/$(PROJECT).bin
-DISK_DSK     := BUILD/$(PROJECT).dsk
-DISK_HFE     := BUILD/$(PROJECT).hfe
+PROGRAM      := BUILD/OricScreenEditor/$(PROJECT).tap
+
+# Assets to add to ZIP
+SCREENS := assets/$(PROJECT)-Title.bin assets/$(PROJECT)-Help1.bin assets/$(PROJECT)-Help2.bin assets/$(PROJECT)-Help3.bin assets/$(PROJECT)-Help4.bin
+SAMPLES := assets/Petscii.pro.bin assets/Petscii.scr.bin assets/Petscii.css.bin assets/Petscii.csa.bin
+
+# ZIP file contents
+ZIP_FILENAME = $(PROJECT)_$(VERSION).zip
+ZIP_CONTENT = $(PROGRAM) $(SCREENS) $(SAMPLES) README.pdf
+
+# Build versioning
+VERSION_MAJOR = 0
+VERSION_MINOR = 1
+VERSION_PATCH = 0
+VERSION_TIMESTAMP = $(shell date "+%Y%m%d-%H%M")
+VERSION = v$(VERSION_MAJOR)$(VERSION_MINOR)$(VERSION_PATCH)-$(VERSION_TIMESTAMP)
 
 # Arguments for emulator
 # # # Use MACH to override the default and run as:
@@ -49,19 +59,33 @@ EMUARG                  += --turbotape on
 
 ## C Sources and library objects to use
 SOURCES = src/main.c src/oric_core.c
-LIBOBJECTS = src/oric_core_assembly.s src/libbasic.s
+ASSOBJECTS = src/oric_core_assembly.s src/tapehdr.s
+LSOURCES = $(wildcard libsrc/*.c)
+LASOURCES = $(wildcard libsrc/*.s)
+LIBRARY = lib/loci.lib
+
+## CC65 paths and programs
+ifndef CC65_HOME
+$(warning CC65_HOME not set. Defaulting to $(HOME)/cc65)
+export CC65_HOME = $(HOME)/cc65
+endif
+CC        = $(CC65_HOME)/bin/cl65
+AR        = $(CC65_HOME)/bin/ar65
+CP        = cp -f
 
 ## Compiler and linker flags
 CC65_TARGET = atmos
-CC = cl65
-CFLAGS  = -t $(CC65_TARGET) --create-dep $(<:.c=.d) -Oirs -I include
-LDFLAGS = -t $(CC65_TARGET) -C oricse_cc65_config.cfg -m $(PROJECT).map
+CFLAGS  = -t $(CC65_TARGET) -Oirs --debug-info -I include --asm-include-dir asminc -I asminc
+LDFLAGS = -t $(CC65_TARGET) -C memoryconfig.cfg -m $(PROJECT).map
+
+#CC65 has changed internal library prefix for errno related symbols. Check which one we have.
+CHECK_CC65 != CC65_HOME=$(CC65_HOME) $(CC) -c $(CFLAGS) -o .asm_check libsrc/mia.s 2>&1
 
 ########################################
 
 .SUFFIXES:
 .PHONY: all clean run run-debug
-all: $(PROGRAM) $(DISK_DSK)
+all: $(PROGRAM) $(ZIP_FILENAME)
 
 ifneq ($(MAKECMDGOALS),clean)
 -include $(SOURCES:.c=.d) $(SOURCESUPD:.c=.d)
@@ -71,22 +95,39 @@ endif
 %.o: %.c
 	$(CC) -c $(CFLAGS) -o $@ $<
 
-# Link compiled objects 
-$(PROGRAM): $(SOURCES:.c=.o)
-	$(CC) $(LDFLAGS) -o $@ $^ $(LIBOBJECTS)
+%.o: %.s
+ifneq ($(strip $(CHECK_CC65)),)
+	$(CC) -c $(CFLAGS) --asm-define OLD_CC65 -o $@ $<
+else
+	$(CC) -c $(CFLAGS) -o $@ $<
+endif
 
-# Build disk
-$(DISK_DSK): $(PROGRAM) $(TESTPROG_BIN)
-	$(OSDK)header $(PROGRAM) BUILD/$(PROJECT).tap 0x0501
-	$(OSDK)tap2dsk -iCLS:$(PROJECT) -c20:3 -n$(PROJECT) BUILD/$(PROJECT).tap OSEHS1.tap OSEHS2.tap OSEHS3.tap OSEHS4.tap OSETSC.tap PETSCIIPJ.tap PETSCIISC.tap PETSCIICS.tap PETSCIICA.tap $(DISK_DSK)
-	$(OSDK)old2mfm $(DISK_DSK)
-	cd $(HXCFE); ./hxcfe -finput:"$(mkfile_path)/$(DISK_DSK)" -foutput:"$(mkfile_path)/$(DISK_HFE)" -conv:HXC_HFE
+# Build librarry
+$(LIBRARY): $(LSOURCES:.c=.o) $(LASOURCES:.s=.o)
+	$(CP) $(CC65_HOME)/lib/$(CC65_TARGET).lib $(LIBRARY)
+	$(AR) a $(LIBRARY) $(LSOURCES:.c=.o) $(LASOURCES:.s=.o)
+
+# Link compiled objects 
+$(PROGRAM): $(SOURCES:.c=.o) $(LIBRARY)
+	cd BUILD; $(RM) *.*
+	cd BUILD/OricScreenEditor; $(RM) *.*
+	$(CC) $(LDFLAGS) -o  $@ $^ $(ASSOBJECTS)
+
+# Creating ZIP file for distribution
+$(ZIP_FILENAME): $(PROGRAM)
+	cp $(SCREENS) $(SAMPLES) BUILD/OricScreenEditor/
+	cp README.pdf BUILD/
+	cd BUILD; zip -r $(ZIP_FILENAME) *
+	cp BUILD/$(ZIP_FILENAME) .
+	cd BUILD; $(RM) *.*
+	cd BUILD/OricScreenEditor; $(RM) *.*
 
 # Clean old builds and objects
 clean:
-	$(RM) $(SOURCES:.c=.o) $(SOURCES:.c=.d) $(PROGRAM) $(PROGRAM).map $(PROGRAM).brk $(PROGRAM).sym
+	$(RM) $(SOURCES:.c=.o) $(SOURCES:.c=.d) $(LSOURCES:.c=.o) $(LASOURCES:.s=.o) *.map *.brk *.sym .asm_check
 	cd BUILD; $(RM) *.*
+	cd BUILD/OricScreenEditor; $(RM) *.*
 
 # Execute in emulator: use make run
-run: $(DISK_DSK)
-	cd $(EMUDIR); $(EMU) $(EMUARG) "$(PROJECT_DIR)/$(DISK_DSK)"
+run: $(PROGRAM)
+	cd $(EMUDIR); $(EMU) $(EMUARG) "$(PROJECT_DIR)/$(PROGRAM)"

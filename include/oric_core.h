@@ -15,12 +15,6 @@
 #define SCROLL_UP               0x08
 
 // Variables in core Functions
-extern unsigned char DOSERROR;
-extern unsigned char ORIC_DIRParse_Xpos;
-extern unsigned char ORIC_DIRParse_Ypos;
-extern unsigned char ORIC_DIRParse_Ymax;
-extern unsigned char ORIC_DIRParse_Xmax;
-extern char ORIC_DIRParse_diskname[22];
 extern unsigned char ORIC_addrh;
 extern unsigned char ORIC_addrl;
 extern unsigned char ORIC_desth;
@@ -34,8 +28,6 @@ extern unsigned char ORIC_tmp3;
 extern unsigned char ORIC_tmp4;
 
 // Import assembly core Functions
-void ORIC_DIRParse_start_core();
-void ORIC_DIRParse_end();
 void ORIC_HChar_core();
 void ORIC_VChar_core();
 void ORIC_FillArea_core();
@@ -49,7 +41,6 @@ void ORIC_RestoreStandardCharset();
 void ORIC_RestoreAlternateCharset();
 
 // Function Prototypes
-void ORIC_DIRParse_start(unsigned char xpos, unsigned char ypos, unsigned char ymax, unsigned char xmax);
 void ORIC_HChar(unsigned char row, unsigned char col, unsigned char character, unsigned char length);
 void ORIC_VChar(unsigned char row, unsigned char col, unsigned char character, unsigned char length);
 void ORIC_FillArea(unsigned char row, unsigned char col, unsigned char character, unsigned char length, unsigned char height);

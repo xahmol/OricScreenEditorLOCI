@@ -179,7 +179,7 @@ int __fastcall__ read_xram(unsigned buf, unsigned count, int fildes);
 int __fastcall__ write_xstack(const void *buf, unsigned count, int fildes);
 int __fastcall__ write_xram(unsigned buf, unsigned count, int fildes);
 
-int __fastcall__ getcwd_xram(unsigned buf, unsigned len);
+void __fastcall__ getcwd_xram(unsigned buf, unsigned len);
 void __fastcall__ getcwd_loci(char* buf, unsigned char len);
 
 int __fastcall__ mount(int drive, register const char *path, register const char *filename);
