@@ -145,7 +145,7 @@ void wait(unsigned int wait_cycles)
         ;
 }
 
-unsigned char getkey(unsigned char joyallowed)
+unsigned char getkey(unsigned char joyallowed, unsigned char norepeat)
 // Function to wait on valid key or joystick press/move
 //  Input:  joyallowed (1 if joystick allowed, 0 if not)
 //  Output: key value (or joystick converted to key value)
@@ -200,10 +200,13 @@ unsigned char getkey(unsigned char joyallowed)
             }
             if (key)
             {
-                do
+                if (norepeat)
                 {
-                    ijk_read();
-                } while (ijk_ljoy || ijk_rjoy);
+                    do
+                    {
+                        ijk_read();
+                    } while (ijk_ljoy || ijk_rjoy);
+                }
                 wait(10);
             }
         }
@@ -304,7 +307,7 @@ int textInput(unsigned char xpos, unsigned char ypos, char *str, unsigned char s
 
     while (1)
     {
-        c = cgetc();
+        c = getkey(ijk_present,1);
         switch (c)
         {
         case CH_ESC:
@@ -635,7 +638,7 @@ unsigned char menupulldown(unsigned char xpos, unsigned char ypos, unsigned char
 
         do
         {
-            key = cgetc();
+            key = getkey(ijk_present,1);
         } while (key != CH_ENTER && key != CH_CURS_LEFT && key != CH_CURS_RIGHT && key != CH_CURS_UP && key != CH_CURS_DOWN && key != CH_ESC && key != CH_STOP);
 
         switch (key)
@@ -721,7 +724,7 @@ unsigned char menumain()
 
             do
             {
-                key = cgetc();
+                key = getkey(ijk_present,1);
             } while (key != CH_ENTER && key != CH_CURS_LEFT && key != CH_CURS_RIGHT && key != CH_ESC && key != CH_STOP);
 
             if (key == CH_CURS_LEFT || key == CH_CURS_RIGHT)
@@ -810,7 +813,7 @@ void fileerrormessage(unsigned char syscharset)
     cprintf("Message: %.30s", strerror(errno));
 
     cputsxy(7, 13, "Press key.");
-    cgetc();
+    getkey(ijk_present,1);
     windowrestore(syscharset);
 }
 
@@ -821,7 +824,7 @@ void messagepopup(char *message, unsigned char syscharset)
     windownew(5, 8, 6, 35, syscharset);
     cputsxy(7, 9, message);
     cputsxy(7, 11, "Press key.");
-    cgetc();
+    getkey(ijk_present,1);
     windowrestore(syscharset);
 }
 
@@ -925,19 +928,17 @@ void helpscreen_load(unsigned char screennumber)
         charset_swap(0);
     }
 
-    
-
     // Load selected help screen
-    sprintf(buffer,"OSEforLOCI-Help%u.bin",screennumber);
+    sprintf(buffer, "OSEforLOCI-Help%u.bin", screennumber);
     strncpy(pathbuffer, homedir, 255);
     strncat(pathbuffer, buffer, 255);
-    file_load(pathbuffer, (void *)SCREENMEMORY, 1080);
+    error = file_load(pathbuffer, (void *)SCREENMEMORY, 1120);
     if (error < 1)
     {
         fileerrormessage(1);
     }
 
-    cgetc();
+    getkey(ijk_present,1);
 
     // Restore screen
     ORIC_CopyViewPort(SCREENMAPBASE, screenwidth, xoffset, yoffset, 0, 0, 40, 27);
@@ -1006,7 +1007,7 @@ void plot_try()
         printstatusbar();
     }
     cputcxy(screen_col, screen_row, plotscreencode);
-    key = cgetc();
+    key = getkey(ijk_present,1);
     if (key == CH_SPACE)
     {
         screenmapplot(screen_row + yoffset, screen_col + xoffset, plotscreencode);
@@ -1029,7 +1030,7 @@ void writemode()
         {
             printstatusbar();
         }
-        key = cgetc();
+        key = getkey(ijk_present,0);
 
         switch (key)
         {
@@ -1207,7 +1208,7 @@ void lineandbox(unsigned char draworselect)
         {
             printstatusbar();
         }
-        key = cgetc();
+        key = getkey(ijk_present,0);
 
         switch (key)
         {
@@ -1369,7 +1370,7 @@ void movemode()
 
     do
     {
-        key = cgetc();
+        key = getkey(ijk_present,0);
 
         switch (key)
         {
@@ -1455,7 +1456,7 @@ void selectmode()
         {
             printstatusbar();
         }
-        key = cgetc();
+        key = getkey(ijk_present,0);
 
         // Toggle statusbar
         if (key == CH_F6)
@@ -1494,7 +1495,7 @@ void selectmode()
                 {
                     printstatusbar();
                 }
-                movekey = cgetc();
+                movekey = getkey(ijk_present,0);
 
                 switch (movekey)
                 {
@@ -1679,7 +1680,7 @@ void palette()
         {
             printstatusbar();
         }
-        key = cgetc();
+        key = getkey(ijk_present,0);
 
         switch (key)
         {
@@ -1895,7 +1896,7 @@ void chareditor()
         {
             printstatusbar();
         }
-        key = cgetc();
+        key = getkey(ijk_present,0);
         cputcxy(xpos + 33, ypos + 3, CH_SPACE + bitset * 128);
 
         switch (key)
@@ -1957,6 +1958,7 @@ void chareditor()
 
         // Toggle bit
         case CH_SPACE:
+        case CH_ENTER:
             char_present[ypos] ^= 1 << (5 - xpos);
             enable_overlay_ram();
             POKE(char_address + ypos, char_present[ypos]);
@@ -2299,7 +2301,7 @@ void resizewidth()
     if ((newwidth * screenheight) > maxsize || newwidth < 40)
     {
         cputsxy(4, 11, "New size unsupported. Press key.");
-        cgetc();
+        getkey(ijk_present,0);
     }
     else
     {
@@ -2379,7 +2381,7 @@ void resizeheight()
     if ((newheight * screenwidth) > maxsize || newheight < 27)
     {
         cputsxy(4, 11, "New size unsupported. press key.");
-        cgetc();
+        getkey(ijk_present,0);
     }
     else
     {
@@ -2443,7 +2445,7 @@ void versioninfo()
     cputsxy(4, 14, "github.com/xahmol/OricScreenEditor");
     cputsxy(4, 16, "(C) 2022, IDreamtIn8bits.com");
     cputsxy(4, 18, "Press a key to continue.");
-    cgetc();
+    getkey(ijk_present,1);
     windowrestore(0);
 }
 
@@ -2572,7 +2574,7 @@ int filepickerfromdir(char *headertext)
     if (!filenamegrabber(x, y))
     {
         cputsxy(4, 6, "No valid files to load. Press key.");
-        cgetc();
+        getkey(ijk_present,1);
         return -1;
     }
 
@@ -2580,7 +2582,7 @@ int filepickerfromdir(char *headertext)
     {
         type = filenamegrabber(x, y);
         highlightfile(x, y, type);
-        key = cgetc();
+        key = getkey(ijk_present,1);
         cputsxy(x, y, filename);
         changed = 0;
         switch (key)
@@ -2684,7 +2686,7 @@ void loadscreenmap(unsigned char combined)
     if ((newwidth * newheight) > maxsize || newwidth < 40 || newheight < 27)
     {
         cputsxy(4, 14, "New size unsupported. Press key.");
-        cgetc();
+        getkey(ijk_present,1);
         windowrestore(0);
     }
     else
@@ -3175,7 +3177,7 @@ void main()
     if (strlen(homedir) > 235)
     {
         cprintf("Path to OSE too long. Press key.");
-        cgetc();
+        getkey(ijk_present,1);
         exit(1);
     }
     ijk_detect();
@@ -3183,7 +3185,7 @@ void main()
     // Load and show title screen
     strncpy(pathbuffer, homedir, 255);
     strncat(pathbuffer, "OSEforLOCI-Title.bin", 255);
-    file_load(pathbuffer, (void *)SCREENMEMORY, 1080);
+    file_load(pathbuffer, (void *)SCREENMEMORY, 1120);
     if (error < 1)
     {
         fileerrormessage(0);
@@ -3200,7 +3202,7 @@ void main()
     // Wait for key press to start application
     printcentered("Press key.", 10, 26, 20);
 
-    cgetc();
+    getkey(ijk_present,1);
 
     // Clear viewport of titlescreen
     clrscr();
@@ -3218,7 +3220,7 @@ void main()
         {
             printstatusbar();
         }
-        key = cgetc();
+        key = getkey(ijk_present,0);
 
         switch (key)
         {
@@ -3392,6 +3394,7 @@ void main()
 
         // Plot present screencode
         case CH_SPACE:
+        case CH_ENTER:
             screenmapplot(screen_row + yoffset, screen_col + xoffset, plotscreencode);
             break;
 
