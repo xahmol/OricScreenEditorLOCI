@@ -2,6 +2,11 @@
     "files.associations": {
         "conio.h": "c",
         "algorithm": "c",
-        "string.h": "c"
+        "string.h": "c",
+        "file.h": "c",
+        "oric_core.h": "c",
+        "loci.h": "c",
+        "stdio.h": "c",
+        "palette.h": "c"
     }
 }

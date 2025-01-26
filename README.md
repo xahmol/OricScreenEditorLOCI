@@ -60,7 +60,7 @@ Version v099-20220615-1454:
 Oric Screen Editor is an editor to create text based screens for the Oric Atmos. It fully supports using user defined character sets.
 
 Main features of the program:
-- Support for screen maps larger than 40x25 characters. Screens can be up to 8 KiB (8.192 bytes), all sizes fitting in that memory with width of 40 at minimum and heigth of 27 at minimum are supported.
+- Support for screen maps larger than 40x25 characters. Screens can be up to 8 KiB (8.192 bytes), all sizes fitting in that memory with width of 40 at minimum and height of 27 at minimum are supported.
 - Supports resizing canvas size, clear or fill the canvas
 - Support for loading user defined charsets (should be standard charsets of 96 characters of 6 bits width and 8 bits height, alternate charsets of 80 characters or combined charsets of 176 characters).
 - Includes a simple character editor to change characters on the fly and directly see the result in your designed screen.
@@ -145,7 +145,7 @@ Press these keys in main mode for editing:
 
 *Moving cursor*
 
-Press the **cursor keys** to move the cursor around the screen. If the canvas size is bigger than the 40x27 screensize, the sreen will scroll on reaching the edges.
+Press the **cursor keys** to move the cursor around the screen. If the canvas size is bigger than the 40x27 screensize, the screen will scroll on reaching the edges.
 
 *Selecting the screencode to plot*
 
@@ -172,8 +172,8 @@ Press **T** to preview how the selected character would look like if plotted wit
 
 *Plotting serial attributes*
 
-Due to the way the Oric handles [color and attribute changes](#serial-attribute-code-reference), every screen position is either an attribute modifier or a character, but never both at the same time. For this reason, on plotting a character no atrribute is plotted. The user of OSE needs to plot the serial attributes seperately by its own desire.
-To do so, press **I** for plotting an **I**nk modifier for the present ink color, **P** for plotting a **P**aper modifier for the present paper color and **U** for plotting a characterset modifier for the present character atrributes (the alternate, double and blink toggles).
+Due to the way the Oric handles [color and attribute changes](#serial-attribute-code-reference), every screen position is either an attribute modifier or a character, but never both at the same time. For this reason, on plotting a character no attribute is plotted. The user of OSE needs to plot the serial attributes separately by its own desire.
+To do so, press **I** for plotting an **I**nk modifier for the present ink color, **P** for plotting a **P**aper modifier for the present paper color and **U** for plotting a characterset modifier for the present character attributes (the alternate, double and blink toggles).
 
 *Grabbing a character*
 
@@ -204,7 +204,7 @@ If enabled, the statusbar is plotted as this at the lowest line of the screen:
 From left to right, this status bar shows:
 
 - Mode: mode the program is in (such as Main, Select, Line/Box, Palette or Character Editor).
-- X,Y: X and Y co-ordinates of the cursor (co-ordinates of the large full screen, and not only the visible screen, if a larger screen than 40 by 27 characters is selected. Normally shows in decimal, but shows in hexadecimal if X or Y maximum size is higher than 99)
+- X,Y: X and Y coordinates of the cursor (coordinates of the large full screen, and not only the visible screen, if a larger screen than 40 by 27 characters is selected. Normally shows in decimal, but shows in hexadecimal if X or Y maximum size is higher than 99)
 - C: Screemcode, the present selected character to plot, first as screencode number in hexadecimal, second as actual visual character.
 - S: The screencode in memory underneath the cursor position. Will show either the character code (bigger than $20) or the attribute code (smaller than $20) in hexadecimal
 - I: Ink, the present selected color for the ink. First as number 0-7, then as visual color.
@@ -266,7 +266,7 @@ Similar to clear, but this will fill the canvas with the present selected screen
 
 In general: pressing **ESC** on a filename input dialogue cancels the file operation. Wildcards can be used in filenames for loading: **\*** for allowing anything afterwards, **?** to allow any character for the given position.
 
-**NB: In the present version, error handling of file opeations is ppor, for example entering incorrect / inexisting filenames exit the program to BASIC with poor recovery possibility of unsaved work. Advice is to save often on work in progress versions.**
+**NB: In the present version, error handling of file operations is ppor, for example entering incorrect / inexisting filenames exit the program to BASIC with poor recovery possibility of unsaved work. Advice is to save often on work in progress versions.**
 
 *Save screen*
 
@@ -293,11 +293,11 @@ Loads a project: the metadata, the screen and the charsets. Provide the filename
 
 *Save combined*
 
-This option saves the present canvas and charsets to disk in a single file (First 768 bytes of the standard charset, 256 bytes of empty space (the first 32 non-visible positions of the alternate charset), then 640 bytes of the visble alternate charset, finally the screenmap). Only makes sense for 40x27 standard screens, with the benefit that they can be loaded in one go with $B500 as base address. For the rest exactly similar in dialogue as Save Screen.
+This option saves the present canvas and charsets to disk in a single file (First 768 bytes of the standard charset, 256 bytes of empty space (the first 32 non-visible positions of the alternate charset), then 640 bytes of the visible alternate charset, finally the screenmap). Only makes sense for 40x27 standard screens, with the benefit that they can be loaded in one go with $B500 as base address. For the rest exactly similar in dialogue as Save Screen.
 
 *Load combined*
 
-This option loads the present canvas and charsets to disk in a single file (First 768 bytes of the standard charset, 256 bytes of empty space (the first 32 non-visible positions of the alternate charset), then 640 bytes of the visble alternate charset, finally the screenmap). For the rest exactly similar in dialogue as Save Screen.
+This option loads the present canvas and charsets to disk in a single file (First 768 bytes of the standard charset, 256 bytes of empty space (the first 32 non-visible positions of the alternate charset), then 640 bytes of the visible alternate charset, finally the screenmap). For the rest exactly similar in dialogue as Save Screen.
 
 **_Charset: Load and save character set_**
 
@@ -607,11 +607,11 @@ The values are calculated from the 3 bits used for the Red, Green and Blue (RGB)
 ## Serial attribute code reference:
 ([Back to contents](#contents))
 
-The Oric does not have a seperate attribute memory space, changing any attribute is done by plotting an attribute code where normally a character would go, with the effect of that attribute valid for the rest of the line until another attribute code overrides it in the rest of the line to the right.
+The Oric does not have a separate attribute memory space, changing any attribute is done by plotting an attribute code where normally a character would go, with the effect of that attribute valid for the rest of the line until another attribute code overrides it in the rest of the line to the right.
 Also, an attribute code can either change the ink, change the paper, change character set modifiers or change video control attributes, not any combination of these four at the same time. If you want to change two or more of these four categories, you have to plot the same number of attribute code after each other. That is why they are called serial attributes.
 This rather complicates screen design in multi color as every color change does cost a spot where no normal character can go.
 
-In Oric Screen Editor, all attributes but the video control attributes are supported. But OSE is not aware of atributes you have placed in the line, so proper attribute placement is something you as user should take care of in the design.
+In Oric Screen Editor, all attributes but the video control attributes are supported. But OSE is not aware of attributes you have placed in the line, so proper attribute placement is something you as user should take care of in the design.
 
 Attributes codes are all plot codes from 0 to 31, codes from 32 to 127 are the printable characters according to standard ASCII codes, codes from 128 and up are the same but in reverse video.
 
@@ -689,7 +689,7 @@ Note that in OSE calculation of these attribute codes by yourselves is not neces
 ## File format reference
 ([Back to contents](#contents))
 
-As the Oric does not have seperate attribute memory, screendata is basically just a width*heigth dump of screen codes. The screen file is a flat data file with these screencodes, length is calculated as width*height.
+As the Oric does not have separate attribute memory, screendata is basically just a width*height dump of screen codes. The screen file is a flat data file with these screencodes, length is calculated as width*height.
 So a standard 40x27 screen would be 1.080 bytes.
 
 ## Credits

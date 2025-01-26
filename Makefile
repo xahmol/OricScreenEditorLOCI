@@ -28,7 +28,7 @@ PROGRAM      := BUILD/OricScreenEditor/$(PROJECT).tap
 
 # Assets to add to ZIP
 SCREENS := assets/$(PROJECT)-Title.bin assets/$(PROJECT)-Help1.bin assets/$(PROJECT)-Help2.bin assets/$(PROJECT)-Help3.bin assets/$(PROJECT)-Help4.bin
-SAMPLES := assets/Petscii.pro.bin assets/Petscii.scr.bin assets/Petscii.css.bin assets/Petscii.csa.bin
+SAMPLES := assets/Petscii.prj.bin assets/Petscii.scr.bin assets/Petscii.css.bin assets/Petscii.csa.bin
 
 # ZIP file contents
 ZIP_FILENAME = $(PROJECT)_$(VERSION).zip
@@ -58,7 +58,7 @@ EMUARG                  += --vsynchack off
 EMUARG                  += --turbotape on
 
 ## C Sources and library objects to use
-SOURCES = src/main.c src/oric_core.c
+SOURCES = src/main.c src/oric_core.c src/generic.c src/menu.c src/screen.c src/draw.c src/menufunctions.c src/dir.c src/file.c src/palette.c src/charedit.c
 ASSOBJECTS = src/oric_core_assembly.s src/tapehdr.s
 LSOURCES = $(wildcard libsrc/*.c)
 LASOURCES = $(wildcard libsrc/*.s)
@@ -102,7 +102,7 @@ else
 	$(CC) -c $(CFLAGS) -o $@ $<
 endif
 
-# Build librarry
+# Build library
 $(LIBRARY): $(LSOURCES:.c=.o) $(LASOURCES:.s=.o)
 	$(CP) $(CC65_HOME)/lib/$(CC65_TARGET).lib $(LIBRARY)
 	$(AR) a $(LIBRARY) $(LSOURCES:.c=.o) $(LASOURCES:.s=.o)

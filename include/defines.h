@@ -31,36 +31,11 @@ Undo			    8C00	    9FFF	1400	35840	    40959	 5120
 #define SCREENMEMORY        0xBB80      // Screen memory base address
 #define CHARSETROM          0xFC78      // ROM address of default standard charset
 #define DIRBASE             0x8000      // Base address for directory enties in LOCI XRAM
+#define DIRSIZE             0x0C00      // Size of directory entries in LOCI XRAM
 #define UNDOBASE            0x8C00      // Base address for undo buffer in LOCI XRAM
 #define UNDOLIMIT           0x9FFF      // Upper limit address for undo buffer in LOCI XRAM
 
 /* Global variables */
-
-// Overlay data
-#define OVERLAYNUMBER       4           // Number of overlays
-#define OVERLAYSIZE         0x1400      // Overlay size (align with config)
-#define OVERLAYLOAD         0xAC00      // Overlay load address (align with config=0xC000-OVERLAYSIZE)
-extern unsigned int overlaydata[4];
-extern unsigned char overlay_active;
-
-//Window data
-struct WindowStruct
-{
-    unsigned int address;
-    unsigned char ypos;
-    unsigned char height;
-};
-extern struct WindowStruct Window[9];
-extern unsigned int windowaddress;
-extern unsigned char windownumber;
-
-//Menu data
-extern unsigned char menubaroptions;
-extern unsigned char pulldownmenunumber;
-extern char menubartitles[4][12];
-extern unsigned char menubarcoords[4];
-extern unsigned char pulldownmenuoptions[5];
-extern char pulldownmenutitles[5][6][16];
 
 // Global variables
 extern unsigned char charsetchanged[2];
@@ -88,7 +63,7 @@ extern unsigned char palettechar;
 extern unsigned char visualmap;
 extern unsigned char favourites[10];
 extern char buffer[81];
-extern char version[22];
+extern char version[23];
 extern char pathbuffer[256];
 extern char homedir[256];
 

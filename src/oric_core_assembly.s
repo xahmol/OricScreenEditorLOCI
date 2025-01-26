@@ -36,8 +36,8 @@
 ; Defines of system addresses
 ; ======================================================================
 
-ROM_ALTCHARS		=	$F816			; Kernal call to ROM generate alt chars
-ROM_COPYROUTINE		=	$F982			; Kernal call to ROM copy routine		
+ROM_ALTCHARS		=	$F816			; Kernel call to ROM generate alt chars
+ROM_COPYROUTINE		=	$F982			; Kernel call to ROM copy routine		
 
 ; ======================================================================
 ; Zero page reservations
@@ -105,7 +105,7 @@ _ORIC_HChar_core:
 	; Initialise paint horizontal line
 	ldy _ORIC_tmp2						; Set Y counter at number of chars
 	dey									; Decrease counter
-    lda _ORIC_tmp1                      ; Set charachter value
+    lda _ORIC_tmp1                      ; Set character value
 
 	; Paint loop
 loophchar1:
@@ -214,7 +214,7 @@ copyloopvp:								; Start of copy loop
 	lda (ZP1),Y							; Load source data
 	sta (ZP3),Y    						; Save at destination
 
-	; Decrese line counter
+	; Decrease line counter
 	dey									; Decrease line counter
 	cpy #$ff							; Check for last character
 	bne copyloopvp						; Continue loop if not yet last char
@@ -301,7 +301,7 @@ Store_address_pointers:
 
 ; ------------------------------------------------------------------------------------------
 _ORIC_Scroll_right_core:
-; Function to scroll text screen 1 charachter to the right, no fill
+; Function to scroll text screen 1 character to the right, no fill
 ; Input:	ORIC_addrh = high byte of source address
 ;			ORIC_addrl = low byte of source address
 ;			ORIC_tmp1 = number of lines to copy
@@ -320,7 +320,7 @@ loop_sr_outer:
 loop_sr_inner:
 	lda (ZP1),y							; Load byte
 	iny									; Increase index
-	sta (ZP1),Y							; Save byte at adress plus 1
+	sta (ZP1),Y							; Save byte at address plus 1
 	dey									; Decrease index again
 	dey									; Decrease index again
 	cpy #$ff							; Check for last char
@@ -336,7 +336,7 @@ loop_sr_inner:
 
 ; ------------------------------------------------------------------------------------------
 _ORIC_Scroll_left_core:
-; Function to scroll text screen 1 charachter to the left, no fill
+; Function to scroll text screen 1 character to the left, no fill
 ; Input:	ORIC_addrh = high byte of source address
 ;			ORIC_addrl = low byte of source address
 ;			ORIC_tmp1 = number of lines to copy
@@ -352,7 +352,7 @@ loop_sl_outer:
 loop_sl_inner:
 	lda (ZP1),y							; Load byte
 	dey									; Decrease index
-	sta (ZP1),Y							; Save byte at adress minus 1
+	sta (ZP1),Y							; Save byte at address minus 1
 	iny									; Increase again
 	iny									; Increase again
 	cpy _ORIC_tmp2						; Compare with width to check for last char in line
@@ -386,7 +386,7 @@ loop_cl_inner:
 
 ; ------------------------------------------------------------------------------------------
 _ORIC_Scroll_down_core:
-; Function to scroll text screen 1 charachter down, no fill
+; Function to scroll text screen 1 character down, no fill
 ; Input:	ORIC_addrh = high byte of source address
 ;			ORIC_addrl = low byte of source address
 ;			ORIC_tmp1 = number of lines to copy
@@ -418,7 +418,7 @@ loop_sd:
 
 ; ------------------------------------------------------------------------------------------
 _ORIC_Scroll_up_core:
-; Function to scroll text screen 1 charachter up, no fill
+; Function to scroll text screen 1 character up, no fill
 ; Input:	ORIC_addrh = high byte of source address
 ;			ORIC_addrl = low byte of source address
 ;			ORIC_tmp1 = number of lines to copy
