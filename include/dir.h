@@ -72,5 +72,6 @@ void dir_last_of_page();
 void dir_gotoroot();
 void dir_parentdir();
 void dir_togglesort();
+unsigned char dir_browse(unsigned char filter);
 
 #endif // __DIR_H_

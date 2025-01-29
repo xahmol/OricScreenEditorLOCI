@@ -64,18 +64,22 @@ BUT WITHOUT ANY WARRANTY. USE THEM AT YOUR OWN RISK!
 #include "loci.h"
 #include "generic.h"
 #include "menu.h"
-#include "screen.h"	
+#include "screen.h"
 #include "dir.h"
 #include "file.h"
 
 // File operation menu functions
 
-int filepickerfromdir(char* headertext)
+unsigned char filepickerfromdir(char *headertext, unsigned char filter)
+// Pick a file or a directory with the directory browser
 {
-    
+    windownew(1, 2, 24, 38, 1);
+    cputsxy(3, 3, headertext);
+    loadoverlay(3);
+    return dir_browse(filter);
 }
 
-int choosedirandfilename(char *headertext, unsigned char maxlen, unsigned char validation)
+unsigned char choosedirandfilename(char *headertext, unsigned char maxlen, unsigned char validation)
 {
     // Function to present dialogue to enter device id and filename
     // Input: Headertext to print, maximum length of filename input string
@@ -108,7 +112,7 @@ void loadscreenmap(unsigned char combined)
     // int len = 0;
     int address = (combined) ? CHARSET_STD : SCREENMAPBASE;
 
-    escapeflag = filepickerfromdir("Load screen");
+    escapeflag = filepickerfromdir("Load screen", 0);
     // escapeflag = choosedirandfilename("Load screen",9,3);
 
     if (escapeflag == -1)
@@ -291,7 +295,7 @@ void loadproject()
     unsigned char projbuffer[19];
     int escapeflag;
 
-    escapeflag = filepickerfromdir("Load project");
+    escapeflag = filepickerfromdir("Load project", 4);
 
     windowrestore(0);
 
@@ -383,7 +387,7 @@ void loadcharset(unsigned char stdoralt)
     // int rc;
     // int len = 0;
 
-    escapeflag = filepickerfromdir("Load character set");
+    escapeflag = filepickerfromdir("Load character set", 0);
 
     windowrestore(0);
 

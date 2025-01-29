@@ -64,7 +64,7 @@ BUT WITHOUT ANY WARRANTY. USE THEM AT YOUR OWN RISK!
 #include "loci.h"
 #include "generic.h"
 #include "menu.h"
-#include "screen.h"	
+#include "screen.h"
 #include "dir.h"
 #include "file.h"
 
@@ -868,4 +868,129 @@ void dir_togglesort()
 {
     sort = !sort;
     dir_draw(1);
+}
+
+unsigned char dir_browse(unsigned char filter)
+// Browse directory
+// Input: filter for which filetype to filter on
+// Output:  pathname in patthbuffer
+//          0 = no file selected
+//          1 = file selected
+{
+    unsigned char done = 0;
+    unsigned char key;
+
+    // Draw directory
+    dir_draw(1);
+
+    // Browse loop
+    do
+    {
+        present = presentdir.present;
+        if (present)
+        {
+            dir_get_element(present);
+        }
+
+        key = getkey(ijk_present,0);
+
+        switch (key)
+        {
+        case CH_CURS_RIGHT:
+        case 's':
+            // Select dir if filter is on type dir and entry is a dir
+            if (filter == 1 && presentdir.firstelement && presentdirelement.meta.type == 1)
+            {
+                strncpy(pathbuffer, presentdir.path, sizeof(pathbuffer));
+                strncat(pathbuffer, presentdirelement.name, sizeof(pathbuffer) - strlen(pathbuffer));
+                strncpy(presentdir.path, pathbuffer, sizeof(presentdir.path));
+                done = 1;
+            }
+            break;
+
+        case CH_ENTER:
+            // Return: Go to dir if entry is a dir
+            if (presentdir.firstelement && presentdirelement.meta.type == 1)
+            {
+                strncpy(pathbuffer, presentdir.path, sizeof(pathbuffer));
+                strncat(pathbuffer, presentdirelement.name, sizeof(pathbuffer) - strlen(pathbuffer));
+                strncpy(presentdir.path, pathbuffer, sizeof(presentdir.path));
+                dir_draw(1);
+            }
+            else
+            {
+                // Return: select file
+                strncpy(pathbuffer, presentdir.path, sizeof(pathbuffer));
+                strncat(pathbuffer, presentdirelement.name, sizeof(pathbuffer) - strlen(pathbuffer));
+                strncpy(presentdir.path, pathbuffer, sizeof(presentdir.path));
+                done = 1;
+            }
+            break;
+
+        case CH_ESC:
+            // Escape: Cancel
+            done = 2;
+            break;
+
+        case '.':
+            // .: Next drive for active pane
+            dir_get_next_drive();
+            break;
+
+        case ',':
+            // ,: Previous drive for active pane
+            dir_get_prev_drive();
+            break;
+
+        case '\\':
+            // \: Go to root
+            dir_gotoroot();
+            break;
+
+        case CH_CURS_LEFT:
+            // Curs Left: Go to parent directory
+            dir_parentdir();
+            break;
+
+        case CH_CURS_DOWN:
+            // Curs Down: Scroll down
+            dir_go_down();
+            break;
+
+        case CH_CURS_UP:
+            // Curs Up: Scroll up
+            dir_go_up();
+            break;
+
+        case 'd':
+            // d: Page down
+            dir_pagedown();
+            break;
+
+        case 'p':
+            // p: Page up
+            dir_pageup();
+            break;
+
+        case 't':
+            // t: Go to top
+            dir_top();
+            break;
+
+        case 'b':
+            // b: Go to bottom
+            dir_bottom();
+            break;
+
+        case 'o':
+            // o: Toggle sort
+            dir_togglesort();
+            break;
+
+        default:
+            break;
+        }
+    } while (!done);
+
+    return (done==2)?0:1;
 }

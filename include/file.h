@@ -2,8 +2,8 @@
 #define __FILE_H_
 
 // Function prototypes
-int filepickerfromdir(char* headertext);
-int choosedirandfilename(char *headertext, unsigned char maxlen, unsigned char validation);
+unsigned char filepickerfromdir(char *headertext, unsigned char filter);
+unsigned char choosedirandfilename(char *headertext, unsigned char maxlen, unsigned char validation);
 void loadscreenmap(unsigned char combined);
 void savescreenmap(unsigned char combined);
 void saveproject();

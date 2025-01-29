@@ -58,7 +58,7 @@ EMUARG                  += --vsynchack off
 EMUARG                  += --turbotape on
 
 ## C Sources and library objects to use
-SOURCES = src/main.c src/oric_core.c src/generic.c src/menu.c src/screen.c src/draw.c src/menufunctions.c src/dir.c src/file.c src/palette.c src/charedit.c
+SOURCES = src/main.c src/oric_core.c src/generic.c src/menu.c src/screen.c src/draw.c src/menufunctions.c src/dir.c src/file.c src/palette.c src/charedit.c src/colorpicker.c
 ASSOBJECTS = src/oric_core_assembly.s src/tapehdr.s
 LSOURCES = $(wildcard libsrc/*.c)
 LASOURCES = $(wildcard libsrc/*.s)

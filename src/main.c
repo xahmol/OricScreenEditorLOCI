@@ -69,6 +69,7 @@ BUT WITHOUT ANY WARRANTY. USE THEM AT YOUR OWN RISK!
 #include "file.h"
 #include "charedit.h"
 #include "palette.h"
+#include "colorpicker.h"
 #include "draw.h"
 #include "menufunctions.h"
 
@@ -260,6 +261,9 @@ void main()
 
     // Initialise LOCI and joystick
     get_locicfg();
+    ijk_detect();
+
+    // Get home directory
     getcwd_loci(homedir, 255);
     if (strlen(homedir) > 230)
     {
@@ -267,7 +271,10 @@ void main()
         getkey(ijk_present, 1);
         ORIC_Exit();
     }
-    ijk_detect();
+
+    // Set homedir as default dir for browser
+    strncpy(presentdir.path, homedir, 256);
+    presentdir.drive = homedir[0] - '0';
 
     // Print loading message
     printcentered("Loading titlescreen.", 10, 26, 20);
@@ -399,7 +406,13 @@ void main()
             }
             break;
 
-            // Toggle blink
+        // Color picker
+        case 'c':
+            loadoverlay(2);
+            colourpicker();
+            break;
+
+        // Toggle blink
         case 'b':
             plotblink = (plotblink == 0) ? 1 : 0;
             break;
