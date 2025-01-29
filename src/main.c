@@ -142,7 +142,7 @@ void mainmenuloop()
         case 14:
             ORIC_ScreenmapFill(SCREENMAPBASE, screenwidth, screenheight, plotink, plotpaper, (menuchoice == 13) ? CH_SPACE : plotscreencode);
             windowrestore(0);
-            ORIC_CopyViewPort(SCREENMAPBASE, screenwidth, xoffset, yoffset, 0, 0, 40, 27);
+            ORIC_CopyViewPort(SCREENMAPBASE, screenwidth, xoffset, yoffset, 0, 0, 40, 28);
             windowsave(0, 1, 0);
             menuplacebar();
             if (showbar)
@@ -234,7 +234,7 @@ void main()
     xoffset = 0;
     yoffset = 0;
     screenwidth = 40;
-    screenheight = 27;
+    screenheight = 28;
     screentotal = screenwidth * screenheight;
     plotscreencode = 33;
     plotink = A_FWWHITE;
@@ -277,7 +277,7 @@ void main()
     presentdir.drive = homedir[0] - '0';
 
     // Print loading message
-    printcentered("Loading titlescreen.", 10, 26, 20);
+    printcentered("Loading titlescreen.", 10, 27, 20);
 
     // Load and show title screen
     strncpy(pathbuffer, homedir, 255);
@@ -300,7 +300,7 @@ void main()
     disable_overlay_ram();
 
     // Wait for key press to start application
-    printcentered("Press key.", 10, 26, 20);
+    printcentered("Press key.", 10, 27, 20);
 
     getkey(ijk_present, 1);
 

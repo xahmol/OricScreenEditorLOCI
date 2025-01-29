@@ -161,7 +161,7 @@ void loadscreenmap(unsigned char combined)
             charset_swap(0);
         }
         //}
-        ORIC_CopyViewPort(SCREENMAPBASE, screenwidth, xoffset, yoffset, 0, 0, 40, 27);
+        ORIC_CopyViewPort(SCREENMAPBASE, screenwidth, xoffset, yoffset, 0, 0, 40, 28);
         windowsave(0, 1, 0);
         menuplacebar();
         if (showbar)
@@ -191,7 +191,7 @@ void savescreenmap(unsigned char combined)
     if (combined)
     {
         windowrestore(0);
-        ORIC_CopyViewPort(SCREENMAPBASE, screenwidth, xoffset, yoffset, 0, 0, 40, 27);
+        ORIC_CopyViewPort(SCREENMAPBASE, screenwidth, xoffset, yoffset, 0, 0, 40, 28);
         charset_swap(1);
         len += 1664;
     }
@@ -347,7 +347,7 @@ void loadproject()
     // if(len)
     //{
     windowrestore(0);
-    ORIC_CopyViewPort(SCREENMAPBASE, screenwidth, xoffset, yoffset, 0, 0, 40, 27);
+    ORIC_CopyViewPort(SCREENMAPBASE, screenwidth, xoffset, yoffset, 0, 0, 40, 28);
     windowsave(0, 1, 0);
     menuplacebar();
     if (showbar)

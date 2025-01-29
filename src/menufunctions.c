@@ -150,7 +150,7 @@ void resizewidth()
         screenwidth = newwidth;
         screentotal = screenwidth * screenheight;
         xoffset = 0;
-        ORIC_CopyViewPort(SCREENMAPBASE, screenwidth, xoffset, yoffset, 0, 0, 40, 27);
+        ORIC_CopyViewPort(SCREENMAPBASE, screenwidth, xoffset, yoffset, 0, 0, 40, 28);
         sprintf(pulldownmenutitles[0][0], "Width:   %5i ", screenwidth);
         menuplacebar();
         if (showbar)
@@ -181,7 +181,7 @@ void resizeheight()
     textInput(4, 9, 4, buffer, 4, 1);
     newheight = (unsigned int)strtol(buffer, &ptrend, 10);
 
-    if ((newheight * screenwidth) > maxsize || newheight < 27)
+    if ((newheight * screenwidth) > maxsize || newheight < 28)
     {
         cputsxy(4, 11, "New size unsupported. press key.");
         getkey(ijk_present, 0);
@@ -225,7 +225,7 @@ void resizeheight()
         screenheight = newheight;
         screentotal = screenwidth * screenheight;
         yoffset = 0;
-        ORIC_CopyViewPort(SCREENMAPBASE, screenwidth, xoffset, yoffset, 0, 0, 40, 27);
+        ORIC_CopyViewPort(SCREENMAPBASE, screenwidth, xoffset, yoffset, 0, 0, 40, 28);
         sprintf(pulldownmenutitles[0][1], "Height:  %5i ", screenheight);
         menuplacebar();
         if (showbar)
