@@ -73,13 +73,13 @@ void printstatusbar()
 {
     unsigned char val;
 
-    if (screen_row == 27)
+    if (screen_row == 26)
     {
         return;
     }
 
     sprintf(buffer, "%-10s", programmode);
-    cputsxy(2, 27, buffer);
+    cputsxy(2, 26, buffer);
     if (screenwidth > 99 || screenheight > 99)
     {
         sprintf(buffer, "%2x,%2x", screen_col + xoffset, screen_row + yoffset);
@@ -88,76 +88,76 @@ void printstatusbar()
     {
         sprintf(buffer, "%2u,%2u", screen_col + xoffset, screen_row + yoffset);
     }
-    cputsxy(14, 27, buffer);
+    cputsxy(14, 26, buffer);
     sprintf(buffer, "%2x", plotscreencode);
-    cputsxy(21, 27, buffer);
-    cputcxy(23, 27, plotscreencode);
+    cputsxy(21, 26, buffer);
+    cputcxy(23, 26, plotscreencode);
     enable_overlay_ram();
     val = PEEK(screenmap_screenaddr(screen_row + yoffset, screen_col + xoffset, screenwidth));
     disable_overlay_ram();
     sprintf(buffer, "%2x", val);
-    cputsxy(26, 27, buffer);
+    cputsxy(26, 26, buffer);
     sprintf(buffer, "%1u", plotink);
-    cputsxy(30, 27, buffer);
+    cputsxy(30, 26, buffer);
     cputc(16 + plotink);
     cputc(A_BGWHITE);
     sprintf(buffer, "%1u", plotpaper);
-    cputsxy(34, 27, buffer);
+    cputsxy(34, 26, buffer);
     cputc(16 + plotpaper);
     cputc(A_BGWHITE);
     if (plotaltchar)
     {
-        cputsxy(37, 27, "A");
+        cputsxy(37, 26, "A");
     }
     else
     {
-        cputsxy(37, 27, "S");
+        cputsxy(37, 26, "S");
     }
     if (plotdouble)
     {
-        cputsxy(38, 27, "D");
+        cputsxy(38, 26, "D");
     }
     else
     {
-        cputsxy(38, 27, " ");
+        cputsxy(38, 26, " ");
     }
     if (plotblink)
     {
-        cputsxy(39, 27, "B");
+        cputsxy(39, 26, "B");
     }
     else
     {
-        cputsxy(39, 27, " ");
+        cputsxy(39, 26, " ");
     }
 }
 
 void initstatusbar()
 {
-    if (screen_row == 27)
+    if (screen_row == 26)
     {
         return;
     }
 
-    gotoxy(0, 27);
+    gotoxy(0, 26);
     cputc(A_FWBLACK);
     cputc(A_BGWHITE);
-    ORIC_FillArea(27, 2, CH_SPACE, 38, 1);
-    cputsxy(12, 27, "XY");
-    cputsxy(20, 27, "C");
-    cputsxy(25, 27, "S");
-    cputsxy(29, 27, "I");
-    cputsxy(33, 27, "P");
+    ORIC_FillArea(26, 2, CH_SPACE, 38, 1);
+    cputsxy(12, 26, "XY");
+    cputsxy(20, 26, "C");
+    cputsxy(25, 26, "S");
+    cputsxy(29, 26, "I");
+    cputsxy(33, 26, "P");
     printstatusbar();
 }
 
 void hidestatusbar()
 {
-    ORIC_CopyViewPort(SCREENMAPBASE, screenwidth, xoffset, yoffset + 27, 0, 27, 40, 1);
+    ORIC_CopyViewPort(SCREENMAPBASE, screenwidth, xoffset, yoffset + 26, 0, 26, 40, 1);
 }
 
 void togglestatusbar()
 {
-    if (screen_row == 27)
+    if (screen_row == 26)
     {
         return;
     }
@@ -233,7 +233,7 @@ void cursormove(unsigned char left, unsigned char right, unsigned char up, unsig
         else
         {
             screen_row--;
-            if (showbar && screen_row == 26)
+            if (showbar && screen_row == 25)
             {
                 initstatusbar();
             }
@@ -241,11 +241,11 @@ void cursormove(unsigned char left, unsigned char right, unsigned char up, unsig
     }
     if (down == 1)
     {
-        if (screen_row == 26)
+        if (screen_row == 25)
         {
             hidestatusbar();
         }
-        if (screen_row == 27)
+        if (screen_row == 26)
         {
             if (yoffset + screen_row < screenheight - 1)
             {
@@ -325,7 +325,7 @@ void helpscreen_load(unsigned char screennumber)
     getkey(ijk_present, 1);
 
     // Restore screen
-    ORIC_CopyViewPort(SCREENMAPBASE, screenwidth, xoffset, yoffset, 0, 0, 40, 28);
+    ORIC_CopyViewPort(SCREENMAPBASE, screenwidth, xoffset, yoffset, 0, 0, 40, 27);
     if (showbar)
     {
         initstatusbar();

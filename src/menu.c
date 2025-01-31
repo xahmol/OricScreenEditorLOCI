@@ -80,7 +80,7 @@ unsigned char menubarcoords[4] = {2, 9, 14, 22};
 unsigned char pulldownmenuoptions[5] = {4, 6, 6, 2, 2};
 char pulldownmenutitles[5][6][16] = {
     {"Width:      40 ",
-     "Height:     28 ",
+     "Height:     27 ",
      "Clear          ",
      "Fill           "},
     {"Save screen    ",

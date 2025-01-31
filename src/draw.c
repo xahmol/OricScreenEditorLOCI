@@ -247,7 +247,7 @@ void plotvisible(unsigned char row, unsigned char col, unsigned char setorrestor
 
     unsigned char val;
 
-    if (row >= yoffset && row <= yoffset + 27 && col >= xoffset && col <= xoffset + 39)
+    if (row >= yoffset && row <= yoffset + 26 && col >= xoffset && col <= xoffset + 39)
     {
         if (setorrestore == 1)
         {
@@ -404,7 +404,7 @@ void lineandbox(unsigned char draworselect)
             memset((void *)screenmap_screenaddr(y, select_startx, screenwidth), plotscreencode, select_width);
         }
         disable_overlay_ram();
-        ORIC_CopyViewPort(SCREENMAPBASE, screenwidth, xoffset, yoffset, 0, 0, 40, 28);
+        ORIC_CopyViewPort(SCREENMAPBASE, screenwidth, xoffset, yoffset, 0, 0, 40, 27);
         if (showbar)
         {
             initstatusbar();
@@ -413,7 +413,7 @@ void lineandbox(unsigned char draworselect)
     }
     else
     {
-        ORIC_CopyViewPort(SCREENMAPBASE, screenwidth, xoffset, yoffset, 0, 0, 40, 28);
+        ORIC_CopyViewPort(SCREENMAPBASE, screenwidth, xoffset, yoffset, 0, 0, 40, 27);
         if (showbar)
         {
             initstatusbar();
@@ -458,25 +458,25 @@ void movemode()
         switch (key)
         {
         case CH_CURS_RIGHT:
-            ORIC_ScrollMove(0, 0, 40, 28, 2, 1);
-            ORIC_VChar(0, 0, CH_SPACE, 28);
+            ORIC_ScrollMove(0, 0, 40, 27, 2, 1);
+            ORIC_VChar(0, 0, CH_SPACE, 27);
             moved = 1;
             break;
 
         case CH_CURS_LEFT:
-            ORIC_ScrollMove(0, 0, 40, 28, 1, 1);
-            ORIC_VChar(0, 39, CH_SPACE, 28);
+            ORIC_ScrollMove(0, 0, 40, 27, 1, 1);
+            ORIC_VChar(0, 39, CH_SPACE, 27);
             moved = 1;
             break;
 
         case CH_CURS_UP:
-            ORIC_ScrollMove(0, 0, 40, 28, 8, 1);
+            ORIC_ScrollMove(0, 0, 40, 27, 8, 1);
             ORIC_HChar(24, 0, CH_SPACE, 40);
             moved = 1;
             break;
 
         case CH_CURS_DOWN:
-            ORIC_ScrollMove(0, 0, 40, 28, 4, 1);
+            ORIC_ScrollMove(0, 0, 40, 27, 4, 1);
             ORIC_HChar(0, 0, CH_SPACE, 40);
             moved = 1;
             break;
@@ -501,7 +501,7 @@ void movemode()
                 disable_overlay_ram();
             }
         }
-        ORIC_CopyViewPort(SCREENMAPBASE, screenwidth, xoffset, yoffset, 0, 0, 40, 28);
+        ORIC_CopyViewPort(SCREENMAPBASE, screenwidth, xoffset, yoffset, 0, 0, 40, 27);
         if (showbar)
         {
             initstatusbar();
@@ -662,7 +662,7 @@ void selectmode()
             }
         }
 
-        ORIC_CopyViewPort(SCREENMAPBASE, screenwidth, xoffset, yoffset, 0, 0, 40, 28);
+        ORIC_CopyViewPort(SCREENMAPBASE, screenwidth, xoffset, yoffset, 0, 0, 40, 27);
         if (showbar)
         {
             initstatusbar();
