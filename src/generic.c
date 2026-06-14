@@ -82,6 +82,16 @@ void wait(unsigned int wait_cycles)
         ;
 }
 
+void debugprint(char *text)
+// Function to print debug text to screen
+// Input: text = text to print
+{
+    gotoxy(2, 1);
+    cclear(39);
+    cputs(text);
+    cgetc();
+}
+
 // Overlay functions
 void loadoverlay(unsigned char overlay_select)
 {

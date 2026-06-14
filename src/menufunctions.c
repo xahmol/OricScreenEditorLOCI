@@ -85,7 +85,7 @@ void resizewidth()
 {
     // Function to resize screen canvas width
 
-    unsigned int newwidth = screenwidth;
+    unsigned int newwidth = cfg.screenwidth;
     unsigned int maxsize = MEMORYLIMIT - SCREENMAPBASE;
     unsigned char areyousure = 0;
     unsigned char sizechanged = 0;
@@ -97,46 +97,46 @@ void resizewidth()
     cputsxy(4, 6, "Resize canvas width");
     cputsxy(4, 8, "Enter new width:");
 
-    sprintf(buffer, "%i", screenwidth);
+    sprintf(buffer, "%i", cfg.screenwidth);
     textInput(4, 9, 4, buffer, 4, 1);
     newwidth = (unsigned int)strtol(buffer, &ptrend, 10);
 
-    if ((newwidth * screenheight) > maxsize || newwidth < 40)
+    if ((newwidth * cfg.screenheight) > maxsize || newwidth < 40)
     {
         cputsxy(4, 11, "New size unsupported. Press key.");
         getkey(ijk_present, 0);
     }
     else
     {
-        if (newwidth < screenwidth)
+        if (newwidth < cfg.screenwidth)
         {
             cputsxy(4, 11, "Shrinking might delete data.");
             cputsxy(4, 12, "Are you sure?");
             areyousure = menupulldown(20, 13, 5, 0);
             if (areyousure == 1)
             {
-                for (y = 0; y < screenheight; y++)
+                for (y = 0; y < cfg.screenheight; y++)
                 {
                     enable_overlay_ram();
-                    memcpy((void *)SCREENMEMORY, (void *)screenmap_screenaddr(y, 0, screenwidth), newwidth);
+                    memcpy((void *)SCREENMEMORY, (void *)screenmap_screenaddr(y, 0, cfg.screenwidth), newwidth);
                     memcpy((void *)screenmap_screenaddr(y, 0, newwidth), (void *)SCREENMEMORY, newwidth);
                     disable_overlay_ram();
                 }
-                if (screen_col > newwidth - 1)
+                if (cfg.screen_col > newwidth - 1)
                 {
-                    screen_col = newwidth - 1;
+                    cfg.screen_col = newwidth - 1;
                 }
                 sizechanged = 1;
             }
         }
-        if (newwidth > screenwidth)
+        if (newwidth > cfg.screenwidth)
         {
-            for (y = 0; y < screenheight; y++)
+            for (y = 0; y < cfg.screenheight; y++)
             {
                 enable_overlay_ram();
-                memcpy((void *)SCREENMEMORY, (void *)screenmap_screenaddr(screenheight - y - 1, 0, screenwidth), screenwidth);
-                memcpy((void *)screenmap_screenaddr(screenheight - y - 1, 0, newwidth), (void *)SCREENMEMORY, screenwidth);
-                memset((void *)screenmap_screenaddr(screenheight - y - 1, screenwidth, newwidth), CH_SPACE, newwidth - screenwidth);
+                memcpy((void *)SCREENMEMORY, (void *)screenmap_screenaddr(cfg.screenheight - y - 1, 0, cfg.screenwidth), cfg.screenwidth);
+                memcpy((void *)screenmap_screenaddr(cfg.screenheight - y - 1, 0, newwidth), (void *)SCREENMEMORY, cfg.screenwidth);
+                memset((void *)screenmap_screenaddr(cfg.screenheight - y - 1, cfg.screenwidth, newwidth), CH_SPACE, newwidth - cfg.screenwidth);
                 disable_overlay_ram();
             }
             sizechanged = 1;
@@ -147,17 +147,17 @@ void resizewidth()
 
     if (sizechanged == 1)
     {
-        screenwidth = newwidth;
-        screentotal = screenwidth * screenheight;
-        xoffset = 0;
-        ORIC_CopyViewPort(SCREENMAPBASE, screenwidth, xoffset, yoffset, 0, 0, 40, 27);
-        sprintf(pulldownmenutitles[0][0], "Width:   %5i ", screenwidth);
+        cfg.screenwidth = newwidth;
+        cfg.screentotal = cfg.screenwidth * cfg.screenheight;
+        cfg.xoffset = 0;
+        ORIC_CopyViewPort(SCREENMAPBASE, cfg.screenwidth, cfg.xoffset, cfg.yoffset, 0, 0, 40, 27);
+        sprintf(pulldownmenutitles[0][0], "Width:   %5i ", cfg.screenwidth);
         menuplacebar();
-        if (showbar)
+        if (cfg.showbar)
         {
             initstatusbar();
         }
-        cputcxy(screen_col, screen_row, plotscreencode + 128);
+        cputcxy(cfg.screen_col, cfg.screen_row, cfg.plotscreencode + 128);
     }
 }
 
@@ -165,7 +165,7 @@ void resizeheight()
 {
     // Function to resize screen camvas height
 
-    unsigned int newheight = screenheight;
+    unsigned int newheight = cfg.screenheight;
     unsigned int maxsize = MEMORYLIMIT - SCREENMAPBASE;
     unsigned char areyousure = 0;
     unsigned char sizechanged = 0;
@@ -177,18 +177,18 @@ void resizeheight()
     cputsxy(4, 6, "Resize canvas height");
     cputsxy(4, 8, "Enter new height:");
 
-    sprintf(buffer, "%i", screenheight);
+    sprintf(buffer, "%i", cfg.screenheight);
     textInput(4, 9, 4, buffer, 4, 1);
     newheight = (unsigned int)strtol(buffer, &ptrend, 10);
 
-    if ((newheight * screenwidth) > maxsize || newheight < 27)
+    if ((newheight * cfg.screenwidth) > maxsize || newheight < 27)
     {
         cputsxy(4, 11, "New size unsupported. press key.");
         getkey(ijk_present, 0);
     }
     else
     {
-        if (newheight < screenheight)
+        if (newheight < cfg.screenheight)
         {
             cputsxy(4, 11, "Shrinking might delete data.");
             cputsxy(4, 12, "Are you sure?");
@@ -196,23 +196,23 @@ void resizeheight()
             if (areyousure == 1)
             {
                 enable_overlay_ram();
-                memcpy((void *)screenmap_screenaddr(0, 0, screenwidth), (void *)screenmap_screenaddr(0, 0, screenwidth), screenheight * screenwidth);
+                memcpy((void *)screenmap_screenaddr(0, 0, cfg.screenwidth), (void *)screenmap_screenaddr(0, 0, cfg.screenwidth), cfg.screenheight * cfg.screenwidth);
                 disable_overlay_ram();
-                if (screen_row > newheight - 1)
+                if (cfg.screen_row > newheight - 1)
                 {
-                    screen_row = newheight - 1;
+                    cfg.screen_row = newheight - 1;
                 }
                 sizechanged = 1;
             }
         }
-        if (newheight > screenheight)
+        if (newheight > cfg.screenheight)
         {
             enable_overlay_ram();
-            for (y = 0; y < screenheight; y++)
+            for (y = 0; y < cfg.screenheight; y++)
             {
-                memcpy((void *)screenmap_screenaddr(screenheight - y - 1, 0, screenwidth), (void *)screenmap_screenaddr(screenheight - y - 1, 0, screenwidth), screenwidth);
+                memcpy((void *)screenmap_screenaddr(cfg.screenheight - y - 1, 0, cfg.screenwidth), (void *)screenmap_screenaddr(cfg.screenheight - y - 1, 0, cfg.screenwidth), cfg.screenwidth);
             }
-            memset((void *)screenmap_screenaddr(screenheight, 0, screenwidth), CH_SPACE, (newheight - screenheight) * screenwidth);
+            memset((void *)screenmap_screenaddr(cfg.screenheight, 0, cfg.screenwidth), CH_SPACE, (newheight - cfg.screenheight) * cfg.screenwidth);
             disable_overlay_ram();
             sizechanged = 1;
         }
@@ -222,17 +222,17 @@ void resizeheight()
 
     if (sizechanged == 1)
     {
-        screenheight = newheight;
-        screentotal = screenwidth * screenheight;
-        yoffset = 0;
-        ORIC_CopyViewPort(SCREENMAPBASE, screenwidth, xoffset, yoffset, 0, 0, 40, 27);
-        sprintf(pulldownmenutitles[0][1], "Height:  %5i ", screenheight);
+        cfg.screenheight = newheight;
+        cfg.screentotal = cfg.screenwidth * cfg.screenheight;
+        cfg.yoffset = 0;
+        ORIC_CopyViewPort(SCREENMAPBASE, cfg.screenwidth, cfg.xoffset, cfg.yoffset, 0, 0, 40, 27);
+        sprintf(pulldownmenutitles[0][1], "Height:  %5i ", cfg.screenheight);
         menuplacebar();
-        if (showbar)
+        if (cfg.showbar)
         {
             initstatusbar();
         }
-        cputcxy(screen_col, screen_row, plotscreencode + 128);
+        cputcxy(cfg.screen_col, cfg.screen_row, cfg.plotscreencode + 128);
     }
 }
 
@@ -242,7 +242,7 @@ void versioninfo()
     cputsxy(4, 6, "Version information and credits");
     cputsxy(4, 8, "ORIC Screen Editor");
     cputsxy(4, 9, "Written in 2022 by Xander Mol");
-    sprintf(buffer, "version: %s", version);
+    sprintf(buffer, "version: %s", cfg.version);
     cputsxy(4, 11, buffer);
     cputsxy(4, 13, "Source, docs and credits at:");
     cputsxy(4, 14, "github.com/xahmol/OricScreenEditor");

@@ -74,36 +74,14 @@ BUT WITHOUT ANY WARRANTY. USE THEM AT YOUR OWN RISK!
 #include "menufunctions.h"
 
 // Global variables
-unsigned char charsetchanged[2];
+struct APPCFG cfg;
 unsigned char appexit;
-char filename[8];
 char programmode[11];
-unsigned char showbar;
-
-unsigned char screen_col;
-unsigned char screen_row;
-unsigned int xoffset;
-unsigned int yoffset;
-unsigned int screenwidth;
-unsigned int screenheight;
-unsigned int screentotal;
-unsigned char plotscreencode;
-unsigned char plotink;
-unsigned char plotpaper;
-unsigned char plotblink;
-unsigned char plotdouble;
-unsigned char plotaltchar;
 unsigned int select_startx, select_starty, select_endx, select_endy, select_width, select_height, select_accept;
-unsigned char rowsel = 0;
-unsigned char colsel = 0;
-unsigned char palettechar;
-unsigned char visualmap = 0;
-unsigned char favourites[10] = {33, 33, 33, 33, 33, 33, 33, 33, 33, 33};
-
 char buffer[81];
-char version[23];
 char pathbuffer[256];
 char homedir[256];
+char filename[64] = "";
 
 // Visual charset data
 unsigned char visualchar[80] =
@@ -140,12 +118,12 @@ void mainmenuloop()
 
         case 13:
         case 14:
-            ORIC_ScreenmapFill(SCREENMAPBASE, screenwidth, screenheight, plotink, plotpaper, (menuchoice == 13) ? CH_SPACE : plotscreencode);
+            ORIC_ScreenmapFill(SCREENMAPBASE, cfg.screenwidth, cfg.screenheight, cfg.plotink, cfg.plotpaper, (menuchoice == 13) ? CH_SPACE : cfg.plotscreencode);
             windowrestore(0);
-            ORIC_CopyViewPort(SCREENMAPBASE, screenwidth, xoffset, yoffset, 0, 0, 40, 27);
+            ORIC_CopyViewPort(SCREENMAPBASE, cfg.screenwidth, cfg.xoffset, cfg.yoffset, 0, 0, 40, 27);
             windowsave(0, 1, 0);
             menuplacebar();
-            if (showbar)
+            if (cfg.showbar)
             {
                 initstatusbar();
             }
@@ -226,30 +204,24 @@ void main()
     int error;
 
     // Reset startvalues global variables
-    charsetchanged[0] = 0;
-    charsetchanged[1] = 0;
-    appexit = 0;
-    screen_col = 0;
-    screen_row = 0;
-    xoffset = 0;
-    yoffset = 0;
-    screenwidth = 40;
-    screenheight = 27;
-    screentotal = screenwidth * screenheight;
-    plotscreencode = 33;
-    plotink = A_FWWHITE;
-    plotpaper = A_FWBLACK;
-    plotblink = 0;
-    plotdouble = 0;
-    plotaltchar = 0;
+    memset(&cfg, 0, sizeof(cfg));
+    strcpy(cfg.identifier,"OSEL");
+    cfg.cfgversion = 1;
+    cfg.screenwidth = 40;
+    cfg.screenheight = 27;
+    cfg.screentotal = cfg.screenwidth * cfg.screenheight;
+    cfg.plotscreencode = 33;
+    cfg.plotink = A_FWWHITE;
+    cfg.plotpaper = A_FWBLACK;
+    cfg.plotblink = 0;
     sort = 0;
     filter = 0;
 
-    sprintf(pulldownmenutitles[0][0], "Width:   %5i ", screenwidth);
-    sprintf(pulldownmenutitles[0][1], "Height:  %5i ", screenheight);
+    sprintf(pulldownmenutitles[0][0], "Width:   %5i ", cfg.screenwidth);
+    sprintf(pulldownmenutitles[0][1], "Height:  %5i ", cfg.screenheight);
 
     // Set version number in string variable
-    sprintf(version,
+    sprintf(cfg.version,
             "v%u.%u.%u - %c%c%c%c%c%c%c%c-%c%c%c%c",
             VERSION_MAJOR, VERSION_MINOR, VERSION_PATCH,
             BUILD_YEAR_CH0, BUILD_YEAR_CH1, BUILD_YEAR_CH2, BUILD_YEAR_CH3, BUILD_MONTH_CH0, BUILD_MONTH_CH1, BUILD_DAY_CH0, BUILD_DAY_CH1, BUILD_HOUR_CH0, BUILD_HOUR_CH1, BUILD_MIN_CH0, BUILD_MIN_CH1);
@@ -277,7 +249,7 @@ void main()
     presentdir.drive = homedir[0] - '0';
 
     // Print loading message
-    printcentered("Loading titlescreen.", 10, 26, 20);
+    printcentered("Loading titlescreen.", 10, 27, 20);
 
     // Load and show title screen
     strncpy(pathbuffer, homedir, 255);
@@ -292,7 +264,7 @@ void main()
     loadoverlay(1);
 
     // Clear screen map in bank 1 with spaces in text color white
-    ORIC_ScreenmapFill(SCREENMAPBASE, screenwidth, screenheight, A_FWWHITE, A_FWBLACK, CH_SPACE);
+    ORIC_ScreenmapFill(SCREENMAPBASE, cfg.screenwidth, cfg.screenheight, A_FWWHITE, A_FWBLACK, CH_SPACE);
 
     // Initialise swap charset with system charset
     enable_overlay_ram();
@@ -300,7 +272,7 @@ void main()
     disable_overlay_ram();
 
     // Wait for key press to start application
-    printcentered("Press key.", 10, 26, 20);
+    printcentered("Press key.", 10, 27, 20);
 
     getkey(ijk_present, 1);
 
@@ -308,15 +280,15 @@ void main()
     clrscr();
 
     // Main program loop
-    cputcxy(screen_col, screen_row, plotscreencode + 128);
+    cputcxy(cfg.screen_col, cfg.screen_row, cfg.plotscreencode + 128);
     strcpy(programmode, "Main");
-    showbar = 1;
+    cfg.showbar = 1;
 
     initstatusbar();
 
     do
     {
-        if (showbar)
+        if (cfg.showbar)
         {
             printstatusbar();
         }
@@ -334,75 +306,75 @@ void main()
 
         // Increase screencode
         case '=':
-            if (plotscreencode == 127)
+            if (cfg.plotscreencode == 127)
             {
-                plotscreencode = 32;
+                cfg.plotscreencode = 32;
             }
             else
             {
-                plotscreencode++;
+                cfg.plotscreencode++;
             }
-            cputcxy(screen_col, screen_row, plotscreencode + 128);
+            cputcxy(cfg.screen_col, cfg.screen_row, cfg.plotscreencode + 128);
             break;
 
         // Decrease screencode
         case '-':
-            if (plotscreencode == 32)
+            if (cfg.plotscreencode == 32)
             {
-                plotscreencode = 127;
+                cfg.plotscreencode = 127;
             }
             else
             {
-                plotscreencode--;
+                cfg.plotscreencode--;
             }
-            cputcxy(screen_col, screen_row, plotscreencode + 128);
+            cputcxy(cfg.screen_col, cfg.screen_row, cfg.plotscreencode + 128);
             break;
 
         // Decrease ink
         case ',':
-            if (plotink == 0)
+            if (cfg.plotink == 0)
             {
-                plotink = 7;
+                cfg.plotink = 7;
             }
             else
             {
-                plotink--;
+                cfg.plotink--;
             }
             break;
 
         // Increase ink
         case '.':
-            if (plotink == 7)
+            if (cfg.plotink == 7)
             {
-                plotink = 0;
+                cfg.plotink = 0;
             }
             else
             {
-                plotink++;
+                cfg.plotink++;
             }
             break;
 
         // Decrease paper
         case ';':
-            if (plotpaper == 0)
+            if (cfg.plotpaper == 0)
             {
-                plotpaper = 7;
+                cfg.plotpaper = 7;
             }
             else
             {
-                plotpaper--;
+                cfg.plotpaper--;
             }
             break;
 
         // Increase paper
         case 39:
-            if (plotpaper == 7)
+            if (cfg.plotpaper == 7)
             {
-                plotpaper = 0;
+                cfg.plotpaper = 0;
             }
             else
             {
-                plotpaper++;
+                cfg.plotpaper++;
             }
             break;
 
@@ -414,17 +386,17 @@ void main()
 
         // Toggle blink
         case 'b':
-            plotblink = (plotblink == 0) ? 1 : 0;
+            cfg.plotblink = (cfg.plotblink == 0) ? 1 : 0;
             break;
 
         // Toggle alternate character set
         case 'a':
-            plotaltchar = (plotaltchar == 0) ? 1 : 0;
+            cfg.plotaltchar = (cfg.plotaltchar == 0) ? 1 : 0;
             break;
 
         // Toggle double
         case 'd':
-            plotdouble = (plotdouble == 0) ? 1 : 0;
+            cfg.plotdouble = (cfg.plotdouble == 0) ? 1 : 0;
             break;
 
         // Character edit mode
@@ -442,29 +414,29 @@ void main()
         // Grab underlying character and attributes
         case 'g':
             enable_overlay_ram();
-            grab = PEEK(screenmap_screenaddr(screen_row + yoffset, screen_col + xoffset, screenwidth));
+            grab = PEEK(screenmap_screenaddr(cfg.screen_row + cfg.yoffset, cfg.screen_col + cfg.xoffset, cfg.screenwidth));
             disable_overlay_ram();
             if (grab > 31)
             {
-                plotscreencode = grab;
-                cputcxy(screen_col, screen_row, plotscreencode + 128);
+                cfg.plotscreencode = grab;
+                cputcxy(cfg.screen_col, cfg.screen_row, cfg.plotscreencode + 128);
             }
             else
             {
                 if (grab < 8)
                 {
-                    plotink = grab;
+                    cfg.plotink = grab;
                 }
                 if (grab > 15)
                 {
-                    plotpaper = grab;
+                    cfg.plotpaper = grab;
                 }
                 if (grab > 7 && grab < 16)
                 {
                     grab -= 8;
-                    plotaltchar = grab & 1;
-                    plotdouble = grab & 2;
-                    plotblink = grab & 4;
+                    cfg.plotaltchar = grab & 1;
+                    cfg.plotdouble = grab & 2;
+                    cfg.plotblink = grab & 4;
                 }
             }
             break;
@@ -501,84 +473,84 @@ void main()
 
         // Increase/decrease plot screencode by 128 (toggle 'RVS ON' and 'RVS OFF')
         case 'r':
-            plotscreencode += 128; // Will increase 128 if <128 and decrease by 128 if >128 by overflow
-            cputcxy(screen_col, screen_row, plotscreencode + 128);
+            cfg.plotscreencode += 128; // Will increase 128 if <128 and decrease by 128 if >128 by overflow
+            cputcxy(cfg.screen_col, cfg.screen_row, cfg.plotscreencode + 128);
             break;
 
         // Plot present screencode
         case CH_SPACE:
         case CH_ENTER:
-            screenmapplot(screen_row + yoffset, screen_col + xoffset, plotscreencode);
+            screenmapplot(cfg.screen_row + cfg.yoffset, cfg.screen_col + cfg.xoffset, cfg.plotscreencode);
             break;
 
         // Plot present ink
         case 'i':
-            screenmapplot(screen_row + yoffset, screen_col + xoffset, plotink);
+            screenmapplot(cfg.screen_row + cfg.yoffset, cfg.screen_col + cfg.xoffset, cfg.plotink);
             plotmove(CH_CURS_DOWN);
             break;
 
         // Plot present paper
         case 'o':
-            screenmapplot(screen_row + yoffset, screen_col + xoffset, 16 + plotpaper);
+            screenmapplot(cfg.screen_row + cfg.yoffset, cfg.screen_col + cfg.xoffset, 16 + cfg.plotpaper);
             plotmove(CH_CURS_DOWN);
             break;
 
         // Plot present character modifier
         case 'u':
-            screenmapplot(screen_row + yoffset, screen_col + xoffset, ORIC_CharAttribute(plotaltchar, plotdouble, plotblink));
+            screenmapplot(cfg.screen_row + cfg.yoffset, cfg.screen_col + cfg.xoffset, ORIC_CharAttribute(cfg.plotaltchar, cfg.plotdouble, cfg.plotblink));
             plotmove(CH_CURS_DOWN);
             break;
 
         // Delete present screencode and attributes
         case CH_DEL:
-            screenmapplot(screen_row + yoffset, screen_col + xoffset, CH_SPACE);
+            screenmapplot(cfg.screen_row + cfg.yoffset, cfg.screen_col + cfg.xoffset, CH_SPACE);
             break;
 
-        // Store to favourites with SHIFT+0-9
+        // Store to cfg.favourites with SHIFT+0-9
         case 33:
-            favourites[1] = plotscreencode;
+            cfg.favourites[1] = cfg.plotscreencode;
             break;
 
         case 64:
-            favourites[2] = plotscreencode;
+            cfg.favourites[2] = cfg.plotscreencode;
             break;
 
         case 35:
-            favourites[3] = plotscreencode;
+            cfg.favourites[3] = cfg.plotscreencode;
             break;
 
         case 36:
-            favourites[4] = plotscreencode;
+            cfg.favourites[4] = cfg.plotscreencode;
             break;
 
         case 37:
-            favourites[5] = plotscreencode;
+            cfg.favourites[5] = cfg.plotscreencode;
             break;
 
         case 94:
-            favourites[6] = plotscreencode;
+            cfg.favourites[6] = cfg.plotscreencode;
             break;
 
         case 38:
-            favourites[7] = plotscreencode;
+            cfg.favourites[7] = cfg.plotscreencode;
             break;
 
         case 42:
-            favourites[8] = plotscreencode;
+            cfg.favourites[8] = cfg.plotscreencode;
             break;
 
         case 40:
-            favourites[9] = plotscreencode;
+            cfg.favourites[9] = cfg.plotscreencode;
             break;
 
         case 41:
-            favourites[0] = plotscreencode;
+            cfg.favourites[0] = cfg.plotscreencode;
             break;
 
         // Go to menu
         case CH_F1:
             mainmenuloop();
-            cputcxy(screen_col, screen_row, plotscreencode);
+            cputcxy(cfg.screen_col, cfg.screen_row, cfg.plotscreencode);
             break;
 
         // Toggle statusbar
@@ -592,11 +564,11 @@ void main()
             break;
 
         default:
-            // 0-9: Favourites select
+            // 0-9: cfg.favourites select
             if (key > 47 && key < 58)
             {
-                plotscreencode = favourites[key - 48];
-                cputcxy(screen_col, screen_row, plotscreencode + 128);
+                cfg.plotscreencode = cfg.favourites[key - 48];
+                cputcxy(cfg.screen_col, cfg.screen_row, cfg.plotscreencode + 128);
             }
             break;
         }

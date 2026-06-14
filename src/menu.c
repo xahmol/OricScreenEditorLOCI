@@ -126,7 +126,7 @@ void windowsave(unsigned char ypos, unsigned char height, unsigned char loadsysc
     windownumber++;
 
     // Load system charset if needed
-    if (loadsyscharset == 1 && charsetchanged[0] == 1)
+    if (loadsyscharset == 1 && cfg.charsetchanged[0] == 1)
     {
         charset_swap(0);
     }
@@ -148,7 +148,7 @@ void windowrestore(unsigned char restorealtcharset)
     disable_overlay_ram();
 
     // Restore custom charset if needed
-    if (restorealtcharset == 1 && charsetchanged[0] == 1)
+    if (restorealtcharset == 1 && cfg.charsetchanged[0] == 1)
     {
         charset_swap(1);
     }

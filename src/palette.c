@@ -94,14 +94,14 @@ void palette_draw()
     cputsxy(3, 15, "Alt:");
 
     // Set coordinate of present char if no visual map
-    rowsel = palettechar / 16 + 1;
-    colsel = palettechar % 16;
+    cfg.rowsel = cfg.palettechar / 16 + 1;
+    cfg.colsel = cfg.palettechar % 16;
 
-    // Favourites palette
+    // cfg.favourites palette
     for (x = 0; x < 10; x++)
     {
-        cputcxy(8 + x * 2, 1, favourites[x]);
-        cputcxy(8 + x * 2, 2, favourites[x]);
+        cputcxy(8 + x * 2, 1, cfg.favourites[x]);
+        cputcxy(8 + x * 2, 2, cfg.favourites[x]);
     }
 
     // Full charsets
@@ -112,7 +112,7 @@ void palette_draw()
             cputcxy(8 + x * 2, 3 + y * 2, counter + 32);
             if (y < 5)
             {
-                cputcxy(8 + x * 2, 15 + y * 2, (visualmap) ? visualchar[counter] : counter + 32);
+                cputcxy(8 + x * 2, 15 + y * 2, (cfg.visualmap) ? visualchar[counter] : counter + 32);
             }
             counter++;
         }
@@ -124,23 +124,23 @@ unsigned char palette_returnscreencode()
     // Get screencode from palette position
     unsigned char palpos;
 
-    if (rowsel == 0)
+    if (cfg.rowsel == 0)
     {
-        palpos = favourites[colsel];
+        palpos = cfg.favourites[cfg.colsel];
     }
-    if (rowsel > 0 && rowsel < 7)
+    if (cfg.rowsel > 0 && cfg.rowsel < 7)
     {
-        palpos = 32 + colsel + (rowsel - 1) * 16;
+        palpos = 32 + cfg.colsel + (cfg.rowsel - 1) * 16;
     }
-    if (rowsel > 6)
+    if (cfg.rowsel > 6)
     {
-        if (visualmap)
+        if (cfg.visualmap)
         {
-            palpos = visualchar[colsel + (rowsel - 7) * 16];
+            palpos = visualchar[cfg.colsel + (cfg.rowsel - 7) * 16];
         }
         else
         {
-            palpos = 32 + colsel + (rowsel - 7) * 16;
+            palpos = 32 + cfg.colsel + (cfg.rowsel - 7) * 16;
         }
     }
 
@@ -153,7 +153,7 @@ void palette()
 
     unsigned char key;
 
-    palettechar = plotscreencode - 32;
+    cfg.palettechar = cfg.plotscreencode - 32;
 
     strcpy(programmode, "Palette");
 
@@ -162,8 +162,8 @@ void palette()
     // Get key loop
     do
     {
-        cputcxy(8 + colsel * 2, 1 + rowsel * 2, palette_returnscreencode() + 128);
-        if (showbar)
+        cputcxy(8 + cfg.colsel * 2, 1 + cfg.rowsel * 2, palette_returnscreencode() + 128);
+        if (cfg.showbar)
         {
             printstatusbar();
         }
@@ -176,69 +176,69 @@ void palette()
         case CH_CURS_LEFT:
         case CH_CURS_DOWN:
         case CH_CURS_UP:
-            cputcxy(8 + colsel * 2, 1 + rowsel * 2, palette_returnscreencode());
+            cputcxy(8 + cfg.colsel * 2, 1 + cfg.rowsel * 2, palette_returnscreencode());
             if (key == CH_CURS_RIGHT)
             {
-                colsel++;
+                cfg.colsel++;
             }
             if (key == CH_CURS_LEFT)
             {
-                if (colsel > 0)
+                if (cfg.colsel > 0)
                 {
-                    colsel--;
+                    cfg.colsel--;
                 }
                 else
                 {
-                    colsel = 15;
-                    if (rowsel > 0)
+                    cfg.colsel = 15;
+                    if (cfg.rowsel > 0)
                     {
-                        rowsel--;
-                        if (rowsel == 0)
+                        cfg.rowsel--;
+                        if (cfg.rowsel == 0)
                         {
-                            colsel = 9;
+                            cfg.colsel = 9;
                         }
                     }
                     else
                     {
-                        rowsel = 11;
+                        cfg.rowsel = 11;
                     }
                 }
             }
             if (key == CH_CURS_DOWN)
             {
-                rowsel++;
+                cfg.rowsel++;
             }
             if (key == CH_CURS_UP)
             {
-                if (rowsel > 0)
+                if (cfg.rowsel > 0)
                 {
-                    rowsel--;
+                    cfg.rowsel--;
                 }
                 else
                 {
-                    rowsel = 11;
+                    cfg.rowsel = 11;
                 }
             }
-            if (colsel > 9 && rowsel == 0)
+            if (cfg.colsel > 9 && cfg.rowsel == 0)
             {
-                colsel = 0;
-                rowsel = 1;
+                cfg.colsel = 0;
+                cfg.rowsel = 1;
             }
-            if (colsel > 15)
+            if (cfg.colsel > 15)
             {
-                colsel = 0;
-                rowsel++;
+                cfg.colsel = 0;
+                cfg.rowsel++;
             }
-            if (rowsel > 11)
+            if (cfg.rowsel > 11)
             {
-                rowsel = 0;
+                cfg.rowsel = 0;
             }
             break;
 
         // Select character
         case CH_SPACE:
         case CH_ENTER:
-            plotscreencode = palette_returnscreencode();
+            cfg.plotscreencode = palette_returnscreencode();
             ;
             key = CH_ESC;
             break;
@@ -246,7 +246,7 @@ void palette()
         // Toggle visual charset map
         case 'v':
             windowrestore(0);
-            visualmap = (visualmap) ? 0 : 1;
+            cfg.visualmap = (cfg.visualmap) ? 0 : 1;
             palette_draw();
             break;
 
@@ -263,19 +263,19 @@ void palette()
             break;
 
         default:
-            // Store in favourites
-            if (key > 47 && key < 58 && rowsel > 0)
+            // Store in cfg.favourites
+            if (key > 47 && key < 58 && cfg.rowsel > 0)
             {
-                palettechar = palette_returnscreencode() - 32;
-                favourites[key - 48] = palettechar + 32;
-                cputcxy(8 + (key - 48) * 2, 1, favourites[key - 48]);
-                cputcxy(8 + (key - 48) * 2, 2, favourites[key - 48]);
+                cfg.palettechar = palette_returnscreencode() - 32;
+                cfg.favourites[key - 48] = cfg.palettechar + 32;
+                cputcxy(8 + (key - 48) * 2, 1, cfg.favourites[key - 48]);
+                cputcxy(8 + (key - 48) * 2, 2, cfg.favourites[key - 48]);
             }
             break;
         }
     } while (key != CH_ESC && key != CH_STOP);
 
     windowrestore(0);
-    cputcxy(screen_col, screen_row, plotscreencode + 128);
+    cputcxy(cfg.screen_col, cfg.screen_row, cfg.plotscreencode + 128);
     strcpy(programmode, "Main");
 }

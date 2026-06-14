@@ -76,6 +76,28 @@ BUT WITHOUT ANY WARRANTY. USE THEM AT YOUR OWN RISK!
 #pragma code-name("OVERLAY2");
 #pragma rodata-name("OVERLAY2");
 
+void colorpicker_cursorplot(unsigned char active, unsigned char ink, unsigned char paper)
+// Print the cursor for the colour picker
+// Inout: active: 1 if cursor is set, 0 if previous position is reset
+{
+    unsigned char reverse = active * 128;
+    unsigned char length;
+
+    // Set length deopending if it is the last column or not
+    length = (ink < 7) ? 5 : 4;
+
+    // Print upper and lower border
+    ORIC_HChar(4 + paper * 2, 1 + ink * 5, CH_SPACE + reverse, length);
+    ORIC_HChar(6 + paper * 2, 1 + ink * 5, CH_SPACE + reverse, length);
+
+    // Print left and right border
+    cputcxy(1 + ink * 5, 5 + paper * 2, ink + reverse);
+    if (ink < 7)
+    {
+        cputcxy(5 + ink * 5, 5 + paper * 2, A_BGWHITE + reverse);
+    }
+}
+
 void colourpicker()
 // Select colour set from palette showing also the inverse colour pair
 {
@@ -101,14 +123,13 @@ void colourpicker()
     cputsxy(2, 22, "RETURN:      Select");
     cputsxy(2, 23, "ESC:         Cancel");
 
-    paper = 0;
-    ink = 0;
+    paper = cfg.plotpaper;
+    ink = cfg.plotink;
 
     do
     {
-        // Prinr cursor position
-        gotoxy(ink * 5, 5 + paper * 2);
-        cprintf("%c%c%c%c%c", A_BGCYAN, ink, paper + 16, '*', '*' + 128);
+        // Print cursor position
+        colorpicker_cursorplot(1, ink, paper);
 
         // Draw present ink color feedback
         gotoxy(25, 21);
@@ -122,8 +143,7 @@ void colourpicker()
         key = getkey(ijk_present, 0);
 
         // Reset cursor position
-        gotoxy(ink * 5, 5 + paper * 2);
-        cprintf("%c%c%c%c%c", A_BGWHITE, ink, paper + 16, '-', '-' + 128);
+        colorpicker_cursorplot(0, ink, paper);
 
         switch (key)
         {
@@ -178,8 +198,8 @@ void colourpicker()
 
     if (key == CH_ENTER)
     {
-        plotpaper = paper;
-        plotink = ink;
+        cfg.plotpaper = paper;
+        cfg.plotink = ink;
     }
 
     windowrestore(1);

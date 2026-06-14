@@ -69,11 +69,10 @@ BUT WITHOUT ANY WARRANTY. USE THEM AT YOUR OWN RISK!
 #include "file.h"
 
 // Placed in:
-// Overlay 3
-#pragma code-name ("OVERLAY3");
-#pragma rodata-name ("OVERLAY3");
+// Main
+#pragma code-name("COE");
+#pragma rodata-name("RODATA");
 
-// Variables
 struct DirElement presentdirelement;
 struct Directory presentdir;
 DIR *dir;
@@ -83,6 +82,7 @@ unsigned previous;
 unsigned next;
 unsigned char sort;
 unsigned char filter;
+
 char *diraddress = (char *)DIRBASE;
 
 char dir_entry_types[8][8] =
@@ -95,6 +95,11 @@ char dir_entry_types[8][8] =
         "StdChar",
         "AltChar",
         "       "};
+
+// Placed in:
+// Overlay 3
+#pragma code-name("OVERLAY3");
+#pragma rodata-name("OVERLAY3");
 
 // Functions
 void dir_get_element(unsigned address)
@@ -125,7 +130,7 @@ void dir_read(unsigned char filter)
     unsigned char presenttype;
     unsigned char datalength;
     unsigned char count = 0;
-    unsigned char xpos = 2;
+    unsigned char xpos = 3;
     unsigned char ypos = 5;
     unsigned element;
     struct DirElement bufferdir;
@@ -168,6 +173,9 @@ void dir_read(unsigned char filter)
         // Get next dir entry
         datalength = strlen(file->d_name);
 
+        sprintf(buffer, "Reading %s", file->d_name);
+        debugprint(buffer);
+
         // print progress counter
         if ((count >> 2) > 36)
         {
@@ -182,6 +190,8 @@ void dir_read(unsigned char filter)
             cputc(progressBar[count & 3]);
             ++count;
         }
+
+        debugprint("dir_read 1");
 
         // Check if entry is a directory
         if (file->d_attrib & DIR_ATTR_DIR)
@@ -279,6 +289,9 @@ void dir_read(unsigned char filter)
             }
         }
 
+        sprintf(buffer,"FT:%u AD:%4x DL:%3u", presenttype, presentdir.address, datalength);
+        debugprint(buffer);
+
         if (presenttype)
         {
             // Check if sufficient memory is left
@@ -365,6 +378,9 @@ void dir_read(unsigned char filter)
             datalength++;
             presentdirelement.meta.length = datalength;
 
+            sprintf(buffer,"PR:%4x PV:%4x NX:%4x", present, previous, next);
+            debugprint(buffer);
+
             // Set meta data
             xram_memcpy_to(presentdir.address, &presentdirelement.meta, sizeof(presentdirelement.meta));
             presentdir.address += sizeof(presentdirelement.meta);
@@ -398,6 +414,11 @@ void dir_print_id_and_path()
 {
     unsigned char ypos = 5;
 
+    debugprint("dir print id and path 1");
+    gotoxy(2,4);
+    cprintf("%u %.30s", presentdir.drive, presentdir.path);
+    cgetc();
+
     // Print device name
     // First set color and clear area
     gotoxy(2, ypos);
@@ -416,6 +437,7 @@ void dir_print_id_and_path()
 
     // Get rest of path and check if it fits else shorten
     cprintf("%.35s", presentdir.path + 3);
+    debugprint("dir_print_id_and_path 2");
 }
 
 void dir_print_entry(unsigned char printpos)
@@ -874,8 +896,8 @@ unsigned char dir_browse(unsigned char filter)
 // Browse directory
 // Input: filter for which filetype to filter on
 // Output:  pathname in patthbuffer
-//          0 = no file selected
-//          1 = file selected
+//          1 = no file selected
+//          0 = file selected
 {
     unsigned char done = 0;
     unsigned char key;
@@ -892,7 +914,7 @@ unsigned char dir_browse(unsigned char filter)
             dir_get_element(present);
         }
 
-        key = getkey(ijk_present,0);
+        key = getkey(ijk_present, 0);
 
         switch (key)
         {
@@ -992,5 +1014,11 @@ unsigned char dir_browse(unsigned char filter)
         }
     } while (!done);
 
-    return (done==2)?0:1;
+    // Return 1 on cancel, 0 on succes
+    return (done == 2) ? 1 : 0;
 }
+
+// Placed in:
+// Main
+#pragma code-name("COE");
+#pragma rodata-name("RODATA");

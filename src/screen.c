@@ -73,39 +73,39 @@ void printstatusbar()
 {
     unsigned char val;
 
-    if (screen_row == 26)
+    if (cfg.screen_row == 26)
     {
         return;
     }
 
     sprintf(buffer, "%-10s", programmode);
     cputsxy(2, 26, buffer);
-    if (screenwidth > 99 || screenheight > 99)
+    if (cfg.screenwidth > 99 || cfg.screenheight > 99)
     {
-        sprintf(buffer, "%2x,%2x", screen_col + xoffset, screen_row + yoffset);
+        sprintf(buffer, "%2x,%2x", cfg.screen_col + cfg.xoffset, cfg.screen_row + cfg.yoffset);
     }
     else
     {
-        sprintf(buffer, "%2u,%2u", screen_col + xoffset, screen_row + yoffset);
+        sprintf(buffer, "%2u,%2u", cfg.screen_col + cfg.xoffset, cfg.screen_row + cfg.yoffset);
     }
     cputsxy(14, 26, buffer);
-    sprintf(buffer, "%2x", plotscreencode);
+    sprintf(buffer, "%2x", cfg.plotscreencode);
     cputsxy(21, 26, buffer);
-    cputcxy(23, 26, plotscreencode);
+    cputcxy(23, 26, cfg.plotscreencode);
     enable_overlay_ram();
-    val = PEEK(screenmap_screenaddr(screen_row + yoffset, screen_col + xoffset, screenwidth));
+    val = PEEK(screenmap_screenaddr(cfg.screen_row + cfg.yoffset, cfg.screen_col + cfg.xoffset, cfg.screenwidth));
     disable_overlay_ram();
     sprintf(buffer, "%2x", val);
     cputsxy(26, 26, buffer);
-    sprintf(buffer, "%1u", plotink);
+    sprintf(buffer, "%1u", cfg.plotink);
     cputsxy(30, 26, buffer);
-    cputc(16 + plotink);
+    cputc(16 + cfg.plotink);
     cputc(A_BGWHITE);
-    sprintf(buffer, "%1u", plotpaper);
+    sprintf(buffer, "%1u", cfg.plotpaper);
     cputsxy(34, 26, buffer);
-    cputc(16 + plotpaper);
+    cputc(16 + cfg.plotpaper);
     cputc(A_BGWHITE);
-    if (plotaltchar)
+    if (cfg.plotaltchar)
     {
         cputsxy(37, 26, "A");
     }
@@ -113,7 +113,7 @@ void printstatusbar()
     {
         cputsxy(37, 26, "S");
     }
-    if (plotdouble)
+    if (cfg.plotdouble)
     {
         cputsxy(38, 26, "D");
     }
@@ -121,7 +121,7 @@ void printstatusbar()
     {
         cputsxy(38, 26, " ");
     }
-    if (plotblink)
+    if (cfg.plotblink)
     {
         cputsxy(39, 26, "B");
     }
@@ -133,7 +133,7 @@ void printstatusbar()
 
 void initstatusbar()
 {
-    if (screen_row == 26)
+    if (cfg.screen_row == 26)
     {
         return;
     }
@@ -152,24 +152,24 @@ void initstatusbar()
 
 void hidestatusbar()
 {
-    ORIC_CopyViewPort(SCREENMAPBASE, screenwidth, xoffset, yoffset + 26, 0, 26, 40, 1);
+    ORIC_CopyViewPort(SCREENMAPBASE, cfg.screenwidth, cfg.xoffset, cfg.yoffset + 26, 0, 26, 40, 1);
 }
 
 void togglestatusbar()
 {
-    if (screen_row == 26)
+    if (cfg.screen_row == 26)
     {
         return;
     }
 
-    if (showbar)
+    if (cfg.showbar)
     {
-        showbar = 0;
+        cfg.showbar = 0;
         hidestatusbar();
     }
     else
     {
-        showbar = 1;
+        cfg.showbar = 1;
         initstatusbar();
     }
 }
@@ -181,7 +181,7 @@ void screenmapplot(unsigned char row, unsigned char col, unsigned char screencod
     // Input: row and column, screencode to plot
 
     enable_overlay_ram();
-    POKE(screenmap_screenaddr(row, col, screenwidth), screencode);
+    POKE(screenmap_screenaddr(row, col, cfg.screenwidth), screencode);
     disable_overlay_ram();
 }
 
@@ -192,48 +192,48 @@ void cursormove(unsigned char left, unsigned char right, unsigned char up, unsig
 
     if (left == 1)
     {
-        if (screen_col == 0)
+        if (cfg.screen_col == 0)
         {
-            if (xoffset > 0)
+            if (cfg.xoffset > 0)
             {
-                ORIC_ScrollCopy(SCREENMAPBASE, screenwidth, xoffset--, yoffset, 0, 0, 40, 27, 2);
+                ORIC_ScrollCopy(SCREENMAPBASE, cfg.screenwidth, cfg.xoffset--, cfg.yoffset, 0, 0, 40, 27, 2);
                 initstatusbar();
             }
         }
         else
         {
-            screen_col--;
+            cfg.screen_col--;
         }
     }
     if (right == 1)
     {
-        if (screen_col == 39)
+        if (cfg.screen_col == 39)
         {
-            if (xoffset + screen_col < screenwidth - 1)
+            if (cfg.xoffset + cfg.screen_col < cfg.screenwidth - 1)
             {
-                ORIC_ScrollCopy(SCREENMAPBASE, screenwidth, xoffset++, yoffset, 0, 0, 40, 27, 1);
+                ORIC_ScrollCopy(SCREENMAPBASE, cfg.screenwidth, cfg.xoffset++, cfg.yoffset, 0, 0, 40, 27, 1);
                 initstatusbar();
             }
         }
         else
         {
-            screen_col++;
+            cfg.screen_col++;
         }
     }
     if (up == 1)
     {
-        if (screen_row == 0)
+        if (cfg.screen_row == 0)
         {
-            if (yoffset > 0)
+            if (cfg.yoffset > 0)
             {
-                ORIC_ScrollCopy(SCREENMAPBASE, screenwidth, xoffset, yoffset--, 0, 0, 40, 27, 4);
+                ORIC_ScrollCopy(SCREENMAPBASE, cfg.screenwidth, cfg.xoffset, cfg.yoffset--, 0, 0, 40, 27, 4);
                 initstatusbar();
             }
         }
         else
         {
-            screen_row--;
-            if (showbar && screen_row == 25)
+            cfg.screen_row--;
+            if (cfg.showbar && cfg.screen_row == 25)
             {
                 initstatusbar();
             }
@@ -241,21 +241,21 @@ void cursormove(unsigned char left, unsigned char right, unsigned char up, unsig
     }
     if (down == 1)
     {
-        if (screen_row == 25)
+        if (cfg.screen_row == 25)
         {
             hidestatusbar();
         }
-        if (screen_row == 26)
+        if (cfg.screen_row == 26)
         {
-            if (yoffset + screen_row < screenheight - 1)
+            if (cfg.yoffset + cfg.screen_row < cfg.screenheight - 1)
             {
-                ORIC_ScrollCopy(SCREENMAPBASE, screenwidth, xoffset, yoffset++, 0, 0, 40, 27, 8);
+                ORIC_ScrollCopy(SCREENMAPBASE, cfg.screenwidth, cfg.xoffset, cfg.yoffset++, 0, 0, 40, 27, 8);
                 initstatusbar();
             }
         }
         else
         {
-            screen_row++;
+            cfg.screen_row++;
         }
     }
 }
@@ -268,10 +268,10 @@ void plotmove(unsigned char direction)
     unsigned char val;
 
     enable_overlay_ram();
-    val = PEEK(screenmap_screenaddr(yoffset + screen_row, xoffset + screen_col, screenwidth));
+    val = PEEK(screenmap_screenaddr(cfg.yoffset + cfg.screen_row, cfg.xoffset + cfg.screen_col, cfg.screenwidth));
     disable_overlay_ram();
 
-    cputcxy(screen_col, screen_row, val);
+    cputcxy(cfg.screen_col, cfg.screen_row, val);
 
     switch (direction)
     {
@@ -295,7 +295,7 @@ void plotmove(unsigned char direction)
         break;
     }
 
-    cputcxy(screen_col, screen_row, plotscreencode + 128);
+    cputcxy(cfg.screen_col, cfg.screen_row, cfg.plotscreencode + 128);
 }
 
 // Help screens
@@ -307,7 +307,7 @@ void helpscreen_load(unsigned char screennumber)
     int error;
 
     // Load system charset if needed
-    if (charsetchanged[0] == 1)
+    if (cfg.charsetchanged[0] == 1)
     {
         charset_swap(0);
     }
@@ -325,18 +325,18 @@ void helpscreen_load(unsigned char screennumber)
     getkey(ijk_present, 1);
 
     // Restore screen
-    ORIC_CopyViewPort(SCREENMAPBASE, screenwidth, xoffset, yoffset, 0, 0, 40, 27);
-    if (showbar)
+    ORIC_CopyViewPort(SCREENMAPBASE, cfg.screenwidth, cfg.xoffset, cfg.yoffset, 0, 0, 40, 27);
+    if (cfg.showbar)
     {
         initstatusbar();
     }
     if (screennumber != 2)
     {
-        cputcxy(screen_col, screen_row, plotscreencode);
+        cputcxy(cfg.screen_col, cfg.screen_row, cfg.plotscreencode);
     }
 
     // Restore custom charset if needed
-    if (charsetchanged[0] == 1)
+    if (cfg.charsetchanged[0] == 1)
     {
         charset_swap(1);
     }

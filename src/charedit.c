@@ -158,9 +158,9 @@ void chareditor()
     char *ptrend;
 
     char_altorstd = 0;
-    char_screencode = plotscreencode;
+    char_screencode = cfg.plotscreencode;
     char_address = charaddress(char_screencode, char_altorstd, 0);
-    charsetchanged[plotaltchar] = 1;
+    cfg.charsetchanged[cfg.plotaltchar] = 1;
     strcpy(programmode, "Charedit");
 
     enable_overlay_ram();
@@ -177,7 +177,7 @@ void chareditor()
     {
         bitset = (char_present[ypos] & (1 << (5 - xpos))) ? 0 : 1;
         cputcxy(xpos + 33, ypos + 3, '*' + bitset * 128);
-        if (showbar)
+        if (cfg.showbar)
         {
             printstatusbar();
         }
@@ -481,7 +481,7 @@ void chareditor()
         case CH_F8:
             windowrestore(0);
             helpscreen_load(2);
-            if (charsetchanged[0] == 1)
+            if (cfg.charsetchanged[0] == 1)
             {
                 charset_swap(1);
             }
@@ -489,52 +489,52 @@ void chareditor()
             showchareditgrid(char_screencode, char_altorstd);
             break;
 
-        // Store to favourites with SHIFT+0-9
+        // Store to cfg.favourites with SHIFT+0-9
         case 33:
-            favourites[1] = char_screencode;
+            cfg.favourites[1] = char_screencode;
             break;
 
         case 64:
-            favourites[2] = char_screencode;
+            cfg.favourites[2] = char_screencode;
             break;
 
         case 35:
-            favourites[3] = char_screencode;
+            cfg.favourites[3] = char_screencode;
             break;
 
         case 36:
-            favourites[4] = char_screencode;
+            cfg.favourites[4] = char_screencode;
             break;
 
         case 37:
-            favourites[5] = char_screencode;
+            cfg.favourites[5] = char_screencode;
             break;
 
         case 94:
-            favourites[6] = char_screencode;
+            cfg.favourites[6] = char_screencode;
             break;
 
         case 38:
-            favourites[7] = char_screencode;
+            cfg.favourites[7] = char_screencode;
             break;
 
         case 42:
-            favourites[8] = char_screencode;
+            cfg.favourites[8] = char_screencode;
             break;
 
         case 40:
-            favourites[9] = char_screencode;
+            cfg.favourites[9] = char_screencode;
             break;
 
         case 41:
-            favourites[0] = char_screencode;
+            cfg.favourites[0] = char_screencode;
             break;
 
         default:
-            // 0-9: Favourites select
+            // 0-9: cfg.favourites select
             if (key > 47 && key < 58)
             {
-                char_screencode = favourites[key - 48];
+                char_screencode = cfg.favourites[key - 48];
                 charchanged = 1;
             }
             break;
@@ -557,8 +557,8 @@ void chareditor()
 
     windowrestore(0);
 
-    plotscreencode = char_screencode;
-    plotaltchar = char_altorstd;
-    cputcxy(screen_col, screen_row, plotscreencode + 128);
+    cfg.plotscreencode = char_screencode;
+    cfg.plotaltchar = char_altorstd;
+    cputcxy(cfg.screen_col, cfg.screen_row, cfg.plotscreencode + 128);
     strcpy(programmode, "Main");
 }

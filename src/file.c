@@ -73,10 +73,38 @@ BUT WITHOUT ANY WARRANTY. USE THEM AT YOUR OWN RISK!
 unsigned char filepickerfromdir(char *headertext, unsigned char filter)
 // Pick a file or a directory with the directory browser
 {
-    windownew(1, 2, 24, 38, 1);
-    cputsxy(3, 3, headertext);
+    unsigned char error, ypos, offs, restlen;
+
+    // Create window and print header text
+    windowsave(2, 24, 1);
+    ORIC_FillArea(2, 2, CH_SPACE, 38, 24);
+    ORIC_VChar(2, 0, A_BGWHITE, 24);
+    ORIC_VChar(2, 1, A_FWBLACK, 24);
+
+    
+    cputsxy(2, 3, headertext);
+    debugprint("filepickerfromdir 1");
+
+    // Start dir browser and select file or dir
     loadoverlay(3);
-    return dir_browse(filter);
+    error = dir_browse(filter);
+
+    // Clear window and print selected path
+    cleararea(2, 5, 21, 38);
+    offs = 0;
+    ypos = 5;
+    restlen = strlen(pathbuffer);
+    cputsxy(2, ypos++, "Selected path:");
+    while (restlen > 36)
+    {
+        gotoxy(2, ypos++);
+        cprintf(".%.36s", pathbuffer + offs);
+        offs += 36;
+        restlen -= 36;
+    }
+
+    // Return 0 on file selected, else 1
+    return error;
 }
 
 unsigned char choosedirandfilename(char *headertext, unsigned char maxlen, unsigned char validation)
@@ -104,70 +132,83 @@ void loadscreenmap(unsigned char combined)
 {
     // Function to load screenmap
 
-    unsigned int newwidth, newheight;
+    unsigned int newwidth, newheight, newtotal;
     unsigned int maxsize = MEMORYLIMIT - SCREENMAPBASE;
     char *ptrend;
-    int escapeflag;
-    // int rc;
-    // int len = 0;
+    unsigned char error;
     int address = (combined) ? CHARSET_STD : SCREENMAPBASE;
+    int charlen = (combined) ? 1920 : 0;
 
-    escapeflag = filepickerfromdir("Load screen", 0);
-    // escapeflag = choosedirandfilename("Load screen",9,3);
-
-    if (escapeflag == -1)
+    error = filepickerfromdir("Load screen", 0);
+    // Return on cancel / no file selected
+    if (error)
     {
         windowrestore(0);
         return;
     }
 
-    cputsxy(4, 10, "Enter screen width:");
-    sprintf(buffer, "%i", screenwidth);
-    textInput(4, 11, 4, buffer, 4, 1);
-    newwidth = (unsigned int)strtol(buffer, &ptrend, 10);
-
-    cputsxy(4, 12, "Enter screen height:");
-    sprintf(buffer, "%i", screenheight);
-    textInput(4, 13, 4, buffer, 4, 1);
-    newheight = (unsigned int)strtol(buffer, &ptrend, 10);
-
-    if ((newwidth * newheight) > maxsize || newwidth < 40 || newheight < 27)
+    if (!combined)
     {
-        cputsxy(4, 14, "New size unsupported. Press key.");
-        getkey(ijk_present, 1);
-        windowrestore(0);
+        cputsxy(2, 14, "Enter screen width:");
+        sprintf(buffer, "%i", cfg.screenwidth);
+        textInput(25, 14, 4, buffer, 4, 1);
+        newwidth = (unsigned int)strtol(buffer, &ptrend, 10);
+
+        cputsxy(2, 15, "Enter screen height:");
+        sprintf(buffer, "%i", cfg.screenheight);
+        textInput(25, 15, 4, buffer, 4, 1);
+        newheight = (unsigned int)strtol(buffer, &ptrend, 10);
     }
     else
     {
-        windowrestore(0);
-        windowrestore(0);
-        sprintf(buffer, "!LOAD\"%s.BIN\",A#%4X", filename, address);
-        // basic(buffer);
-        // sprintf(buffer,"%s.*",filename);
-        // rc=loadfile(buffer,(void*)address,&len);
+        newwidth = 40;
+        newheight = SCREENHEIGHT;
+    }   
 
-        // if(len)
-        //{
-        screenwidth = newwidth;
-        screenheight = newheight;
-        if (combined)
-        {
-            enable_overlay_ram();
-            memcpy((void *)SCREENMAPBASE, (void *)SCREENMEMORY, 1080);
-            memcpy((void *)CHARSET_SWAP, (void *)CHARSET_STD, 768);
-            disable_overlay_ram();
-            charsetchanged[0] = 1;
-            charsetchanged[1] = 1;
-            charset_swap(0);
-        }
-        //}
-        ORIC_CopyViewPort(SCREENMAPBASE, screenwidth, xoffset, yoffset, 0, 0, 40, 27);
-        windowsave(0, 1, 0);
-        menuplacebar();
-        if (showbar)
-        {
-            initstatusbar();
-        }
+    newtotal = newwidth * newheight;
+
+    if (newtotal > maxsize || newwidth < 40 || newheight < 27)
+    {
+        cputsxy(2, 16, "New size unsupported. Press key.");
+        getkey(ijk_present, 1);
+        windowrestore(0);
+        return;
+    }
+
+    windowrestore(0);
+    windowrestore(0);
+
+    // Load screen data
+    enable_overlay_ram();
+    error = file_load(pathbuffer, (void *)address, newtotal + charlen);
+    disable_overlay_ram();
+    if (error < 1)
+    {
+        fileerrormessage(0);
+        return;
+    }
+
+    cfg.screenwidth = newwidth;
+    cfg.screenheight = newheight;
+    cfg.screentotal = newtotal;
+
+    if (combined)
+    {
+        enable_overlay_ram();
+        memcpy((void *)SCREENMAPBASE, (void *)SCREENMEMORY, newtotal);
+        memcpy((void *)CHARSET_SWAP, (void *)CHARSET_STD, 768);
+        disable_overlay_ram();
+        cfg.charsetchanged[0] = 1;
+        cfg.charsetchanged[1] = 1;
+        charset_swap(0);
+    }
+
+    ORIC_CopyViewPort(SCREENMAPBASE, cfg.screenwidth, cfg.xoffset, cfg.yoffset, 0, 0, 40, 27);
+    windowsave(0, 1, 0);
+    menuplacebar();
+    if (cfg.showbar)
+    {
+        initstatusbar();
     }
 }
 
@@ -176,7 +217,7 @@ void savescreenmap(unsigned char combined)
     // Function to save screenmap
     int escapeflag;
     // int rc;
-    int len = screenwidth * screenheight;
+    int len = cfg.screenwidth * cfg.screenheight;
     int address = (combined) ? CHARSET_STD : SCREENMAPBASE;
 
     escapeflag = choosedirandfilename("Save screen", 9, 3);
@@ -191,7 +232,7 @@ void savescreenmap(unsigned char combined)
     if (combined)
     {
         windowrestore(0);
-        ORIC_CopyViewPort(SCREENMAPBASE, screenwidth, xoffset, yoffset, 0, 0, 40, 27);
+        ORIC_CopyViewPort(SCREENMAPBASE, cfg.screenwidth, cfg.xoffset, cfg.yoffset, 0, 0, 40, 27);
         charset_swap(1);
         len += 1664;
     }
@@ -206,7 +247,7 @@ void savescreenmap(unsigned char combined)
         charset_swap(0);
         windowsave(0, 1, 0);
         menuplacebar();
-        if (showbar)
+        if (cfg.showbar)
         {
             initstatusbar();
         }
@@ -220,39 +261,19 @@ void saveproject()
     // Function to save project (screen, charsets and metadata)
     // int rc;
     // int len = 0;
-    char projbuffer[19];
-    int escapeflag;
 
-    escapeflag = choosedirandfilename("Save project", 7, 3);
+    unsigned char error;
+
+    error = choosedirandfilename("Save project", 7, 3);
 
     windowrestore(0);
 
-    if (escapeflag == -1)
+    if (error)
     {
         return;
     }
 
-    // Store project data to buffer variable
-    projbuffer[0] = charsetchanged[0];
-    projbuffer[1] = charsetchanged[1];
-    projbuffer[2] = screen_col;
-    projbuffer[3] = screen_row;
-    projbuffer[4] = (screenwidth >> 8) & 0xff;
-    projbuffer[5] = screenwidth & 0xff;
-    projbuffer[6] = (screenheight >> 8) & 0xff;
-    projbuffer[7] = screenheight & 0xff;
-    projbuffer[8] = (screentotal >> 8) & 0xff;
-    projbuffer[9] = screentotal & 0xff;
-    projbuffer[10] = plotink;
-    projbuffer[11] = plotpaper;
-    projbuffer[12] = plotblink;
-    projbuffer[13] = plotdouble;
-    projbuffer[14] = plotaltchar;
-    projbuffer[15] = plotscreencode;
-    projbuffer[17] = xoffset;
-    projbuffer[18] = yoffset;
-
-    sprintf(buffer, "SAVEO\"%sPJ.BIN\",A#%4X,E#%4X", filename, projbuffer, projbuffer + 18);
+    //sprintf(buffer, "SAVEO\"%sPJ.BIN\",A#%4X,E#%4X", filename, projbuffer, projbuffer + 18);
     // basic(buffer);
     // sprintf(buffer,"%spj.BIN",filename);
     // rc = savefile(buffer,(void*)projbuffer,19);
@@ -260,16 +281,16 @@ void saveproject()
     // if(rc) { fileerrormessage(rc,0); }
 
     // Store screen data
-    sprintf(buffer, "SAVEO\"%sSC.BIN\",A#%4X,E#%4X", filename, SCREENMAPBASE, SCREENMAPBASE + (screenwidth * screenheight) - 1);
+    //sprintf(buffer, "SAVEO\"%sSC.BIN\",A#%4X,E#%4X", filename, SCREENMAPBASE, SCREENMAPBASE + (cfg.screenwidth * cfg.screenheight) - 1);
     // basic(buffer);
     // sprintf(buffer,"%ssc.BIN",filename);
-    // rc = savefile(buffer,(void*)SCREENMAPBASE,screenwidth*screenheight);
+    // rc = savefile(buffer,(void*)SCREENMAPBASE,cfg.screenwidth*cfg.screenheight);
     // if(rc) { fileerrormessage(rc,0); }
 
     // Store standard charset
-    if (charsetchanged[0] == 1)
+    if (cfg.charsetchanged[0] == 1)
     {
-        sprintf(buffer, "SAVEO\"%sCS.BIN\",A#%4X,E#%4X", filename, CHARSET_SWAP, CHARSET_SWAP + 767);
+        //sprintf(buffer, "SAVEO\"%sCS.BIN\",A#%4X,E#%4X", filename, CHARSET_SWAP, CHARSET_SWAP + 767);
         // basic(buffer);
         // sprintf(buffer,"%scs.BIN",filename);
         // rc = savefile(buffer,(void*)CHARSET_SWAP,768);
@@ -277,9 +298,9 @@ void saveproject()
     }
 
     // Store alternate charset
-    if (charsetchanged[1] == 1)
+    if (cfg.charsetchanged[1] == 1)
     {
-        sprintf(buffer, "SAVEO\"%sCA.BIN\",A#%4X,E#%4X", filename, CHARSET_ALT, CHARSET_ALT + 639);
+        //sprintf(buffer, "SAVEO\"%sCA.BIN\",A#%4X,E#%4X", filename, CHARSET_ALT, CHARSET_ALT + 639);
         // basic(buffer);
         // sprintf(buffer,"%sca.BIN",filename);
         // rc = savefile(buffer,(void*)CHARSET_ALT,640);
@@ -293,51 +314,43 @@ void loadproject()
     // int rc;
     // int len = 0;
     unsigned char projbuffer[19];
-    int escapeflag;
+    unsigned char error;
 
-    escapeflag = filepickerfromdir("Load project", 4);
+    error = filepickerfromdir("Load project", 4);
 
     windowrestore(0);
 
-    if (escapeflag == -1)
+    // Return if no file selected
+    if (error)
     {
         return;
     }
-
-    if (escapeflag != 2)
-    {
-        messagepopup("No project file.", 0);
-        return;
-    }
-
-    escapeflag = strlen(filename);
-    filename[escapeflag - 2] = 0;
 
     // Load project variables
-    sprintf(buffer, "!LOAD\"%sPJ.BIN\",A#%4X", filename, projbuffer);
-    // basic(buffer);
-    // sprintf(buffer,"%spj.BIN",filename);
-    // rc = loadfile(buffer,(void*)projbuffer,&len);
+    error = file_load(pathbuffer, projbuffer, 19);
+    if (error < 1)
+    {
+        fileerrormessage(0);
+        return;
+    }
 
-    // if(!len) { return; }
-
-    charsetchanged[0] = projbuffer[0];
-    charsetchanged[1] = projbuffer[1];
-    screen_col = projbuffer[2];
-    screen_row = projbuffer[3];
-    screenwidth = projbuffer[4] * 256 + projbuffer[5];
-    sprintf(pulldownmenutitles[0][0], "Width:   %5i ", screenwidth);
-    screenheight = projbuffer[6] * 256 + projbuffer[7];
-    sprintf(pulldownmenutitles[0][1], "Height:  %5i ", screenheight);
-    screentotal = projbuffer[8] * 256 + projbuffer[9];
-    plotink = projbuffer[10];
-    plotpaper = projbuffer[11];
-    plotblink = projbuffer[12];
-    plotdouble = projbuffer[13];
-    plotaltchar = projbuffer[14];
-    plotscreencode = projbuffer[15];
-    xoffset = projbuffer[17];
-    yoffset = projbuffer[18];
+    cfg.charsetchanged[0] = projbuffer[0];
+    cfg.charsetchanged[1] = projbuffer[1];
+    cfg.screen_col = projbuffer[2];
+    cfg.screen_row = projbuffer[3];
+    cfg.screenwidth = projbuffer[4] * 256 + projbuffer[5];
+    sprintf(pulldownmenutitles[0][0], "Width:   %5i ", cfg.screenwidth);
+    cfg.screenheight = projbuffer[6] * 256 + projbuffer[7];
+    sprintf(pulldownmenutitles[0][1], "Height:  %5i ", cfg.screenheight);
+    cfg.screentotal = projbuffer[8] * 256 + projbuffer[9];
+    cfg.plotink = projbuffer[10];
+    cfg.plotpaper = projbuffer[11];
+    cfg.plotblink = projbuffer[12];
+    cfg.plotdouble = projbuffer[13];
+    cfg.plotaltchar = projbuffer[14];
+    cfg.plotscreencode = projbuffer[15];
+    cfg.xoffset = projbuffer[17];
+    cfg.yoffset = projbuffer[18];
 
     // Load screen
     sprintf(buffer, "!LOAD\"%sSC.BIN\",A#%4X", filename, SCREENMAPBASE);
@@ -347,33 +360,33 @@ void loadproject()
     // if(len)
     //{
     windowrestore(0);
-    ORIC_CopyViewPort(SCREENMAPBASE, screenwidth, xoffset, yoffset, 0, 0, 40, 27);
+    ORIC_CopyViewPort(SCREENMAPBASE, cfg.screenwidth, cfg.xoffset, cfg.yoffset, 0, 0, 40, 27);
     windowsave(0, 1, 0);
     menuplacebar();
-    if (showbar)
+    if (cfg.showbar)
     {
         initstatusbar();
     }
     //}
 
     // Load standard charset
-    if (charsetchanged[0] == 1)
+    if (cfg.charsetchanged[0] == 1)
     {
         sprintf(buffer, "!LOAD\"%sCS.BIN\",A#%4X", filename, CHARSET_SWAP);
         // basic(buffer);
         // sprintf(buffer,"%scs.BIN",filename);
         // rc=loadfile(buffer,(void*)CHARSET_SWAP,&len);
-        // if(!len) { charsetchanged[0]=0; }
+        // if(!len) { cfg.charsetchanged[0]=0; }
     }
 
     // Load alternate charset
-    if (charsetchanged[1] == 1)
+    if (cfg.charsetchanged[1] == 1)
     {
         sprintf(buffer, "!LOAD\"%sCA.BIN\",A#%4X", filename, CHARSET_ALT);
         // basic(buffer);
         // sprintf(buffer,"%sca.BIN",filename);
         // rc=loadfile(buffer,(void*)CHARSET_ALT,&len);
-        // if(!len) { charsetchanged[1]=0; }
+        // if(!len) { cfg.charsetchanged[1]=0; }
     }
 }
 
@@ -418,12 +431,12 @@ void loadcharset(unsigned char stdoralt)
     //{
     if (stdoralt < 2)
     {
-        charsetchanged[stdoralt] = 1;
+        cfg.charsetchanged[stdoralt] = 1;
     }
     else
     {
-        charsetchanged[0] = 1;
-        charsetchanged[1] = 1;
+        cfg.charsetchanged[0] = 1;
+        cfg.charsetchanged[1] = 1;
         enable_overlay_ram();
         memcpy((void *)CHARSET_SWAP, (void *)CHARSET_STD, 768);
         disable_overlay_ram();

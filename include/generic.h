@@ -12,6 +12,7 @@ extern unsigned char overlay_active;
 
 // Generic functions
 void wait(unsigned int wait_cycles);
+void debugprint(char *text);
 
 // Overlay functions
 void loadoverlay(unsigned char overlay_select);
