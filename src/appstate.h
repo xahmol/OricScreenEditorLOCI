@@ -7,9 +7,14 @@
 #define VIEWPORT_WIDTH   40
 #define VIEWPORT_HEIGHT  27
 
-// Canvas size for Phase 1 (fixed; resizable from Phase 2 onward)
+// Canvas size: starts at the viewport size, resizable up to CANVAS_MAX_SIZE
+// cells (Screen > Width/Height, canvas_resize()). 8192 is a documented,
+// revisable budget -- about 2.5x V1's 6655-byte CC65 ceiling, leaving ~34KB
+// of the ~42.4KB main-RAM region for the menu engine and later phases'
+// static buffers.
 #define CANVAS_WIDTH     VIEWPORT_WIDTH
 #define CANVAS_HEIGHT    VIEWPORT_HEIGHT
+#define CANVAS_MAX_SIZE  8192
 
 typedef enum {
     MODE_MAIN = 0

@@ -7,6 +7,8 @@
 #include "appstate.h"
 #include "canvas.h"
 #include "statusbar.h"
+#include "menu.h"
+#include "menudata.h"
 #include "editor.h"
 
 AppState app;
@@ -26,6 +28,8 @@ int main(void)
 
     canvas_init();
     statusbar_init();
+    menu_init();
+    menudata_init();
     editor_run();
 
     return 0;

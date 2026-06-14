@@ -4,6 +4,8 @@
 #include "appstate.h"
 #include "canvas.h"
 #include "statusbar.h"
+#include "menu.h"
+#include "menudata.h"
 #include "editor.h"
 
 #define PLOT_MIN 0x20
@@ -11,8 +13,6 @@
 
 void editor_run(void)
 {
-    app.canvas_width  = CANVAS_WIDTH;
-    app.canvas_height = CANVAS_HEIGHT;
     app.cursor_x = 0;
     app.cursor_y = 0;
     app.xoffset = 0;
@@ -38,7 +38,7 @@ void editor_run(void)
             break;
 
         case KEY_DOWN:
-            if (app.cursor_y < app.canvas_height - 1) app.cursor_y++;
+            if (app.cursor_y < VIEWPORT_HEIGHT - 1) app.cursor_y++;
             break;
 
         case KEY_LEFT:
@@ -46,7 +46,7 @@ void editor_run(void)
             break;
 
         case KEY_RIGHT:
-            if (app.cursor_x < app.canvas_width - 1) app.cursor_x++;
+            if (app.cursor_x < VIEWPORT_WIDTH - 1) app.cursor_x++;
             break;
 
         case KEY_SPACE:
@@ -69,6 +69,10 @@ void editor_run(void)
 
         case KEY_F6:
             statusbar_show(!app.showstatusbar);
+            break;
+
+        case KEY_F1:
+            menu_run();
             break;
 
         default:

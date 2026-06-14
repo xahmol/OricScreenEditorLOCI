@@ -18,17 +18,17 @@ storage device**.
 - Enhanced palette mode that also shows the inverse colour combinations for
   each ink/paper pair
 
-**Status: Phase 1 of 9 complete** (canvas data model + minimal main mode +
-Phosphoric test harness skeleton; binary 2744 bytes). A previous CC65-based
-attempt at this got stuck and is archived in the `nonworkingcc65` branch (full
-history + uncommitted state). `main` was restarted from scratch on the Oscar64
-native/bare-metal build chain developed for
+**Status: Phase 2 of 9 complete** (canvas data model + minimal main mode +
+menu bar/Screen menu + Phosphoric test harness; binary 9325 bytes). A previous
+CC65-based attempt at this got stuck and is archived in the `nonworkingcc65`
+branch (full history + uncommitted state). `main` was restarted from scratch
+on the Oscar64 native/bare-metal build chain developed for
 [locifilemanager-v2](https://github.com/xahmol/locifilemanager-v2)
 (`/home/xahmol/git/locifilemanager-v2`), which the runtime and libraries below
-were copied from verbatim. The remaining 8 phases (menu/Screen menu, character
-editor, palette/colour picker, select/move/line-box/write modes, LOCI file I/O,
-file picker, overlay-RAM undo, IJK/help/polish) are tracked in the active plan
-— see `~/.claude/plans/snappy-beaming-lynx.md` or ask Claude for status.
+were copied from verbatim. The remaining 7 phases (character editor,
+palette/colour picker, select/move/line-box/write modes, LOCI file I/O, file
+picker, overlay-RAM undo, IJK/help/polish) are tracked in the active plan —
+see `~/.claude/plans/snappy-beaming-lynx.md` or ask Claude for status.
 
 ### Canvas architecture (Phase 1 decision)
 
@@ -133,9 +133,14 @@ handler corrupt zero page / screen RAM.
 src/
   main.c          Application entry point: splash, canvas/statusbar init, editor_run()
   appstate.h      Global AppState struct (canvas size, cursor, viewport, mode, ...)
-  canvas.c/h      Flat 40x27 screenmap[] buffer + raw $BB80 blit (bypasses charwin)
+  canvas.c/h      Flat 40x27 screenmap[] buffer + raw $BB80 blit (bypasses charwin),
+                  canvas_resize() (up to CANVAS_MAX_SIZE)
   statusbar.c/h   Row-27 statusbar (OricCharWin, Mode/X,Y/C/S readout)
-  editor.c/h      Main-mode loop: cursor move, +/- screencode select, SPACE/DEL plot
+  editor.c/h      Main-mode loop: cursor move, +/- screencode select, SPACE/DEL plot,
+                  FUNCT+1 opens the menu bar
+  menu.c/h        Menu bar/pulldown/popup engine + main-RAM window-save stack
+  menudata.c/h    OSE menu tables (Screen/File/Charset/Information) + Screen
+                  pulldown dispatch (Width/Height/Clear/Fill)
   strings.h       User-visible message strings (MSG_* macros required by loci.c)
 include/
   oric.h          Hardware constants (VIA, AY, screen, overlay RAM, ASTR_*/CH_*/A_* attrs)
@@ -173,3 +178,68 @@ codes, MIA/TAP register layout, MIA helper calling conventions, etc.).
   applies attrs left-to-right.
 - **Inverse video:** `ch | 0x80` inverts pixel rendering; `CH_INVSPACE`
   (0xA0) = solid ink-coloured block.
+
+## Menu System (Phase 2)
+
+`src/menu.c/h` is adapted from locifilemanager-v2's bar/pulldown/popup engine
+(`/home/xahmol/git/locifilemanager-v2/src/menu.c/h`). Three layers: menu bar
+(row 0, `MENUBAR_MAXOPTIONS=4`: Screen/File/Charset/Information) → pulldown
+menus (`PULLDOWN_NUMBER=5`: 4 bar pulldowns + index `MENU_YESNO=4` for the
+Yes/No confirm dialog, `PULLDOWN_MAXOPTIONS=6`) → popup dialogs.
+
+- **`menu_main()` return encoding**: `menubarchoice*10 + menuoptionchoice`
+  (1..49 = a real choice); `menubarchoice*10 + 99` (>= 99) = ESC at bar level.
+  Callers loop `while (choice < 99)`.
+- **`menu_pulldown()` special returns**: `MENU_CANCEL=0` (ESC, if
+  `escapable=1`), `MENU_LEFT_ARROW=18`/`MENU_RIGHT_ARROW=19` (switch bar
+  item), else 1..N = selected item (1-indexed).
+- **Window save/restore is main-RAM, not overlay RAM**: `menu_winsave()`/
+  `menu_winrestore()` use a static `menu_winbuf[MENU_WINBUF_SIZE=2048]` LIFO
+  buffer (`MENU_WIN_DEPTH=9` nested saves max), unlike locifilemanager-v2's
+  `cwin_push`/`cwin_pop` (overlay RAM). This makes menus close with no residue
+  in plain Oricutron (no LOCI/`--loci-flash` needed) — correct for this
+  project where overlay RAM is optional (Phase 8 undo only). Largest nested
+  path so far (bar + Screen pulldown + resize popup + shrink-confirm popup +
+  Yes/No pulldown) = 1080B, well within the 2048B budget.
+- **Canvas resize** (`canvas_resize()`, dispatched from `menudata.c`
+  `resize_dialog()`): new size validated as
+  `(newval >= minval) && (neww*newh <= CANVAS_MAX_SIZE=8192)`, where
+  `minval = VIEWPORT_WIDTH` (40) for width, `VIEWPORT_HEIGHT` (27) for height
+  — both equal the *default* canvas size, so a dimension can only be shrunk
+  below its default after first being grown above it. Shrinking below the
+  *current* (already-grown) size triggers `menu_areyousure()` (Yes applies,
+  No leaves the size unchanged).
+
+## Phosphoric Testing Notes
+
+Beyond `tests/scripts/test_boot.sh`'s pattern (see that file), Phase 2 added
+`test_menus.sh`/`test_screenresize.sh` which drive the menu via
+`--type-keys`. Key things to know when writing further `--type-keys`-based
+tests:
+
+- **`\fN` (FUNCT+N, N=0-9)** is a Phosphoric escape **added locally to the
+  PHOSDIR fork** (`/home/xahmol/git/Phosphoric`, uncommitted as of Phase 2) —
+  not yet upstreamed. It holds FUNCT (sentinel `0x84`) and digit N together.
+  If `make test-menus`/`test-screenresize` start failing with "FUNCT does
+  nothing", check whether PHOSDIR points at a checkout with this patch.
+- **`\p1` before every distinct key/combo action is mandatory.** OSE's
+  `keyb_poll()` (`include/keyboard.c`) sets `release_count=RELEASE_DEBOUNCE
+  (20)` when a key is first accepted, and only decrements it on a frame with
+  no key pressed. Without a `\p1` (pause 1s, releases all keys) between
+  consecutive `--type-keys` actions, `release_count` never reaches 0 and the
+  next key is silently dropped.
+- **Cycle-count formula**: `total_cycles ≈ 8,080,000 (boot + splash-dismiss)
+  + N_pairs × 1,100,000 (each "\p1+action" pair) + 300,000 (render/dump
+  margin)`, where `N_pairs` = number of distinct `\p1`-prefixed actions.
+- **`oric_screen.py --find` searches *stripped* text**, where attribute
+  bytes (0x00-0x1F, rendered as extra spaces in the unstripped `--row`
+  view) are removed entirely rather than replaced with a space. A run of
+  "word `<attr>` word" in `--row` output (shown as "word  word", two spaces)
+  collapses to "word word" (one space) in `--find`'s haystack. Always derive
+  `--find` needles from the *stripped* text (e.g. via a quick
+  `load_grid()`/`row_text(stripped=True)` check), not from `--row` output.
+- **`cwin_textinput`** (`include/charwin.c`) cursor starts at `idx=strlen`
+  (end of "40"/"60"); typed chars *overwrite* at the cursor and advance it.
+  `KEY_DEL` (0x7F) is unmapped in Phosphoric's `char_map`, so to change "40"
+  to "60", navigate left twice (`\l\l` → idx=0) then type the new leading
+  digit (overwrites '4').
