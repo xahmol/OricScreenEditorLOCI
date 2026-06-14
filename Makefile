@@ -1,133 +1,151 @@
-# Oric Screen Editor - LOCI version
-# Screen editor for the Oric Atmos, specific version for LOCI devices
-# Written in 2025 by Xander Mol
-# Based on VDC Screen Editor for the C128 and
-# the standard version of the Oric Screen Editor
-# 
-# https://github.com/xahmol/OricScreenEditorLOCI
-# https://www.idreamtin8bits.com/
+# Makefile - OricScreenEditorLOCI (Oric Atmos, Oscar64)
+#
+# Two-step build:
+#   1. Oscar64 (-n -tf=bin -rt=include/oric_crt.c) -> build/*.bin
+#   2. tools/mktap.py -> build/*.tap
+#
+# make run requires Oricutron; see ORICUTRON_HOME below
+# Overlay RAM / LOCI features require real LOCI hardware (not testable in Oricutron).
 
-# For full credits: see src/main.c
+# -------------------------------------------------------------------------
+# Cross-platform portability (Windows CMD vs POSIX)
+# -------------------------------------------------------------------------
 
-# Thanks to Iss for pointers for this Makefile:
-# https://forum.defence-force.org/viewtopic.php?p=25411#p25411
+ifeq ($(OS),Windows_NT)
+  NULLDEV = nul:
+  DEL     = -del /f
+  RMDIR   = rmdir /s /q
+  MKDIR   = mkdir
+else
+  NULLDEV = /dev/null
+  DEL     = $(RM)
+  RMDIR   = $(RM) -r
+  MKDIR   = mkdir -p
+endif
 
-## Paths
-# Path tp OSDK install. Edit for local dir
-# Installation instructions for Linux: #https://forum.defence-force.org/viewtopic.php?p=25396#p25396
-OSDK := /home/xahmol/OSDK-build/pc/tools/osdk/main/osdk-linux/bin/
-# Emulator path: edit for location of emulator to use
-EMUL_DIR := /home/xahmol/oricutron/
-# Makefile full path
-mkfile_path := $(shell dirname $(realpath $(firstword $(MAKEFILE_LIST))))
+# -------------------------------------------------------------------------
+# Toolchain
+# -------------------------------------------------------------------------
 
-## Project name
-PROJECT      := OSEforLOCI
-PROJECT_DIR  := $(shell pwd)
-PROGRAM      := BUILD/OricScreenEditor/$(PROJECT).tap
+ifndef OSCAR64_HOME
+$(warning OSCAR64_HOME not set. Defaulting to $(HOME)/oscar64)
+export OSCAR64_HOME = $(HOME)/oscar64
+endif
 
-# Assets to add to ZIP
-SCREENS := assets/$(PROJECT)-Title.bin assets/$(PROJECT)-Help1.bin assets/$(PROJECT)-Help2.bin assets/$(PROJECT)-Help3.bin assets/$(PROJECT)-Help4.bin
-SAMPLES := assets/Petscii.prj.bin assets/Petscii.scr.bin assets/Petscii.css.bin assets/Petscii.csa.bin
+ifndef ORICUTRON_HOME
+$(warning ORICUTRON_HOME not set. Defaulting to $(HOME)/oricutron)
+export ORICUTRON_HOME = $(HOME)/oricutron
+endif
 
-# ZIP file contents
-ZIP_FILENAME = $(PROJECT)_$(VERSION).zip
-ZIP_CONTENT = $(PROGRAM) $(SCREENS) $(SAMPLES) README.pdf
+CC    = $(OSCAR64_HOME)/bin/oscar64
+PY    = python3
+EMUL  = $(ORICUTRON_HOME)/oricutron
 
+# -------------------------------------------------------------------------
 # Build versioning
+# -------------------------------------------------------------------------
+
 VERSION_MAJOR = 0
 VERSION_MINOR = 1
 VERSION_PATCH = 0
-VERSION_TIMESTAMP = $(shell date "+%Y%m%d-%H%M")
-VERSION = v$(VERSION_MAJOR)$(VERSION_MINOR)$(VERSION_PATCH)-$(VERSION_TIMESTAMP)
 
-# Arguments for emulator
-# # # Use MACH to override the default and run as:
-# # # make run-tap MACH=-ma for Atmos (default)
-# # # make run-tap MACH=-m1 for Oric-1
-# # # make run-tap MACH=-mo16k for Oric-1 / 16K
-# # # make run-tap MACH=-mp for Pravetz-8D
-# # # make run-tap MACH=-mt for Telestrat
-MACH := -ma
-EMU                     := ./oricutron
-EMUDIR                  := $(EMUL_DIR)
-EMUARG                  := $(MACH)
-# # # (un)comment, add, remove more Oricutron cmd-line options
-EMUARG                  += --serial none
-EMUARG                  += --vsynchack off
-EMUARG                  += --turbotape on
+# -------------------------------------------------------------------------
+# Project
+# -------------------------------------------------------------------------
 
-## C Sources and library objects to use
-SOURCES = src/main.c src/oric_core.c src/generic.c src/menu.c src/screen.c src/draw.c src/menufunctions.c src/dir.c src/file.c src/palette.c src/charedit.c src/colorpicker.c
-ASSOBJECTS = src/oric_core_assembly.s src/tapehdr.s
-LSOURCES = $(wildcard libsrc/*.c)
-LASOURCES = $(wildcard libsrc/*.s)
-LIBRARY = lib/loci.lib
+MAIN      = oseloci
+PROGNAME  = OSELOCI
+LOAD_ADDR = 0x0500
 
-## CC65 paths and programs
-ifndef CC65_HOME
-$(warning CC65_HOME not set. Defaulting to $(HOME)/cc65)
-export CC65_HOME = $(HOME)/cc65
-endif
-CC        = $(CC65_HOME)/bin/cl65
-AR        = $(CC65_HOME)/bin/ar65
-CP        = cp -f
+# -------------------------------------------------------------------------
+# Compiler flags
+# -------------------------------------------------------------------------
 
-## Compiler and linker flags
-CC65_TARGET = atmos
-CFLAGS  = -t $(CC65_TARGET) -Oirs --debug-info -I include --asm-include-dir asminc -I asminc
-LDFLAGS = -t $(CC65_TARGET) -C memoryconfig.cfg -m $(PROJECT).map
+CFLAGS = \
+  -n              \
+  -tf=bin         \
+  -rt=include/oric_crt.c \
+  -i=include      \
+  -i=src          \
+  -O2             \
+  -dNOFLOAT       \
+  -dVERSION_MAJOR=$(VERSION_MAJOR) \
+  -dVERSION_MINOR=$(VERSION_MINOR) \
+  -dVERSION_PATCH=$(VERSION_PATCH)
 
-#CC65 has changed internal library prefix for errno related symbols. Check which one we have.
-CHECK_CC65 != CC65_HOME=$(CC65_HOME) $(CC) -c $(CFLAGS) -o .asm_check libsrc/mia.s 2>&1
+# -------------------------------------------------------------------------
+# Source dependency lists
+# Oscar64 follows #pragma compile chains internally; make does not --
+# list everything here so rebuilds trigger correctly.
+# -------------------------------------------------------------------------
 
-########################################
+MAIN_SRCS = \
+  src/main.c            \
+  src/strings.h         \
+  include/oric_crt.c    \
+  include/crt_math.c    \
+  include/oric.h        \
+  include/charwin.c      \
+  include/charwin.h      \
+  include/keyboard.c     \
+  include/keyboard.h     \
+  include/ijk.c          \
+  include/ijk.h          \
+  include/loci.c         \
+  include/loci.h
 
-.SUFFIXES:
-.PHONY: all clean run run-debug
-all: $(PROGRAM) $(ZIP_FILENAME)
+# -------------------------------------------------------------------------
+# Emulator flags
+# -------------------------------------------------------------------------
 
-ifneq ($(MAKECMDGOALS),clean)
--include $(SOURCES:.c=.d) $(SOURCESUPD:.c=.d)
-endif
+EMUFLAG = -ma --serial none --vsynchack off --turbotape on
 
-# Compile C sources
-%.o: %.c
-	$(CC) -c $(CFLAGS) -o $@ $<
+# =========================================================================
+# Targets
+# all: must appear first so it is the default goal
+# =========================================================================
 
-%.o: %.s
-ifneq ($(strip $(CHECK_CC65)),)
-	$(CC) -c $(CFLAGS) --asm-define OLD_CC65 -o $@ $<
-else
-	$(CC) -c $(CFLAGS) -o $@ $<
-endif
+.PHONY: all clean run docs
 
-# Build library
-$(LIBRARY): $(LSOURCES:.c=.o) $(LASOURCES:.s=.o)
-	$(CP) $(CC65_HOME)/lib/$(CC65_TARGET).lib $(LIBRARY)
-	$(AR) a $(LIBRARY) $(LSOURCES:.c=.o) $(LASOURCES:.s=.o)
+all: build/$(MAIN).tap
 
-# Link compiled objects 
-$(PROGRAM): $(SOURCES:.c=.o) $(LIBRARY)
-	cd BUILD; $(RM) *.*
-	cd BUILD/OricScreenEditor; $(RM) *.*
-	$(CC) $(LDFLAGS) -o  $@ $^ $(ASSOBJECTS)
+# Step 1: compile main app to raw binary
+build/$(MAIN).bin: $(MAIN_SRCS)
+	@$(MKDIR) build 2>$(NULLDEV) ; true
+	$(CC) $(CFLAGS) -o=build/$(MAIN).bin src/main.c
 
-# Creating ZIP file for distribution
-$(ZIP_FILENAME): $(PROGRAM)
-	cp $(SCREENS) $(SAMPLES) BUILD/OricScreenEditor/
-	cp README.pdf BUILD/
-	cd BUILD; zip -r $(ZIP_FILENAME) *
-	cp BUILD/$(ZIP_FILENAME) .
-	cd BUILD; $(RM) *.*
-	cd BUILD/OricScreenEditor; $(RM) *.*
+# Step 2: wrap binary in Oric tape header
+build/$(MAIN).tap: build/$(MAIN).bin
+	$(PY) tools/mktap.py \
+	    build/$(MAIN).bin \
+	    build/$(MAIN).tap \
+	    $(PROGNAME) \
+	    $(LOAD_ADDR)
 
-# Clean old builds and objects
+# Launch in Oricutron (must cd to oricutron dir -- it loads ROMs from cwd)
+run: build/$(MAIN).tap
+	cd $(ORICUTRON_HOME) && \
+	    $(EMUL) $(EMUFLAG) "$(CURDIR)/build/$(MAIN).tap"
+
+# -------------------------------------------------------------------------
+# Documentation -- generate PDF from Markdown (requires pandoc)
+# README.pdf is committed to git so it ships in release ZIPs even if the
+# recipient does not have pandoc installed.
+# -------------------------------------------------------------------------
+
+docs: README.pdf
+
+README.pdf: README.md
+	@if which pandoc >/dev/null 2>&1; then \
+	    pandoc README.md -o README.pdf; \
+	else \
+	    echo "WARNING: pandoc not found -- README.pdf not updated (install: sudo apt install pandoc texlive-xetex)"; \
+	fi
+
+# -------------------------------------------------------------------------
+# Clean
+# -------------------------------------------------------------------------
+
 clean:
-	$(RM) $(SOURCES:.c=.o) $(SOURCES:.c=.d) $(LSOURCES:.c=.o) $(LASOURCES:.s=.o) *.map *.brk *.sym .asm_check
-	cd BUILD; $(RM) *.*
-	cd BUILD/OricScreenEditor; $(RM) *.*
-
-# Execute in emulator: use make run
-run: $(PROGRAM)
-	cd $(EMUDIR); $(EMU) $(EMUARG) "$(PROJECT_DIR)/$(PROGRAM)"
+	$(DEL) build/$(MAIN).bin 2>$(NULLDEV) ; true
+	$(DEL) build/$(MAIN).tap 2>$(NULLDEV) ; true

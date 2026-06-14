@@ -1,16 +1,20 @@
 {
     "configurations": [
         {
-            "name": "CC65",
+            "name": "Linux",
             "includePath": [
-                "${default}",
-                "include",
-                "/home/xahmol/cc65/include"
+                "/home/xahmol/oscar64/include/",
+                "${workspaceFolder}/include",
+                "${workspaceFolder}/src"
             ],
-            "defines": [],
-            "cStandard": "c17",
-            "cppStandard": "c++14",
-            "intelliSenseMode": "linux-gcc-x86"
+            "defines": [
+                "NOFLOAT",
+                "VERSION=\"0.1.0-dev\"",
+                "__noinline=",
+                "__zeropage="
+            ],
+            "cStandard": "c23",
+            "intelliSenseMode": "linux-gcc-x64"
         }
     ],
     "version": 4
