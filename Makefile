@@ -81,6 +81,13 @@ CFLAGS = \
 
 MAIN_SRCS = \
   src/main.c            \
+  src/appstate.h        \
+  src/canvas.c          \
+  src/canvas.h          \
+  src/statusbar.c       \
+  src/statusbar.h       \
+  src/editor.c          \
+  src/editor.h          \
   src/strings.h         \
   include/oric_crt.c    \
   include/crt_math.c    \
@@ -100,12 +107,28 @@ MAIN_SRCS = \
 
 EMUFLAG = -ma --serial none --vsynchack off --turbotape on
 
+# -------------------------------------------------------------------------
+# Phosphoric automated testing
+# -------------------------------------------------------------------------
+# PHOSDIR is set in .env (see .env.example) -- checkout of
+# https://github.com/benedictemarty/Phosphoric, providing oric1-emu and
+# roms/basic11b.rom. Phosphoric lets oseloci.tap be fast-loaded (-t ... -f)
+# under Atmos BASIC 1.1 and tested headless via RAM dumps.
+
+-include .env
+
+PHOSDIR  ?= NOT_SET
+PHOS      = $(PHOSDIR)/oric1-emu
+ATMOSROM  = $(PHOSDIR)/roms/basic11b.rom
+
+CYCLES   ?= 8000000
+
 # =========================================================================
 # Targets
 # all: must appear first so it is the default goal
 # =========================================================================
 
-.PHONY: all clean run docs
+.PHONY: all clean run docs check-phosphoric sandbox-reset test-capture test-boot test
 
 all: build/$(MAIN).tap
 
@@ -126,6 +149,56 @@ build/$(MAIN).tap: build/$(MAIN).bin
 run: build/$(MAIN).tap
 	cd $(ORICUTRON_HOME) && \
 	    $(EMUL) $(EMUFLAG) "$(CURDIR)/build/$(MAIN).tap"
+
+# -------------------------------------------------------------------------
+# Phosphoric automated testing
+# -------------------------------------------------------------------------
+# make test          -- full automated suite (currently: test-boot)
+# make test-capture CYCLES=N TYPEKEYS='...'
+#                    -- calibration helper: fast-loads oseloci.tap under
+#                       Atmos BASIC 1.1, runs for CYCLES, dumps
+#                       tests/out/capture.bin (RAM) and tests/out/capture.png
+#                       (screenshot). No assertions -- used to find the
+#                       right cycle counts / --type-keys sequences.
+
+check-phosphoric:
+	@test "$(PHOSDIR)" != "NOT_SET" || \
+	    (echo "ERROR: PHOSDIR not set -- copy .env.example to .env and set PHOSDIR" && false)
+	@test -x "$(PHOS)" || \
+	    (echo "ERROR: oric1-emu not found/executable at $(PHOS) -- check PHOSDIR in .env" && false)
+	@test -f "$(ATMOSROM)" || \
+	    (echo "ERROR: Atmos ROM not found at $(ATMOSROM)" && false)
+
+# Reset the test sandbox from checked-in fixtures + the freshly built tap,
+# so every test run starts from a known state.
+sandbox-reset: build/$(MAIN).tap
+	$(RMDIR) tests/sandbox 2>$(NULLDEV) ; true
+	$(MKDIR) tests/sandbox 2>$(NULLDEV) ; true
+	cp -r tests/fixtures/. tests/sandbox/
+	find tests/sandbox -name '.gitkeep' -delete
+	cp build/$(MAIN).tap tests/sandbox/
+
+test-capture: check-phosphoric sandbox-reset
+	$(MKDIR) tests/out 2>$(NULLDEV) ; true
+	$(PHOS) -r $(ATMOSROM) \
+	    -t tests/sandbox/$(MAIN).tap -f \
+	    --headless -c $(CYCLES) \
+	    $(if $(TYPEKEYS),--type-keys '$(TYPEKEYS)') \
+	    --dump-ram-at $(CYCLES):tests/out/capture.bin \
+	    --screenshot-at $(CYCLES):tests/out/capture.ppm
+	@which pnmtopng >$(NULLDEV) 2>&1 && pnmtopng tests/out/capture.ppm > tests/out/capture.png || true
+	python3 tests/scripts/oric_screen.py tests/out/capture.bin
+
+test-boot: check-phosphoric sandbox-reset
+	$(MKDIR) tests/out 2>$(NULLDEV) ; true
+	PHOS=$(PHOS) ATMOSROM=$(ATMOSROM) SANDBOX=tests/sandbox OUT=tests/out \
+	    TAPFILE=$(MAIN).tap \
+	    bash tests/scripts/test_boot.sh
+
+test:
+	@status=0; \
+	$(MAKE) test-boot || status=1; \
+	exit $$status
 
 # -------------------------------------------------------------------------
 # Documentation -- generate PDF from Markdown (requires pandoc)
