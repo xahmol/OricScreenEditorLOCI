@@ -158,7 +158,7 @@ CYCLES   ?= 8000000
 # all: must appear first so it is the default goal
 # =========================================================================
 
-.PHONY: all all-langs clean run docs check-phosphoric sandbox-reset test-capture test-boot test-menus test-screenresize test-charsetram-spike test-charsetedit test
+.PHONY: all all-langs clean run docs check-phosphoric sandbox-reset test-capture test-boot test-menus test-screenresize test-charsetram-spike test-charsetedit test-palette test-colourpicker test
 
 all: build/$(MAIN)$(LANGSUFFIX).tap
 
@@ -254,6 +254,18 @@ test-charsetedit: check-phosphoric sandbox-reset
 	    TAPFILE=$(MAIN)$(LANGSUFFIX).tap \
 	    bash tests/scripts/test_charsetedit.sh
 
+test-palette: check-phosphoric sandbox-reset
+	$(MKDIR) tests/out 2>$(NULLDEV) ; true
+	PHOS=$(PHOS) ATMOSROM=$(ATMOSROM) SANDBOX=tests/sandbox OUT=tests/out \
+	    TAPFILE=$(MAIN)$(LANGSUFFIX).tap \
+	    bash tests/scripts/test_palette.sh
+
+test-colourpicker: check-phosphoric sandbox-reset
+	$(MKDIR) tests/out 2>$(NULLDEV) ; true
+	PHOS=$(PHOS) ATMOSROM=$(ATMOSROM) SANDBOX=tests/sandbox OUT=tests/out \
+	    TAPFILE=$(MAIN)$(LANGSUFFIX).tap \
+	    bash tests/scripts/test_colourpicker.sh
+
 test:
 	@status=0; \
 	$(MAKE) test-boot || status=1; \
@@ -261,6 +273,8 @@ test:
 	$(MAKE) test-screenresize || status=1; \
 	$(MAKE) test-charsetram-spike || status=1; \
 	$(MAKE) test-charsetedit || status=1; \
+	$(MAKE) test-palette || status=1; \
+	$(MAKE) test-colourpicker || status=1; \
 	exit $$status
 
 # -------------------------------------------------------------------------
