@@ -46,7 +46,10 @@ as part of the screen design — charwin would clobber those on every blit.
 `OricCharWin`/`cwin_*` (incl. `cwin_push/pop`, `cwin_textinput`, popups) remain
 the right tool for Phase 2+ UI chrome (menus/popups) and for the **statusbar**
 (row 27, `src/statusbar.c/h`), which genuinely benefits from the bordered
-2-attr-column model.
+2-attr-column model. Colours: `A_FWBLACK`/`A_BGWHITE` (black-on-white)
+throughout — matches V1's statusbar/editor-field convention and the
+popup/menu chrome (locifilemanager-v2's `cwin_init(..., A_FWBLACK,
+A_BGWHITE)` everywhere).
 
 **Feature-set reference:** `README.md` / `README.pdf` and `screenshots/`
 describe V1's UI and feature set (main mode, character editor, palette mode,
@@ -60,6 +63,18 @@ and may be reusable as-is.
 `src/charsetedit.c/h` — entered via `e` from main mode, edits the 6x8-pixel
 glyph for `app.plotscreencode`/`app.plotaltchar`.
 
+- **Layout: popup, not V1's sidebar (deliberate Phase 3 deviation)**. V1 draws
+  the char editor as a fixed inline panel in screen columns 27-39 (rows 0-11),
+  because V1's canvas width was capped to leave that area permanently free.
+  Phase 1 of this rewrite deliberately removed that fixed reservation — the
+  canvas is a *resizable, full-width* `screenmap[]` (see "Canvas architecture"
+  above) — and Phase 2 introduced a popup-window/menu system
+  (`cwin_init`/`menu_winsave`/`menu_winrestore`) for all UI chrome. A literal
+  V1-style sidebar would overlap canvas content on wide canvases unless the
+  canvas were re-capped, undoing that Phase 1 decision. The character editor
+  therefore reuses V1's **key bindings/behaviour** (per the Phase 3 plan) but
+  presents them in a popup, consistent with the menu system. Colours
+  (`A_FWBLACK`/`A_BGWHITE`) match V1's editor-field convention.
 - **Strategy A (confirmed by the Phase 3a spike, kept as a permanent
   regression in `tests/scripts/test_charsetram_spike.sh`)**: both
   `CHARSET_STD` ($B400) and `CHARSET_ALT` ($B800) banks are edited

@@ -7,7 +7,7 @@ OricCharWin statusbar_win;
 
 void statusbar_init(void)
 {
-    cwin_init(&statusbar_win, 2, VIEWPORT_HEIGHT, 38, 1, A_FWWHITE, A_BGBLUE);
+    cwin_init(&statusbar_win, 2, VIEWPORT_HEIGHT, 38, 1, A_FWBLACK, A_BGWHITE);
     statusbar_draw();
 }
 
