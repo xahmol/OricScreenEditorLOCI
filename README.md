@@ -21,6 +21,8 @@ Screen editor for the Oric Atmos
 
 [Palette mode](#palette-mode)
 
+[Colour picker](#colour-picker)
+
 [Select mode](#select-mode)
 
 [Move mode](#move-mode)
@@ -135,6 +137,7 @@ Press these keys in main mode for editing:
 |**M**|Go to '**M**ove mode'
 |**S**|Go to '**S**elect mode'
 |**P**|Go to '**P**alette mode'
+|**C**|Go to '**C**olour picker'
 |**T**|**T**ry mode
 |**R**|Toggle '**R**everse': toggle increase/decrease screencode by 128
 |**FUNCT+1**|Go to main menu
@@ -163,7 +166,7 @@ Pressing **SHIFT** plus **0-9** stores the presently selected character to the c
 
 *Selecting the attributes to plot*
 
-Increase or decrease the [color code](#color-value-reference) by one by pressing the **.** resp. **,** key for the Ink color, or **;** resp. **\'** for the Paper color. Pressing **B**, **D** or **A** will toggle the **B**link, **D**ouble size or **A**lternate charset attribute.
+Increase or decrease the [color code](#color-value-reference) by one by pressing the **.** resp. **,** key for the Ink color, or **;** resp. **\'** for the Paper color. Pressing **B**, **D** or **A** will toggle the **B**link, **D**ouble size or **A**lternate charset attribute. Alternatively, press **C** to open the [colour picker](#colour-picker) and select the Ink and Paper colors together from a visual grid.
 
 *Plotting and deleting a character*
 
@@ -444,6 +447,41 @@ Pressing **V** toggles between normal and visual mode.
 *Leave mode and help*
 
 Pressing **ESC** leaves the palette mode and returns to main mode. **FUNCT+8** will show a help screen with all keyboard commands of the character mode.
+
+## Colour picker
+([Back to contents](#contents))
+
+Pressing **C** in main mode starts the Colour picker. This is an addition over the original OricScreenEditor: a visual grid for selecting the Ink and Paper colors to plot with together, including a preview of the resulting normal and inverse color combination.
+
+A window like this appears, showing an 8x8 grid of all Ink/Paper combinations, plus feedback lines for the currently highlighted Ink, Paper and the resulting normal/inverse preview:
+
+```
+Select ink and paper colour
+<8x8 grid of ink x paper colour cells, each showing the normal and inverse swatch for that combination>
+Ink:    N <swatch>
+Paper:  N <swatch>
+Result: <normal/inverse preview>
+```
+
+Keyboard commands in this mode:
+
+|Key|Description
+|---|---|
+|**Cursor keys**|Move cursor (LEFT/RIGHT cycle Ink, UP/DOWN cycle Paper, both wrap 0-7)
+|**SPACE or ENTER**|Select the highlighted Ink/Paper combination
+|**ESC**|Leave the colour picker and go back to main mode, leaving the selected Ink/Paper colors unchanged
+
+*Moving cursor*
+
+Press the **cursor keys** to move the cursor around the 8x8 grid. **LEFT**/**RIGHT** cycle the Ink color, **UP**/**DOWN** cycle the Paper color, both wrapping between color 0 and 7.
+
+*Selecting ink and paper*
+
+Press **SPACE** or **ENTER** to select the highlighted Ink/Paper combination as the new colors to plot with. This leaves the colour picker and returns to main mode; the statusbar's I and P fields update accordingly.
+
+*Leave mode*
+
+Pressing **ESC** leaves the colour picker without changing the selected Ink/Paper colors, and returns to main mode.
 
 ## Select mode:
 ([Back to contents](#contents))

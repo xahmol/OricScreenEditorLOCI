@@ -186,9 +186,13 @@ src/
   appstate.h      Global AppState struct (canvas size, cursor, viewport, mode, ...)
   canvas.c/h      Flat 40x27 screenmap[] buffer + raw $BB80 blit (bypasses charwin),
                   canvas_resize() (up to CANVAS_MAX_SIZE)
-  statusbar.c/h   Row-27 statusbar (OricCharWin, Mode/X,Y/C/S readout)
-  editor.c/h      Main-mode loop: cursor move, +/- screencode select, SPACE/DEL plot,
-                  FUNCT+1 opens the menu bar, 'e' opens the character editor
+  statusbar.c/h   Row-27 statusbar (OricCharWin, Mode/XY/C/S/I/P readout +
+                  A/D/B attribute flags, see §6.2/§6.7/§6.8)
+  editor.c/h      Main-mode loop: cursor move, +/- screencode select, SPACE/DEL
+                  plot, ,/.;/' ink/paper cycling, b/d/a attribute toggles,
+                  0-9/SHIFT+0-9 favourites, FUNCT+1 opens the menu bar, 'e'
+                  opens the character editor, 'p' opens the palette popup, 'c'
+                  opens the colour picker
   menu.c/h        Menu bar/pulldown/popup engine + main-RAM window-save stack
   menudata.c/h    OSE menu tables (Screen/File/Charset/Information) + Screen
                   pulldown dispatch (Width/Height/Clear/Fill)
@@ -196,6 +200,10 @@ src/
                   app.plotscreencode/app.plotaltchar directly in live charset RAM
   charsetswap.c/h Charset-swap mechanism: backs up/restores CHARSET_STD around
                   popups so chrome renders with ROM glyphs
+  palette.c/h     Palette popup ('p'): Fav/Std/Alt charset grid + visualchar[]
+                  visual-charmap toggle (§6.7)
+  colourpicker.c/h Colour picker popup ('c'): 8x8 ink x paper grid with
+                  inverse-colour preview, new vs V1 (§6.8)
   strings.h       Localisation gateway (LANG_FR -> strings_fr.h, else strings_en.h)
   strings_en.h    User-visible MSG_* strings, English
   strings_fr.h    User-visible MSG_* strings, French (unaccented)
@@ -284,6 +292,11 @@ typedef struct {
     uint16_t   yoffset;         // viewport scroll offset (rows)
     uint8_t    plotscreencode;  // character placed by SPACE
     uint8_t    plotaltchar;     // 0 = standard charset, 1 = alternate
+    uint8_t    plotink;         // 0-7, ink colour to plot
+    uint8_t    plotpaper;       // 0-7, paper colour to plot
+    uint8_t    plotblink;       // 0/1, blink attribute to plot
+    uint8_t    plotdouble;      // 0/1, double-height attribute to plot
+    uint8_t    visualmap;       // 0/1, palette Alt-charset visual-charmap toggle
     uint8_t    favourites[FAVOURITES_COUNT]; // character-editor favourites
     EditorMode mode;
     uint8_t    showstatusbar;
@@ -296,7 +309,11 @@ extern AppState app;
 6655-byte CC65 ceiling), leaving headroom in the ~42.4 KB program region for
 the menu engine and later phases' static buffers. `EditorMode` currently has
 a single value (`MODE_MAIN`) — select/move/line-box/write modes (Phase 5)
-will add more.
+will add more. The Phase 4a fields (`plotink`/`plotpaper`/`plotblink`/
+`plotdouble`/`visualmap`) default to `A_FWWHITE`/`A_FWBLACK`/`0`/`0`/`0` (set
+in `editor_run()`'s init block) and are read/written by the main-mode
+attribute-selection keys, the statusbar, and the palette/colour-picker popups
+(§6.2, §6.7, §6.8).
 
 ### 4.3 Canvas (`src/canvas.h`)
 
@@ -411,8 +428,10 @@ main.c
  ├─ menudata.h   (Screen/File/Charset/Information tables + Screen dispatch)
  │   └─ menu.h, canvas.h, statusbar.h, strings.h
  ├─ editor.h     (main-mode loop)
- │   └─ charsetedit.h (character editor popup)
- │       └─ charset.h (glyph addressing + bitmap transforms)
+ │   ├─ charsetedit.h (character editor popup)
+ │   │   └─ charset.h (glyph addressing + bitmap transforms)
+ │   ├─ palette.h     (palette popup: Fav/Std/Alt grid, visualchar[])
+ │   └─ colourpicker.h (colour picker popup: 8x8 ink x paper grid)
  └─ strings.h    (EN/FR localisation gateway -> strings_en.h/strings_fr.h, §3)
 
 main.c, canvas.c, statusbar.c, menu.c, menudata.c, editor.c, charsetedit.c,
@@ -465,6 +484,8 @@ the second time.
 app.cursor_x = app.cursor_y = 0;
 app.xoffset = app.yoffset = 0;
 app.plotscreencode = 'A'; app.plotaltchar = 0;
+app.plotink = A_FWWHITE; app.plotpaper = A_FWBLACK;
+app.plotblink = 0; app.plotdouble = 0; app.visualmap = 0;
 app.favourites[0..9] = '!';
 app.mode = MODE_MAIN; app.showstatusbar = 1;
 
@@ -478,9 +499,16 @@ for (;;) {
         case KEY_SPACE: canvas_put(cursor, app.plotscreencode); canvas_blit();
         case KEY_DEL:   canvas_put(cursor, CH_SPACE); canvas_blit();
         case '+'/'-':   cycle app.plotscreencode in [0x20, 0x7E], wrapping
+        case ','/'.':   cycle app.plotink 0-7, wrapping        (Phase 4a)
+        case ';'/'\'':  cycle app.plotpaper 0-7, wrapping       (Phase 4a)
+        case 'b'/'d'/'a': toggle plotblink/plotdouble/plotaltchar (Phase 4a)
+        case '0'-'9':   app.plotscreencode = app.favourites[c-'0'] (Phase 4a)
+        case SHIFT+0-9: app.favourites[n] = app.plotscreencode  (Phase 4a)
         case KEY_F6:    statusbar_show(!app.showstatusbar);
         case KEY_F1:    menu_run();          // open the menu bar
         case 'e':       charsetedit_run();   // open the character editor
+        case 'p':       palette_run();       // open the palette popup (Phase 4b)
+        case 'c':       colourpicker_run();  // open the colour picker (Phase 4c)
     }
     statusbar_draw();
     canvas_cell_invert(cursor);              // show cursor at new pos
@@ -517,7 +545,8 @@ plain Oricutron.
 
 Call sites and their `swap_charset` argument: `menu_run()` (menu bar, `1`),
 `menu_pulldown()` (`1`), `menu_areyousure()` (`1`), `menu_messagepopup()`
-(`1`), `resize_dialog()` (`1`); `charsetedit_run()` passes `0` (§6.4/§6.5).
+(`1`), `resize_dialog()` (`1`), `palette_run()` (`1`, §6.7),
+`colourpicker_run()` (`1`, §6.8); `charsetedit_run()` passes `0` (§6.4/§6.5).
 
 Return-code convention from `menu_run()`'s `switch`: `menubarchoice*10 +
 menuoptionchoice` — e.g. `11`/`12` = Screen pulldown (bar item 1), options 1
@@ -595,6 +624,71 @@ above it) and `neww*newh <= CANVAS_MAX_SIZE` (8192). Shrinking below the
 the size unchanged. On success, `canvas_resize()` is applied and
 `update_size_titles()` rewrites the pulldown labels.
 
+### 6.7 Palette mode (`src/palette.c`, entered via `p`)
+
+Near-full-width popup (`PAL_WIN_SX=2/SY=0/WX=38/WY=13`, screen cols 2-39 rows
+0-12, `menu_winsave(0, 13, 1)`) for selecting `app.plotscreencode`/
+`app.plotaltchar`.
+
+Layout (13 rows x 16 cols, `PAL_GRID_X0=5`, `PAL_GRID_STEP=2`): row 0
+(`PAL_ROW_FAV`) = `"Fav:"` + 10 favourite glyphs (`app.favourites[]`); rows
+1-6 (`PAL_ROW_STD0=1`) = `"Std:"` + the full standard charset 0x20-0x7F (96
+glyphs, 16/row); rows 7-12 (`PAL_ROW_ALT0=7`) = `"Alt:"` + the full alternate
+charset 0x20-0x7F, or — if `app.visualmap` — rows 7-11 remapped via
+`visualchar[80]` (row 12 stays identity 0x70-0x7F). Each grid cell is the
+screencode byte, drawn under the row's `A_STD`/`A_ALT` attribute byte at
+`PAL_ATTR_X=4`. `visualchar[80]` is ported verbatim from V1 OricScreenEditor
+(`/home/xahmol/git/OricScreenEditor/src/main.c`), credited to jab/Artline
+Designs.
+
+Cursor `(rowsel, colsel)` is highlighted via `^0x80` (same convention as
+charsetedit's grid cursor). Initial position mirrors V1: derived from
+`app.plotscreencode` (`row = (code-0x20)/16 + 1`, `col = (code-0x20)%16`),
+always landing in the Std rows. `pal_wrap()` applies cursor-wrap post-checks
+(row overflow, then favourites-row column limit, then general column limit —
+order matters to avoid an out-of-bounds `favourites[]` access).
+
+Key bindings: cursor keys navigate with wrap across all three sections;
+`SPACE`/`ENTER` set `plotscreencode`/`plotaltchar` from the highlighted cell
+and close the popup (`menu_winrestore()`); `0`-`9` store the highlighted
+cell's screencode into `favourites[n]` (redraws the Fav row); `v` toggles
+`app.visualmap` (redraws rows 7-12); `FUNCT+6` toggles the statusbar; `ESC`
+closes the popup leaving `plotscreencode`/`plotaltchar` unchanged.
+
+Opts IN to the charset-swap (`menu_winsave(..., 1)`) — the Std/Alt grids
+render via `A_STD`/`A_ALT` attribute bytes, not direct charset-RAM access, so
+there's no live-edit-preview requirement.
+
+### 6.8 Colour picker (`src/colourpicker.c`, entered via `c`)
+
+**New OSE-LOCI feature over V1** (see README.md "Planned feature additions
+over V1"). Popup (`CP_WIN_SX=2/SY=0/WX=36/WY=13`, screen cols 2-37 rows 0-12,
+`menu_winsave(0, 13, 1)`) for selecting `app.plotink`/`app.plotpaper` from an
+8x8 ink x paper grid.
+
+Layout: row 0 = title (`MSG_COLOURPICKER_TITLE`); rows 1-8 (`CP_ROW_GRID0=1`)
+= one row per paper value 0-7, 8 cells (ink 0-7) at `CP_GRID_X0=2`,
+`CP_CELL_STEP=4` cols/cell: `[ink-attr byte, paper-attr byte (16+paper),
+normal swatch, inverse swatch]`. Rows 10-12 are feedback lines: `Ink:` +
+swatch (`CP_ROW_INK`), `Paper:` + swatch (`CP_ROW_PAPER`), `Result:` +
+ink/paper attrs + normal+inverse preview pair (`CP_ROW_RESULT`).
+
+Cursor highlight swaps a cell's two swatch chars (`CH_SPACE`<->`CH_INVSPACE`;
+normal = paper-colour swatch then ink-colour swatch, highlighted = reversed)
+— a 2-char analogue of charsetedit's `^0x80` cursor. Initial position =
+`(app.plotink, app.plotpaper)`.
+
+Key bindings: LEFT/RIGHT cycle ink (wrap 0-7), UP/DOWN cycle paper (wrap 0-7);
+`SPACE`/`ENTER` commit the highlighted cell to `plotink`/`plotpaper` and close
+the popup; `FUNCT+6` toggles the statusbar; `ESC` closes the popup leaving
+`plotink`/`plotpaper` unchanged.
+
+Adapted from V1's `colourpicker()`/`colorpicker_cursorplot()` (archived
+`nonworkingcc65:src/colorpicker.c`) — same 8x8 grid + Ink:/Paper:/Result:
+feedback concept; the border-drawing cursor is replaced with the simpler
+2-char swatch swap. Opts IN to the charset-swap — swatch glyphs
+(`CH_SPACE`/`CH_INVSPACE`) are plain Std-charset chars.
+
 ---
 
 ## 7. Testing Infrastructure
@@ -605,12 +699,14 @@ Automated headless testing runs `build/oseloci.tap` under **Phosphoric**
 screen-content assertions via `tests/scripts/oric_screen.py`).
 
 ```
-make test                  # full suite (all 5 targets below)
+make test                  # full suite (all 7 targets below)
 make test-boot              # headless boot smoke test: splash + canvas/statusbar render
 make test-menus              # menu bar/pulldown/Screen-menu regression
 make test-screenresize        # Screen > Width/Height resize + shrink-confirm
 make test-charsetram-spike     # Strategy A charset-RAM edit regression (Phase 3a)
 make test-charsetedit            # character editor: grid, favourites, transforms, Std/Alt
+make test-palette                 # palette popup: Fav/Std/Alt grid, cursor wrap, select/store/visualmap
+make test-colourpicker              # colour picker: 8x8 grid, cursor wrap, select/ESC
 make test-capture CYCLES=N TYPEKEYS='...'  # calibration helper for new scripts
 ```
 
@@ -618,11 +714,11 @@ make test-capture CYCLES=N TYPEKEYS='...'  # calibration helper for new scripts
   `tests/sandbox/`, copies `tests/fixtures/` into it, and copies the
   freshly-built `.tap` in.
 - `tests/scripts/oric_screen.py` decodes the 40x28 `$BB80` text screen from a
-  `--dump-ram-at` dump, providing `--find`/`--row` assertions used by the
-  shell scripts in `tests/scripts/test_*.sh`.
-- Current totals: 5 + 15 + 8 + 2 + 12 = **42/42** (`test-boot` +
+  `--dump-ram-at` dump, providing `--find`/`--row`/`--bytes` assertions used
+  by the shell scripts in `tests/scripts/test_*.sh`.
+- Current totals: 5 + 15 + 8 + 2 + 12 + 14 + 14 = **70/70** (`test-boot` +
   `test-menus` + `test-screenresize` + `test-charsetram-spike` +
-  `test-charsetedit`).
+  `test-charsetedit` + `test-palette` + `test-colourpicker`).
 - LOCI/overlay-RAM features (§2.4) are not yet present, so nothing here
   exercises them; once wired in, those features will need real-hardware
   verification (Phosphoric/Oricutron cannot emulate overlay RAM).

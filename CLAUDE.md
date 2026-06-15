@@ -18,19 +18,21 @@ storage device**.
 - Enhanced palette mode that also shows the inverse colour combinations for
   each ink/paper pair
 
-**Status: Phase 3 of 9 complete**, plus charset-swap infrastructure, a narrow
-charset-editor popup, and EN/FR localisation (Phase 4 prep; canvas data model
-+ minimal main mode + menu bar/Screen menu + character editor + charset-swap
-mechanism + Phosphoric test harness; binary 11382 bytes EN / 11435 bytes FR).
+**Status: Phase 4 of 9 complete**, plus charset-swap infrastructure, a narrow
+charset-editor popup, palette mode, the colour picker, the main-mode
+attribute-selection keys and a redesigned statusbar, and EN/FR localisation
+(canvas data model + minimal main mode + menu bar/Screen menu + character
+editor + charset-swap mechanism + palette/colour-picker popups + Phosphoric
+test harness; binary 13448 bytes EN / 13501 bytes FR).
 A previous CC65-based attempt at this got stuck and is archived
 in the `nonworkingcc65` branch (full history + uncommitted state). `main` was
 restarted from scratch on the Oscar64 native/bare-metal build chain developed
 for [locifilemanager-v2](https://github.com/xahmol/locifilemanager-v2)
 (`/home/xahmol/git/locifilemanager-v2`), which the runtime and libraries below
-were copied from verbatim. The remaining 6 phases (palette/colour picker,
-select/move/line-box/write modes, LOCI file I/O, file picker, overlay-RAM
-undo, IJK/help/polish) are tracked in the active plan — see
-`~/.claude/plans/snappy-beaming-lynx.md` or ask Claude for status.
+were copied from verbatim. The remaining 5 phases (select/move/line-box/write
+modes, LOCI file I/O, file picker, overlay-RAM undo, IJK/help/polish) are
+tracked in the active plan — see `~/.claude/plans/snappy-beaming-lynx.md` or
+ask Claude for status.
 
 **Other docs**: `ARCHITECTURE.md` (memory map, module layout, dependency
 graph), `libmanual.md`/`libmanual_fr.md` (per-function API reference for
@@ -138,6 +140,111 @@ glyph for `app.plotscreencode`/`app.plotaltchar`.
 - **Favourites default**: `editor_run()` initialises all 10 slots to `'!'`
   (0x21); `FAVOURITES_COUNT=10` in `src/appstate.h`.
 
+### Main-mode attribute-selection keys and statusbar redesign (Phase 4a)
+
+`src/appstate.h` gained five `AppState` fields: `plotink`/`plotpaper` (0-7,
+default `A_FWWHITE`/`A_FWBLACK`), `plotblink`/`plotdouble` (0/1 toggles), and
+`visualmap` (0/1, palette Alt-section toggle — see "Palette mode" below).
+`editor_run()`'s main key switch (`src/editor.c`) gained, matching V1
+`main.c`'s attribute-selection key table:
+
+- `,`/`.`: decrease/increase `plotink` (wrap 0-7)
+- `;`/`'`: decrease/increase `plotpaper` (wrap 0-7)
+- `b`/`d`/`a`: toggle `plotblink`/`plotdouble`/`plotaltchar`
+- `0`-`9`: `plotscreencode = favourites[n]`
+- `)`/`!`/`@`/`#`/`$`/`%`/`^`/`&`/`*`/`(` (SHIFT+0-9): `favourites[n] =
+  plotscreencode` — same key-code mapping as `charsetedit.c`'s favourite-store
+- `p`/`c`: open the palette/colour-picker popups (below)
+
+`G` (grab) and `I`/`O`/`U` (serial-attribute *plotting* into the canvas) are
+deferred to Phase 5, alongside Write mode.
+
+**Statusbar** (`src/statusbar.c`, `MSG_STATUSBAR_MAIN_FMT`) was redesigned to
+match V1's `printstatusbar()` layout within the 36-content-column budget:
+`Mode | XY x,y | C <code><glyph> | S <underlying-byte> | I <ink><swatch> | P
+<paper><swatch> | A/S D/_ B/_`. The `S` field (`canvas_get()` at the cursor)
+replaces the Phase 1-3 "canvas WxH" placeholder. The four 1-column ink/paper
+swatches (`16+plotink`/`A_BGWHITE`/`16+plotpaper`/`A_BGWHITE`) are drawn via
+separate `cwin_putat_char()` calls after `cwin_putat_printf()` — the literal
+`"  "` gaps in `MSG_STATUSBAR_MAIN_FMT` are overwritten by these swatch
+attribute bytes, which are `<0x20` and so render as nothing (not a visible
+gap).
+
+### Palette mode (Phase 4b)
+
+`src/palette.c/h` — entered via `p` from main mode, a near-full-width popup
+(`PAL_WIN_SX=2/SY=0/WX=38/WY=13`, screen cols 2-39 rows 0-12,
+`menu_winsave(0, 13, 1)`) for selecting `app.plotscreencode`/
+`app.plotaltchar`.
+
+- **Layout** (13 rows x 16 cols, `PAL_GRID_X0=5`, `PAL_GRID_STEP=2`): row 0
+  (`PAL_ROW_FAV`) = `"Fav:"` + 10 favourite glyphs; rows 1-6
+  (`PAL_ROW_STD0=1`) = `"Std:"` + the full standard charset 0x20-0x7F (96
+  glyphs, 16 per row); rows 7-12 (`PAL_ROW_ALT0=7`) = `"Alt:"` + the full
+  alternate charset 0x20-0x7F, or — if `app.visualmap` is set — rows 7-11
+  remapped via `visualchar[80]` (row 12 stays identity 0x70-0x7F). Each grid
+  cell is the screencode byte itself, drawn under the row's `A_STD`/`A_ALT`
+  attribute byte at `PAL_ATTR_X=4`.
+- **`visualchar[80]`**: ported verbatim from V1 OricScreenEditor
+  (`/home/xahmol/git/OricScreenEditor/src/main.c`), credited to jab/Artline
+  Designs (Jaakko Luoto) — see README.md Credits. Covers screencodes
+  0x20-0x6F; the final alternate row (0x70-0x7F) is always identity, matching
+  V1.
+- **Cursor**: `(rowsel, colsel)` highlighted via `^0x80` (same convention as
+  `charsetedit`'s grid cursor). Initial position mirrors V1: derived from
+  `app.plotscreencode` (`row = (code-0x20)/16 + 1`, `col = (code-0x20)%16`),
+  always landing in the Std rows regardless of `app.plotaltchar`. OSE uses a
+  13-row grid (V1 used 12); `pal_wrap()`'s post-check order was re-derived for
+  13 rows to avoid an out-of-bounds `favourites[]` access when wrapping DOWN
+  from the last Alt row into a favourites column > 9.
+- **Keys**: cursor keys navigate with wrap across all three sections;
+  `SPACE`/`ENTER` set `plotscreencode`/`plotaltchar` from the highlighted cell
+  and close the popup; `0`-`9` store the highlighted cell's screencode into
+  `favourites[n]` (redraws the Fav row); `v` toggles `app.visualmap`
+  (redraws rows 7-12); `FUNCT+6` toggles the statusbar; `ESC` closes the popup
+  unchanged.
+- **Charset-swap**: opts IN (`menu_winsave(..., 1)`) — the Std/Alt grids
+  render via the `A_STD`/`A_ALT` attribute bytes, not direct charset-RAM
+  access, so there's no live-edit-preview requirement (unlike charsetedit).
+
+**Noted follow-up (not blocking)**: V1 ships `assets/Petscii.css.bin` as the
+default Alt charset, which is what makes `visualmap`'s reordering visually
+meaningful. OSE doesn't load any default Alt-charset asset at startup (a
+Phase-1 gap, not Phase-4-specific) — `visualmap` still works correctly (a pure
+index permutation over whatever is in `CHARSET_ALT`), just less visually
+useful until a default-charset-loading mechanism exists.
+
+### Colour picker (Phase 4c)
+
+`src/colourpicker.c/h` — entered via `c` from main mode, a **new OSE-LOCI
+feature over V1** (see README.md "Planned feature additions over V1": "Enhanced
+palette mode also showing inverse ink/paper colour combinations"). Popup
+(`CP_WIN_SX=2/SY=0/WX=36/WY=13`, screen cols 2-37 rows 0-12,
+`menu_winsave(0, 13, 1)`) for selecting `app.plotink`/`app.plotpaper` from an
+8x8 ink x paper grid.
+
+- **Layout**: row 0 = title (`MSG_COLOURPICKER_TITLE`); rows 1-8
+  (`CP_ROW_GRID0=1`) = one row per paper value 0-7, each with 8 cells (one per
+  ink value 0-7) at `CP_GRID_X0=2`, `CP_CELL_STEP=4` cols/cell: `[ink-attr
+  byte, paper-attr byte (16+paper), normal swatch, inverse swatch]`. Rows
+  10-12 are feedback lines: `"Ink:    N"` + swatch (`CP_ROW_INK`), `"Paper:
+  N"` + swatch (`CP_ROW_PAPER`), `"Result:"` + ink/paper attrs + normal+inverse
+  preview pair (`CP_ROW_RESULT`).
+- **Cursor**: the highlighted cell swaps its two swatch chars
+  (`CH_SPACE`<->`CH_INVSPACE`; normal = paper-colour swatch then ink-colour
+  swatch, highlighted = reversed) — a 2-char analogue of charsetedit's `^0x80`
+  cursor. Initial position = `(app.plotink, app.plotpaper)`.
+- **Keys**: LEFT/RIGHT cycle ink (wrap 0-7), UP/DOWN cycle paper (wrap 0-7);
+  `SPACE`/`ENTER` commit the highlighted cell to `plotink`/`plotpaper` and
+  close the popup; `FUNCT+6` toggles the statusbar; `ESC` closes the popup
+  unchanged.
+- **Adapted from** V1's `colourpicker()`/`colorpicker_cursorplot()` (archived
+  `nonworkingcc65:src/colorpicker.c`) — same 8x8 grid + Ink:/Paper:/Result:
+  feedback concept; the border-drawing cursor is replaced with the simpler
+  2-char swatch swap.
+- **Charset-swap**: opts IN — swatch glyphs (`CH_SPACE`/`CH_INVSPACE`) are
+  plain Std-charset chars, no live-edit-preview requirement.
+
 ### Charset-swap mechanism
 
 `src/charsetswap.c/h` + `include/charset.c/h` ensure popup chrome (menu bar,
@@ -181,10 +288,10 @@ user's edits.
   opt-out" above) so its live glyph edits remain visible while it is open.
   Current call sites: `menu_run()` (menu bar, `menudata.c`),
   `menu_pulldown()`, `menu_areyousure()`, `menu_messagepopup()` (all
-  `src/menu.c`), and `resize_dialog()` (`src/menudata.c`) all pass `1`;
-  `charsetedit_run()` (`src/charsetedit.c`) passes `0`. Future popups (Phase
-  4 palette/colour picker etc.) should pass `1` unless they have the same
-  live-charset-RAM preview requirement as the character editor.
+  `src/menu.c`), `resize_dialog()` (`src/menudata.c`), `palette_run()`
+  (`src/palette.c`) and `colourpicker_run()` (`src/colourpicker.c`) all pass
+  `1`; `charsetedit_run()` (`src/charsetedit.c`) passes `0` — the only popup
+  with the live-charset-RAM preview requirement.
 
 ## Code Style
 
@@ -229,8 +336,9 @@ make run          # build + launch in Oricutron (LANG=FR for the French build)
 make clean        # remove build artifacts (both languages)
 make docs         # regenerate README.pdf from README.md (requires pandoc)
 make test         # full automated Phosphoric test suite (test-boot, test-menus,
-                  # test-screenresize, test-charsetram-spike, test-charsetedit)
-                  # -- EN only, see "Localisation" below
+                  # test-screenresize, test-charsetram-spike, test-charsetedit,
+                  # test-palette, test-colourpicker) -- EN only, see
+                  # "Localisation" below
 make test-boot    # headless boot smoke test (splash + canvas/statusbar render)
 make test-capture CYCLES=N TYPEKEYS='...'
                   # calibration helper: dumps tests/out/capture.bin + .png
@@ -283,9 +391,14 @@ src/
   appstate.h      Global AppState struct (canvas size, cursor, viewport, mode, ...)
   canvas.c/h      Flat 40x27 screenmap[] buffer + raw $BB80 blit (bypasses charwin),
                   canvas_resize() (up to CANVAS_MAX_SIZE)
-  statusbar.c/h   Row-27 statusbar (OricCharWin, Mode/X,Y/C/S readout)
-  editor.c/h      Main-mode loop: cursor move, +/- screencode select, SPACE/DEL plot,
-                  FUNCT+1 opens the menu bar, 'e' opens the character editor
+  statusbar.c/h   Row-27 statusbar (OricCharWin, Mode/XY/C/S/I/P + A/D/B flags,
+                  see "Main-mode attribute-selection keys and statusbar
+                  redesign (Phase 4a)")
+  editor.c/h      Main-mode loop: cursor move, +/- screencode select, SPACE/DEL
+                  plot, ,/.;/' ink/paper cycling, b/d/a attribute toggles,
+                  0-9/SHIFT+0-9 favourites, FUNCT+1 opens the menu bar, 'e'
+                  opens the character editor, 'p' opens the palette, 'c' opens
+                  the colour picker
   menu.c/h        Menu bar/pulldown/popup engine + main-RAM window-save stack
   menudata.c/h    OSE menu tables (Screen/File/Charset/Information) + Screen
                   pulldown dispatch (Width/Height/Clear/Fill)
@@ -295,6 +408,11 @@ src/
   charsetswap.c/h Charset-swap mechanism: backs up/restores CHARSET_STD around
                   popups so chrome renders with ROM glyphs (see "Charset-swap
                   mechanism")
+  palette.c/h     Palette popup ('p'): Fav/Std/Alt charset grid + visualchar[]
+                  visual-charmap toggle (see "Palette mode (Phase 4b)")
+  colourpicker.c/h Colour picker popup ('c'): 8x8 ink x paper grid with
+                  inverse-colour preview, NEW vs V1 (see "Colour picker
+                  (Phase 4c)")
   strings.h       Localisation gateway: #include "strings_en.h" or
                   "strings_fr.h" depending on LANG_FR (see "Localisation")
   strings_en.h    All user-visible MSG_* strings, English (default)
@@ -458,3 +576,15 @@ tests:
   `KEY_DEL` (0x7F) is unmapped in Phosphoric's `char_map`, so to change "40"
   to "60", navigate left twice (`\l\l` → idx=0) then type the new leading
   digit (overwrites '4').
+- **`cwin_putat_printf`'s `%x`/`%02x` produce UPPERCASE hex digits**
+  (`include/charwin.c`'s `_cwin_vformat()`: `'A'+d-10`), unlike Python's
+  `f"{b:02x}"` (lowercase) used by `oric_screen.py --bytes`. When asserting
+  on-screen hex text via `--find` (e.g. a statusbar `C3F?` readout), use
+  UPPERCASE; when asserting raw screen-RAM bytes via `--bytes` (e.g. `"3f"`),
+  use lowercase. These are two different rendering paths for the same value.
+- **`oric_screen.py --bytes ADDR:LEN` dumps RAW bytes, unmasked** — unlike
+  `--find`/`--row`'s `load_grid()`, which applies `byte & 0x7F` to strip
+  attribute bytes and the inverse-video bit. A highlighted grid cell
+  (screencode XOR 0x80, e.g. the cursor cell in `charsetedit`/`palette`/
+  `colourpicker`) shows as `code|0x80` in `--bytes` but as the plain
+  `code&0x7F` character in `--find`/`--row`.

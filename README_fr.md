@@ -21,6 +21,8 @@
 
 [Mode palette](#mode-palette)
 
+[Sélecteur de couleurs](#sélecteur-de-couleurs)
+
 [Mode sélection](#mode-sélection)
 
 [Mode déplacement](#mode-déplacement)
@@ -135,6 +137,7 @@ Appuyez sur ces touches en mode principal pour l'édition :
 |**M**|Aller au mode '**M**ove' (déplacement)
 |**S**|Aller au mode '**S**élection'
 |**P**|Aller au mode '**P**alette'
+|**C**|Aller au sélecteur de couleurs ('**C**olour picker')
 |**T**|Mode d'essai (**T**ry)
 |**R**|Basculer '**R**everse' (vidéo inversée) : bascule l'augmentation/diminution du code écran de 128
 |**FUNCT+1**|Aller au menu principal
@@ -163,7 +166,7 @@ Appuyer sur **SHIFT** plus **0-9** enregistre le caractère actuellement sélect
 
 *Sélectionner les attributs à tracer*
 
-Augmentez ou diminuez le [code couleur](#référence-des-valeurs-de-couleur) de un en appuyant sur la touche **.** resp. **,** pour la couleur d'encre, ou **;** resp. **\'** pour la couleur de papier. Appuyer sur **B**, **D** ou **A** bascule l'attribut **B**link (clignotement), **D**ouble taille ou **A**lternatif du jeu de caractères.
+Augmentez ou diminuez le [code couleur](#référence-des-valeurs-de-couleur) de un en appuyant sur la touche **.** resp. **,** pour la couleur d'encre, ou **;** resp. **\'** pour la couleur de papier. Appuyer sur **B**, **D** ou **A** bascule l'attribut **B**link (clignotement), **D**ouble taille ou **A**lternatif du jeu de caractères. Vous pouvez aussi appuyer sur **C** pour ouvrir le [sélecteur de couleurs](#sélecteur-de-couleurs) et choisir ensemble les couleurs d'Encre et de Papier depuis une grille visuelle.
 
 *Tracer et effacer un caractère*
 
@@ -444,6 +447,41 @@ Appuyer sur **V** bascule entre le mode normal et le mode visuel.
 *Quitter le mode et aide*
 
 Appuyer sur **ESC** quitte le mode palette et revient au mode principal. **FUNCT+8** affiche un écran d'aide avec toutes les commandes clavier du mode caractère.
+
+## Sélecteur de couleurs
+([Retour au sommaire](#sommaire))
+
+Appuyer sur **C** en mode principal démarre le sélecteur de couleurs. Il s'agit d'un ajout par rapport à l'OricScreenEditor original : une grille visuelle permettant de sélectionner ensemble les couleurs d'encre et de papier à tracer, avec un aperçu de la combinaison normale et inversée résultante.
+
+Une fenêtre comme celle-ci apparaît, montrant une grille 8x8 de toutes les combinaisons Encre/Papier, ainsi que des lignes d'information indiquant l'Encre et le Papier actuellement en surbrillance et l'aperçu normal/inversé résultant :
+
+```
+Choisir encre et papier
+<grille 8x8 de cellules encre x papier, chacune montrant l'echantillon normal et inverse pour cette combinaison>
+Encre:  N <echantillon>
+Papier: N <echantillon>
+Result: <apercu normal/inverse>
+```
+
+Commandes clavier dans ce mode :
+
+|Touche|Description
+|---|---|
+|**Touches curseur**|Déplacer le curseur (GAUCHE/DROITE font défiler l'Encre, HAUT/BAS font défiler le Papier, les deux bouclent de 0 à 7)
+|**ESPACE ou ENTER**|Sélectionner la combinaison Encre/Papier en surbrillance
+|**ESC**|Quitter le sélecteur de couleurs et revenir au mode principal, sans modifier les couleurs Encre/Papier sélectionnées
+
+*Déplacer le curseur*
+
+Appuyez sur les **touches curseur** pour déplacer le curseur dans la grille 8x8. **GAUCHE**/**DROITE** font défiler la couleur d'Encre, **HAUT**/**BAS** font défiler la couleur de Papier, les deux bouclant entre les couleurs 0 et 7.
+
+*Sélectionner l'encre et le papier*
+
+Appuyez sur **ESPACE** ou **ENTER** pour sélectionner la combinaison Encre/Papier en surbrillance comme nouvelles couleurs de tracé. Ceci quitte le sélecteur de couleurs et revient au mode principal ; les champs I et P de la barre d'état se mettent à jour en conséquence.
+
+*Quitter le mode*
+
+Appuyer sur **ESC** quitte le sélecteur de couleurs sans modifier les couleurs Encre/Papier sélectionnées, et revient au mode principal.
 
 ## Mode sélection
 ([Retour au sommaire](#sommaire))
