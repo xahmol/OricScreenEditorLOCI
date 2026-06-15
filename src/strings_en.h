@@ -80,6 +80,18 @@
 #define MSG_PALETTE_STD  "Std:"
 #define MSG_PALETTE_ALT  "Alt:"
 
+// ── Colour picker popup (src/colourpicker.c) ────────────────────────────────
+// MSG_COLOURPICKER_INK_FMT/PAPER_FMT pad to 9 chars so the swatch (drawn
+// separately at CP_SWATCH_X=9) lands in the same column for both lines.
+// MSG_COLOURPICKER_RESULT is kept identical in EN/FR (7 chars, "Result:" is
+// already an unaccented French cognate) -- a literal translation
+// ("Resultat:", 9 chars) would collide with the fixed swatch columns at
+// x=7..12, same precedent as MSG_PALETTE_FAV/STD/ALT above.
+#define MSG_COLOURPICKER_TITLE     "Select ink and paper colour"
+#define MSG_COLOURPICKER_INK_FMT   "Ink:    %u"
+#define MSG_COLOURPICKER_PAPER_FMT "Paper:  %u"
+#define MSG_COLOURPICKER_RESULT    "Result:"
+
 // ── Status bar (src/statusbar.c) ────────────────────────────────────────────
 // 36-col layout: "Main"+6sp, "XY"+cursor x,y, "C"+plotscreencode hex (+glyph
 // at col 20), "S"+screencode under cursor, "I"+plotink (+swatch), "P"+

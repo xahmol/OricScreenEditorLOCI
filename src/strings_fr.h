@@ -90,6 +90,17 @@
 #define MSG_PALETTE_STD  "Std:"
 #define MSG_PALETTE_ALT  "Alt:"
 
+// ── Colour picker popup (src/colourpicker.c) ────────────────────────────────
+// MSG_COLOURPICKER_INK_FMT/PAPER_FMT ("Encre:"/"Papier:") pad to 9 chars,
+// same swatch-column convention as strings_en.h. MSG_COLOURPICKER_RESULT
+// kept as "Result:" (7 chars) -- same precedent as MSG_PALETTE_FAV/STD/ALT:
+// a literal "Resultat:" (9 chars) would collide with the fixed swatch
+// columns at x=7..12.
+#define MSG_COLOURPICKER_TITLE     "Choisir encre et papier"
+#define MSG_COLOURPICKER_INK_FMT   "Encre:  %u"
+#define MSG_COLOURPICKER_PAPER_FMT "Papier: %u"
+#define MSG_COLOURPICKER_RESULT    "Result:"
+
 // ── Status bar (src/statusbar.c) ────────────────────────────────────────────
 // "Princ." (Principal) replaces "Main", same 10-column field width (36-col
 // layout -- see strings_en.h for the full column breakdown).
