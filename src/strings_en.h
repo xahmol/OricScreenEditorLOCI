@@ -73,6 +73,13 @@
 #define MSG_CE_SET_ALT    "Set:Alt"
 #define MSG_CE_HEX_LABEL  "Hex:$"
 
+// ── Palette popup (src/palette.c) ───────────────────────────────────────────
+// Fixed 4-char labels (PAL_LABEL_X..PAL_LABEL_X+3) -- must stay 4 chars in
+// both languages to preserve the 36-col grid layout.
+#define MSG_PALETTE_FAV  "Fav:"
+#define MSG_PALETTE_STD  "Std:"
+#define MSG_PALETTE_ALT  "Alt:"
+
 // ── Status bar (src/statusbar.c) ────────────────────────────────────────────
 // 36-col layout: "Main"+6sp, "XY"+cursor x,y, "C"+plotscreencode hex (+glyph
 // at col 20), "S"+screencode under cursor, "I"+plotink (+swatch), "P"+

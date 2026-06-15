@@ -7,6 +7,7 @@
 #include "menu.h"
 #include "menudata.h"
 #include "charsetedit.h"
+#include "palette.h"
 #include "editor.h"
 
 #define PLOT_MIN 0x20
@@ -21,8 +22,8 @@
  * 'b'/'d'/'a' toggle plotblink/plotdouble/plotaltchar, '0'-'9' recall a
  * favourite into plotscreencode and SHIFT+0-9 store plotscreencode into a
  * favourite, FUNCT+6 toggles the statusbar, FUNCT+1 opens the menu bar
- * (menu_run()), and 'e' opens the character editor (charsetedit_run()).
- * Never returns.
+ * (menu_run()), 'e' opens the character editor (charsetedit_run()), and 'p'
+ * opens the palette popup (palette_run()). Never returns.
  *
  * @return (none)
  */
@@ -145,6 +146,10 @@ void editor_run(void)
 
         case 'e':
             charsetedit_run();
+            break;
+
+        case 'p':
+            palette_run();
             break;
 
         default:

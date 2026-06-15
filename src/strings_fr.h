@@ -83,6 +83,13 @@
 #define MSG_CE_SET_ALT    "Jeu:Alt"
 #define MSG_CE_HEX_LABEL  "Hex:$"
 
+// ── Palette popup (src/palette.c) ───────────────────────────────────────────
+// Same abbreviations as English -- "Fav:"/"Std:"/"Alt:" are short enough and
+// already unaccented; must stay 4 chars to preserve the 36-col grid layout.
+#define MSG_PALETTE_FAV  "Fav:"
+#define MSG_PALETTE_STD  "Std:"
+#define MSG_PALETTE_ALT  "Alt:"
+
 // ── Status bar (src/statusbar.c) ────────────────────────────────────────────
 // "Princ." (Principal) replaces "Main", same 10-column field width (36-col
 // layout -- see strings_en.h for the full column breakdown).
