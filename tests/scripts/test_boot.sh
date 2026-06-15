@@ -87,7 +87,7 @@ else
     echo ""
     echo "Main mode (after dismiss)"
     check_not_found "splash dismissed"     "OricScreenEditor for LOCI" "$MAIN_DUMP"
-    check_found     "statusbar renders"    "Main  X:00 Y:00  C:\$41  S:40x27" "$MAIN_DUMP"
+    check_found     "statusbar renders"    "Main      XY 0, 0C41A S20I7P0S" "$MAIN_DUMP"
 fi
 
 echo ""

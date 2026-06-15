@@ -84,7 +84,8 @@
 #define MSG_CE_HEX_LABEL  "Hex:$"
 
 // ── Status bar (src/statusbar.c) ────────────────────────────────────────────
-// "Princ." (Principal) replaces "Main", same 6-column width.
-#define MSG_STATUSBAR_MAIN_FMT  "Princ.X:%02u Y:%02u  C:$%02x  S:%ux%u"
+// "Princ." (Principal) replaces "Main", same 10-column field width (36-col
+// layout -- see strings_en.h for the full column breakdown).
+#define MSG_STATUSBAR_MAIN_FMT  "Princ.    XY%2u,%2uC%02x  S%02xI%u  P%u  %c%c%c"
 
 #endif // STRINGS_FR_H

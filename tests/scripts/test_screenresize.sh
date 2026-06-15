@@ -86,8 +86,16 @@ DUMP1="$OUT/capture_resize_grow.bin"
 run_capture 17200000 '\p1\f1\p1\n\p1\n\p1\l\p1\l\p16\p1\n\p1\e' "$DUMP1"
 echo ""
 echo "Width 40 -> 60 (grow, applies immediately)"
-check_found "statusbar shows 60x27" "Main  X:00 Y:00  C:\$41  S:60x27" "$DUMP1"
 check_not_found "bar gone" "Screen File  Charset  Information" "$DUMP1"
+
+# Reopen the Screen pulldown (FUNCT+1, ENTER) to confirm canvas_width was
+# actually applied -- the statusbar no longer shows canvas size (Phase 4
+# repurposed the "S" field for the screencode under the cursor), so
+# pulldown_titles[0][0] ("Width:  NN", via update_size_titles()) is now the
+# only on-screen signal for the resized width.
+DUMP1W="$OUT/capture_resize_grow_width.bin"
+run_capture 19400000 '\p1\f1\p1\n\p1\n\p1\l\p1\l\p16\p1\n\p1\e\p1\f1\p1\n' "$DUMP1W"
+check_found "Width pulldown shows 60" "Width:   60" "$DUMP1W"
 
 # --- Scenario 2: grow 40 -> 60, then shrink 60 -> 40, confirm Yes -----------
 # Repeats scenario 1, then reopens Screen pulldown, Width dialog (now "60"),
@@ -99,9 +107,15 @@ run_capture 25500000 \
     "$DUMP2"
 echo ""
 echo "Width 60 -> 40 (shrink, confirm Yes -> applies)"
-check_found "statusbar shows 40x27" "Main  X:00 Y:00  C:\$41  S:40x27" "$DUMP2"
 check_not_found "bar gone" "Screen File  Charset  Information" "$DUMP2"
 check_not_found "confirm popup gone" "Yes" "$DUMP2"
+
+# Reopen the Screen pulldown to confirm canvas_width is back to 40.
+DUMP2W="$OUT/capture_resize_shrink_yes_width.bin"
+run_capture 27800000 \
+    '\p1\f1\p1\n\p1\n\p1\l\p1\l\p16\p1\n\p1\n\p1\n\p1\l\p1\l\p14\p1\n\p1\n\p1\e\p1\f1\p1\n' \
+    "$DUMP2W"
+check_found "Width pulldown shows 40" "Width:   40" "$DUMP2W"
 
 # --- Scenario 3: grow 40 -> 60, then shrink 60 -> 40, confirm No ------------
 # Same as scenario 2, but DOWN before the final ENTER selects "No" instead
@@ -112,9 +126,16 @@ run_capture 26000000 \
     "$DUMP3"
 echo ""
 echo "Width 60 -> 40 (shrink, confirm No -> size unchanged)"
-check_found "statusbar shows 60x27" "Main  X:00 Y:00  C:\$41  S:60x27" "$DUMP3"
 check_not_found "bar gone" "Screen File  Charset  Information" "$DUMP3"
 check_not_found "confirm popup gone" "Yes" "$DUMP3"
+
+# Reopen the Screen pulldown to confirm canvas_width is still 60 (shrink
+# was declined).
+DUMP3W="$OUT/capture_resize_shrink_no_width.bin"
+run_capture 28200000 \
+    '\p1\f1\p1\n\p1\n\p1\l\p1\l\p16\p1\n\p1\n\p1\n\p1\l\p1\l\p14\p1\n\p1\d\p1\n\p1\e\p1\f1\p1\n' \
+    "$DUMP3W"
+check_found "Width pulldown shows 60" "Width:   60" "$DUMP3W"
 
 echo ""
 echo "==========================================================="

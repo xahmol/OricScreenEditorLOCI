@@ -96,7 +96,7 @@ run_capture 12700000 '\p1\f1\p1\n\p1\e\p1\e' "$DUMP3"
 echo ""
 echo "ESC (pulldown) + ESC (bar) closes with no residue"
 check_not_found "bar gone"       "Screen" "$DUMP3"
-check_found     "statusbar intact" "Main  X:00 Y:00  C:\$41  S:40x27" "$DUMP3"
+check_found     "statusbar intact" "Main      XY 0, 0C41A S20I7P0S" "$DUMP3"
 
 # --- Scenario 4: File pulldown stub -> "Not yet implemented" popup --------
 DUMP4="$OUT/capture_menu_notimpl.bin"
@@ -113,7 +113,7 @@ echo ""
 echo "Dismiss popup (SPACE) then ESC closes with no residue"
 check_not_found "popup gone"       "Not yet implemented" "$DUMP5"
 check_not_found "bar gone"         "Screen"              "$DUMP5"
-check_found     "statusbar intact" "Main  X:00 Y:00  C:\$41  S:40x27" "$DUMP5"
+check_found     "statusbar intact" "Main      XY 0, 0C41A S20I7P0S" "$DUMP5"
 
 # --- Scenario 6: Fill dispatch ----------------------------------------------
 DUMP6="$OUT/capture_menu_fill.bin"
@@ -122,7 +122,7 @@ echo ""
 echo "Screen > Fill fills the canvas with the current char"
 check_found "row 0 filled with A"  "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA" "$DUMP6"
 check_found "row 26 filled with A" "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA" "$DUMP6"
-check_found "statusbar intact"     "Main  X:00 Y:00  C:\$41  S:40x27" "$DUMP6"
+check_found "statusbar intact"     "Main      XY 0, 0C41A S41I7P0S" "$DUMP6"
 
 echo ""
 echo "==========================================================="

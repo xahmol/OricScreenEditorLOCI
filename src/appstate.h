@@ -32,6 +32,11 @@ typedef struct {
     uint16_t   yoffset;         // viewport scroll offset (rows)
     uint8_t    plotscreencode;  // character placed by SPACE
     uint8_t    plotaltchar;     // 0 = standard charset, 1 = alternate
+    uint8_t    plotink;         // 0-7, ink colour to plot
+    uint8_t    plotpaper;       // 0-7, paper colour to plot
+    uint8_t    plotblink;       // 0/1, blink attribute to plot
+    uint8_t    plotdouble;      // 0/1, double-height attribute to plot
+    uint8_t    visualmap;       // 0/1, palette Alt-charset visual-charmap toggle
     uint8_t    favourites[FAVOURITES_COUNT]; // character-editor favourite screencodes
     EditorMode mode;
     uint8_t    showstatusbar;

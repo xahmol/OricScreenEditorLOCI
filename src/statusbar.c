@@ -1,6 +1,7 @@
 #include "oric.h"
 #include "charwin.h"
 #include "appstate.h"
+#include "canvas.h"
 #include "statusbar.h"
 #include "strings.h"
 
@@ -19,9 +20,10 @@ void statusbar_init(void)
 }
 
 /**
- * Redraw the statusbar with the current cursor position, plot screencode,
- * and canvas size. No-op if the statusbar is currently hidden
- * (app.showstatusbar == 0).
+ * Redraw the statusbar with the current cursor position, the screencode
+ * under the cursor, and the current plot attributes (screencode/glyph,
+ * ink/paper colour incl. swatches, and altchar/double/blink flags). No-op
+ * if the statusbar is currently hidden (app.showstatusbar == 0).
  *
  * @return (none)
  */
@@ -32,7 +34,18 @@ void statusbar_draw(void)
     cwin_clear(&statusbar_win);
     cwin_putat_printf(&statusbar_win, 0, 0, MSG_STATUSBAR_MAIN_FMT,
                        app.cursor_x, app.cursor_y,
-                       app.plotscreencode, app.canvas_width, app.canvas_height);
+                       app.plotscreencode,
+                       canvas_get(app.cursor_x + app.xoffset, app.cursor_y + app.yoffset),
+                       app.plotink, app.plotpaper,
+                       app.plotaltchar ? 'A' : 'S',
+                       app.plotdouble ? 'D' : ' ',
+                       app.plotblink ? 'B' : ' ');
+
+    cwin_putat_char(&statusbar_win, 20, 0, app.plotscreencode);
+    cwin_putat_char(&statusbar_win, 27, 0, 16 + app.plotink);
+    cwin_putat_char(&statusbar_win, 28, 0, A_BGWHITE);
+    cwin_putat_char(&statusbar_win, 31, 0, 16 + app.plotpaper);
+    cwin_putat_char(&statusbar_win, 32, 0, A_BGWHITE);
 }
 
 /**

@@ -140,7 +140,7 @@ run_capture 15980000 '\p1e\p1+\p2@\p1-\p12\p1\e' "$DUMP6"
 echo ""
 echo "+/-  cycle the screencode; @ stores, 2 recalls a favourite"
 check_found "ESC commits recalled code to plotscreencode (\$42)" \
-    'Main  X:00 Y:00  C:$42  S:40x27' "$DUMP6"
+    'Main      XY 0, 0C42B S20I7P0S' "$DUMP6"
 
 # --- Scenario 7: a toggles Std/Alt charset ---------------------------------
 DUMP7="$OUT/capture_ce_altset.bin"

@@ -74,6 +74,9 @@
 #define MSG_CE_HEX_LABEL  "Hex:$"
 
 // ── Status bar (src/statusbar.c) ────────────────────────────────────────────
-#define MSG_STATUSBAR_MAIN_FMT  "Main  X:%02u Y:%02u  C:$%02x  S:%ux%u"
+// 36-col layout: "Main"+6sp, "XY"+cursor x,y, "C"+plotscreencode hex (+glyph
+// at col 20), "S"+screencode under cursor, "I"+plotink (+swatch), "P"+
+// plotpaper (+swatch), then altchar/double/blink flag chars.
+#define MSG_STATUSBAR_MAIN_FMT  "Main      XY%2u,%2uC%02x  S%02xI%u  P%u  %c%c%c"
 
 #endif // STRINGS_EN_H

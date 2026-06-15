@@ -17,7 +17,10 @@
  * favourites table, draws the canvas and statusbar, then loops reading
  * keys: cursor keys move the cursor, SPACE/DEL plot/clear the cell under
  * the cursor with app.plotscreencode/CH_SPACE, '+'/'-' cycle the plot
- * screencode, FUNCT+6 toggles the statusbar, FUNCT+1 opens the menu bar
+ * screencode, ','/'.' and ';'/'\'' cycle plotink/plotpaper (wrap 0-7),
+ * 'b'/'d'/'a' toggle plotblink/plotdouble/plotaltchar, '0'-'9' recall a
+ * favourite into plotscreencode and SHIFT+0-9 store plotscreencode into a
+ * favourite, FUNCT+6 toggles the statusbar, FUNCT+1 opens the menu bar
  * (menu_run()), and 'e' opens the character editor (charsetedit_run()).
  * Never returns.
  *
@@ -33,6 +36,11 @@ void editor_run(void)
     app.yoffset = 0;
     app.plotscreencode = 0x41; // 'A'
     app.plotaltchar = 0;
+    app.plotink = A_FWWHITE;
+    app.plotpaper = A_FWBLACK;
+    app.plotblink = 0;
+    app.plotdouble = 0;
+    app.visualmap = 0;
     for (i = 0; i < FAVOURITES_COUNT; i++) app.favourites[i] = 33; // '!'
     app.mode = MODE_MAIN;
     app.showstatusbar = 1;
@@ -82,6 +90,50 @@ void editor_run(void)
         case '-':
             app.plotscreencode = (app.plotscreencode > PLOT_MIN) ? app.plotscreencode - 1 : PLOT_MAX;
             break;
+
+        case ',':
+            app.plotink = (app.plotink > 0) ? app.plotink - 1 : 7;
+            break;
+
+        case '.':
+            app.plotink = (app.plotink < 7) ? app.plotink + 1 : 0;
+            break;
+
+        case ';':
+            app.plotpaper = (app.plotpaper > 0) ? app.plotpaper - 1 : 7;
+            break;
+
+        case '\'':
+            app.plotpaper = (app.plotpaper < 7) ? app.plotpaper + 1 : 0;
+            break;
+
+        case 'b':
+            app.plotblink = !app.plotblink;
+            break;
+
+        case 'd':
+            app.plotdouble = !app.plotdouble;
+            break;
+
+        case 'a':
+            app.plotaltchar = !app.plotaltchar;
+            break;
+
+        case '0': case '1': case '2': case '3': case '4':
+        case '5': case '6': case '7': case '8': case '9':
+            app.plotscreencode = app.favourites[c - '0'];
+            break;
+
+        case ')': app.favourites[0] = app.plotscreencode; break;
+        case '!': app.favourites[1] = app.plotscreencode; break;
+        case '@': app.favourites[2] = app.plotscreencode; break;
+        case '#': app.favourites[3] = app.plotscreencode; break;
+        case '$': app.favourites[4] = app.plotscreencode; break;
+        case '%': app.favourites[5] = app.plotscreencode; break;
+        case '^': app.favourites[6] = app.plotscreencode; break;
+        case '&': app.favourites[7] = app.plotscreencode; break;
+        case '*': app.favourites[8] = app.plotscreencode; break;
+        case '(': app.favourites[9] = app.plotscreencode; break;
 
         case KEY_F6:
             statusbar_show(!app.showstatusbar);
