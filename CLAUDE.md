@@ -18,9 +18,10 @@ storage device**.
 - Enhanced palette mode that also shows the inverse colour combinations for
   each ink/paper pair
 
-**Status: Phase 3 of 9 complete** (canvas data model + minimal main mode +
-menu bar/Screen menu + character editor + Phosphoric test harness; binary
-11446 bytes). A previous CC65-based attempt at this got stuck and is archived
+**Status: Phase 3 of 9 complete**, plus charset-swap infrastructure and a
+narrow charset-editor popup (Phase 4 prep; canvas data model + minimal main
+mode + menu bar/Screen menu + character editor + charset-swap mechanism +
+Phosphoric test harness; binary 11382 bytes). A previous CC65-based attempt at this got stuck and is archived
 in the `nonworkingcc65` branch (full history + uncommitted state). `main` was
 restarted from scratch on the Oscar64 native/bare-metal build chain developed
 for [locifilemanager-v2](https://github.com/xahmol/locifilemanager-v2)
@@ -63,18 +64,18 @@ and may be reusable as-is.
 `src/charsetedit.c/h` — entered via `e` from main mode, edits the 6x8-pixel
 glyph for `app.plotscreencode`/`app.plotaltchar`.
 
-- **Layout: popup, not V1's sidebar (deliberate Phase 3 deviation)**. V1 draws
-  the char editor as a fixed inline panel in screen columns 27-39 (rows 0-11),
-  because V1's canvas width was capped to leave that area permanently free.
-  Phase 1 of this rewrite deliberately removed that fixed reservation — the
-  canvas is a *resizable, full-width* `screenmap[]` (see "Canvas architecture"
-  above) — and Phase 2 introduced a popup-window/menu system
-  (`cwin_init`/`menu_winsave`/`menu_winrestore`) for all UI chrome. A literal
-  V1-style sidebar would overlap canvas content on wide canvases unless the
-  canvas were re-capped, undoing that Phase 1 decision. The character editor
-  therefore reuses V1's **key bindings/behaviour** (per the Phase 3 plan) but
-  presents them in a popup, consistent with the menu system. Colours
-  (`A_FWBLACK`/`A_BGWHITE`) match V1's editor-field convention.
+- **Layout: narrow sidebar popup (cols 27-39, rows 0-14), matching V1's
+  sidebar intent**. V1 draws the char editor as a fixed inline panel in
+  screen columns 27-39 (rows 0-11), leaving the user's canvas visible to the
+  left while editing. Phase 1 of this rewrite made the canvas a *resizable,
+  full-width* `screenmap[]` (see "Canvas architecture" above), and Phase 2
+  introduced a popup-window/menu system (`cwin_init`/`menu_winsave`/
+  `menu_winrestore`). Phase 3 initially presented the editor as a wide
+  (38x16) full-screen popup; this was revised so canvas cols 0-26 stay
+  visible (and live-updating) on every row while the popup is open, matching
+  V1. The character editor reuses V1's **key bindings/behaviour** (per the
+  Phase 3 plan). Colours (`A_FWBLACK`/`A_BGWHITE`) match V1's editor-field
+  convention.
 - **Strategy A (confirmed by the Phase 3a spike, kept as a permanent
   regression in `tests/scripts/test_charsetram_spike.sh`)**: both
   `CHARSET_STD` ($B400) and `CHARSET_ALT` ($B800) banks are edited
@@ -83,21 +84,31 @@ glyph for `app.plotscreencode`/`app.plotaltchar`.
   preview cell (`ce_draw_header`, `CE_PREVIEW_ATTR_X`/`CE_PREVIEW_CHAR_X`)
   and any on-canvas occurrences of the edited glyph update for free as soon
   as `ce_draw_grid()` redraws.
-- **Address formula** (`charset_address()`, `src/charsetedit.c`): `base +
-  screencode*8` where `base` = `CHARSET_STD`/`CHARSET_ALT` — **no** `-0x20`
-  offset (full 128-glyph banks, codes 0x00-0x7F). `CHARSETROM` ($FC78, used
-  by the `s` restore-from-ROM command, std charset only) uses the **opposite**
+- **Charset-swap opt-out**: `charsetedit_run()` calls
+  `menu_winsave(CE_WIN_SY, CE_WIN_WY, 0)` — the final `0` opts OUT of the
+  charset-swap mechanism (see "Charset-swap mechanism" below), so glyph edits
+  to `CHARSET_STD` stay visible live in the popup's preview/grid and the
+  canvas while editing. Every other popup opts IN (`1`).
+- **Address formula** (`charset_address()`, now in `include/charset.c/h` — a
+  generic, non-OSE-specific Oric charset-addressing helper, see "Charset-swap
+  mechanism" below): `base + screencode*8` where `base` = `CHARSET_STD`/
+  `CHARSET_ALT` — **no** `-0x20` offset (full 128-glyph banks, codes
+  0x00-0x7F). `CHARSETROM` ($FC78, used by the `s` restore-from-ROM command,
+  std charset only, via `charset_rom_glyph()`) uses the **opposite**
   convention: `CHARSETROM + (screencode-0x20)*8`, since the ROM table only
   covers the 96 printable codes 0x20-0x7F. Both conventions are documented in
-  `include/oric.h`.
-- **Popup layout** (38x16, screen rows 1-16, `CE_WIN_SX=2/CE_WIN_SY=1`):
-  header (row 0: `Character editor   Code:$xx  Set:Std|Alt` + live-preview
-  attr/char at `CE_PREVIEW_ATTR_X`/`CE_PREVIEW_CHAR_X`), favourites (rows 1-2,
-  `CE_FAV_Y`/`CE_FAV_VALUE_Y`, digit labels '0'-'9' over `app.favourites[10]`
-  screencodes starting at `CE_FAV_X`), the 6x8 pixel grid (rows 4-11,
-  `CE_GRID_X`/`CE_GRID_Y`, one screen cell per pixel), an inline hex-row input
-  (`CE_HEX_LABEL_X`/`CE_HEX_INPUT_X`, row `CE_HEX_Y`, via `cwin_textinput`),
-  and 4 lines of key hints (rows 12-15).
+  `include/oric.h` and `include/charset.h`.
+- **Popup layout** (13x15, screen cols 27-39 rows 0-14,
+  `CE_WIN_SX=27/CE_WIN_SY=0/CE_WIN_WX=13/CE_WIN_WY=15`): row 0 = `Code:$xx` +
+  live-preview attr/char (`CE_PREVIEW_ATTR_X`/`CE_PREVIEW_CHAR_X`); row 1 =
+  `Set:Std`/`Set:Alt` (`CE_SET_Y`); rows 3-4 = favourite digit labels
+  '0'-'9' (`CE_FAV_Y`) over `app.favourites[10]` screencodes
+  (`CE_FAV_VALUE_Y`), both starting at `CE_FAV_X`; rows 6-13 = the 6x8 pixel
+  grid (`CE_GRID_X`/`CE_GRID_Y`, one screen cell per pixel); row 14 = inline
+  hex-row input (`CE_HEX_LABEL_X`/`CE_HEX_INPUT_X`, via `cwin_textinput`).
+  The 4 lines of key-binding hints from the earlier 38x16 popup were dropped
+  (no room in 13 cols) — key bindings move to the Phase 9 help system
+  (`FUNCT+8`).
 - **Pixel/cursor 4-state grid rendering** (`ce_draw_grid`): pixel=0,cursor=0
   -> `CH_SPACE` (0x20); pixel=1,cursor=0 -> `CE_PIXEL_CHAR` `'#'` (0x23);
   pixel=0,cursor=1 -> `CH_INVSPACE` (0xA0, = `CH_SPACE ^ 0x80`); pixel=1,
@@ -119,6 +130,54 @@ glyph for `app.plotscreencode`/`app.plotaltchar`.
   (`menu_winsave`/`menu_winrestore`, main-RAM window stack — no residue).
 - **Favourites default**: `editor_run()` initialises all 10 slots to `'!'`
   (0x21); `FAVOURITES_COUNT=10` in `src/appstate.h`.
+
+### Charset-swap mechanism
+
+`src/charsetswap.c/h` + `include/charset.c/h` ensure popup chrome (menu bar,
+pulldowns, Are-you-sure/message popups, the resize dialog) always renders
+with the ROM-standard `CHARSET_STD` glyphs, even after the user has redefined
+characters in the character editor -- without permanently discarding the
+user's edits.
+
+- **Generic primitives** (`include/charset.c/h`, no OSE-specific state, no
+  `#pragma compile` chain back into `src/`): `charset_address()`,
+  `charset_save()`/`charset_load()` (768-byte displayable-range copies
+  between a charset bank and a buffer or `CHARSETROM`), `charset_rom_glyph()`,
+  and the 7 glyph-bitmap transforms
+  (`charset_glyph_invert/mirror_v/mirror_h/scroll_up/scroll_down/rotate_left/
+  rotate_right`) used by the character editor's `i`/`x`/`y`/`u`/`d`/`l`/`r`
+  commands.
+- **Std-only** (Part 1 spike outcome): `jsr $F816` (`ROM_ALTCHARS`, used by V1
+  to regenerate `CHARSET_ALT` from `CHARSET_STD`) is a no-op when called from
+  Oscar64 in this runtime -- `CHARSET_ALT` is left untouched by the swap.
+  Only `CHARSET_STD`'s 768-byte displayable range is backed up/restored.
+  `CHARSET_ALT` keeps whatever the user has edited, even while popups are
+  open; this is acceptable because popup chrome (menu bar, pulldowns,
+  dialogs) only ever uses `CHARSET_STD` glyphs (`A_STD` attribute).
+- **`charset_changed` gate**: `charsetswap_mark_changed()` is called once,
+  from `ce_snapshot()` (the chokepoint already called before every
+  destructive glyph edit in `charsetedit.c`). Until the user edits a glyph
+  for the first time, `charsetswap_enter()`/`exit()` are no-ops -- popups on
+  an unmodified charset render identically with or without the swap.
+- **Depth-counting** (`swap_depth`): `charsetswap_enter()` only backs up
+  `CHARSET_STD` on the *outermost* call (`swap_depth==0`);
+  `charsetswap_exit()` only restores on the call that brings `swap_depth`
+  back to 0. This lets nested popups (e.g. the Screen pulldown opening the
+  resize dialog, which can open an Are-you-sure popup) share a single backup
+  buffer safely.
+- **`menu_winsave(ypos, height, swap_charset)`**: the new third parameter is
+  stored in the pushed `MenuWinRecord` (see "Menu System" below);
+  `menu_winrestore()` pairs `charsetswap_exit()` with a saved record's
+  `charsetswap_enter()` automatically via the LIFO window stack, so callers
+  cannot get enter/exit out of sync. **Opt-in convention**: every popup
+  passes `1` except the character editor, which passes `0` (see "Charset-swap
+  opt-out" above) so its live glyph edits remain visible while it is open.
+  Current call sites: `menu_run()` (menu bar, `menudata.c`),
+  `menu_pulldown()`, `menu_areyousure()`, `menu_messagepopup()` (all
+  `src/menu.c`), and `resize_dialog()` (`src/menudata.c`) all pass `1`;
+  `charsetedit_run()` (`src/charsetedit.c`) passes `0`. Future popups (Phase
+  4 palette/colour picker etc.) should pass `1` unless they have the same
+  live-charset-RAM preview requirement as the character editor.
 
 ## Compiler Toolchain
 
@@ -210,6 +269,9 @@ src/
   charsetedit.c/h Character editor popup: edits the 6x8 glyph for
                   app.plotscreencode/app.plotaltchar directly in live charset
                   RAM (Strategy A -- see "Character editor (Phase 3)")
+  charsetswap.c/h Charset-swap mechanism: backs up/restores CHARSET_STD around
+                  popups so chrome renders with ROM glyphs (see "Charset-swap
+                  mechanism")
   strings.h       User-visible message strings (MSG_* macros required by loci.c)
 include/
   oric.h          Hardware constants (VIA, AY, screen, overlay RAM, ASTR_*/CH_*/A_* attrs)
@@ -217,6 +279,9 @@ include/
   crt_math.c      Math/float runtime routines for the custom runtime
   keyboard.h/c    Direct VIA/AY keyboard scanner — no ROM calls
   charwin.h/c     Character window / menu library
+  charset.h/c     Generic Oric charset-bank addressing/copy + glyph-bitmap
+                   transform primitives (new to this project, not copied from
+                   locifilemanager-v2; see "Charset-swap mechanism")
   loci.h/c        LOCI mass storage API (MIA/TAP/XRAM/file/dir/mount/overlay RAM)
   ijk.h/c         Raxiss IJK joystick driver (VIA Port A; independent of LOCI)
 tools/
@@ -270,6 +335,12 @@ Yes/No confirm dialog, `PULLDOWN_MAXOPTIONS=6`) → popup dialogs.
   project where overlay RAM is optional (Phase 8 undo only). Largest nested
   path so far (bar + Screen pulldown + resize popup + shrink-confirm popup +
   Yes/No pulldown) = 1080B, well within the 2048B budget.
+- **`menu_winsave()`'s third parameter** (`swap_charset`, 0 or 1): opts the
+  popup in or out of the charset-swap mechanism (see "Charset-swap
+  mechanism" above). `menu_winrestore()` pairs the matching
+  `charsetswap_enter()`/`exit()` automatically via the saved `MenuWinRecord`,
+  so enter/exit can't drift out of sync. Every current call site passes `1`
+  except `charsetedit_run()`, which passes `0`.
 - **Canvas resize** (`canvas_resize()`, dispatched from `menudata.c`
   `resize_dialog()`): new size validated as
   `(newval >= minval) && (neww*newh <= CANVAS_MAX_SIZE=8192)`, where

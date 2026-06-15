@@ -7,6 +7,13 @@
 // CLAUDE.md "Character editor (Phase 3)"). ESC commits the current
 // screencode/charset back to app.plotscreencode/app.plotaltchar.
 //
+// Layout: narrow sidebar popup (cols 27-39, rows 0-14) so the user's canvas
+// (cols 0-26) stays visible to the left while editing -- matches V1
+// OricScreenEditor's sidebar intent (see CLAUDE.md "Charset-swap mechanism
+// and narrow character editor"). Opts OUT of menu_winsave()'s charset-swap
+// (swap_charset=0) so glyph edits stay visible live in the canvas while this
+// popup is open.
+//
 // Pixel-toggle/scroll/mirror algorithms ported from V1 OricScreenEditor
 // chareditor() (local reference at /home/xahmol/git/OricScreenEditor/src/main.c).
 
@@ -16,30 +23,35 @@
 #include "appstate.h"
 #include "menu.h"
 #include "statusbar.h"
+#include "charset.h"
+#include "charsetswap.h"
 #include "charsetedit.h"
 
 // -------------------------------------------------------------------------
-// Popup window layout (38 cols x 16 rows, screen rows 1-16)
+// Popup window layout (13 cols x 15 rows, screen cols 27-39, rows 0-14)
 // -------------------------------------------------------------------------
 
-#define CE_WIN_SX  2
-#define CE_WIN_SY  1
-#define CE_WIN_WX  38
-#define CE_WIN_WY  16
+#define CE_WIN_SX  27
+#define CE_WIN_SY   0
+#define CE_WIN_WX  13
+#define CE_WIN_WY  15
 
-#define CE_GRID_X  1    // window-relative x of grid column 0
-#define CE_GRID_Y  4    // window-relative y of grid row 0
+#define CE_HEADER_Y        0   // "Code:$xx" + live preview
+#define CE_PREVIEW_ATTR_X  9   // charset-mode attribute byte (live preview)
+#define CE_PREVIEW_CHAR_X 10   // live-preview character cell
 
-#define CE_FAV_Y        1   // favourite digit labels ('0'-'9')
-#define CE_FAV_VALUE_Y  2   // favourite screencodes
-#define CE_FAV_X       13   // first favourite column
+#define CE_SET_Y           1   // "Set:Std" / "Set:Alt"
 
-#define CE_PREVIEW_ATTR_X  8   // charset-mode attribute byte (live preview)
-#define CE_PREVIEW_CHAR_X  9   // live-preview character cell
+#define CE_FAV_Y           3   // favourite digit labels ('0'-'9')
+#define CE_FAV_VALUE_Y     4   // favourite screencodes
+#define CE_FAV_X           1   // first favourite column
 
-#define CE_HEX_LABEL_X 12
-#define CE_HEX_INPUT_X 22
-#define CE_HEX_Y        5
+#define CE_GRID_X          3   // window-relative x of grid column 0
+#define CE_GRID_Y          6   // window-relative y of grid row 0
+
+#define CE_HEX_LABEL_X     0
+#define CE_HEX_INPUT_X     5
+#define CE_HEX_Y          14
 
 #define CE_PIXEL_CHAR  '#'   // grid: pixel-set marker (XOR 0x80 = cursor highlight)
 
@@ -54,12 +66,6 @@ static uint8_t     ce_cx, ce_cy;  // cursor within the 6x8 grid
 static uint8_t     ce_undo[CHAREDIT_GRID_H];
 static uint8_t     ce_copy[CHAREDIT_GRID_H];
 static uint8_t     ce_copy_valid;
-
-uint16_t charset_address(uint8_t screencode, uint8_t altorstd)
-{
-    uint16_t base = (altorstd == 0) ? CHARSET_STD : CHARSET_ALT;
-    return base + (uint16_t)screencode * 8;
-}
 
 // -------------------------------------------------------------------------
 // Helpers
@@ -79,10 +85,13 @@ static uint8_t ce_max_code(void)
 }
 
 // Snapshot the current glyph into ce_undo[] (call before any destructive edit).
+// Also marks the charset as user-edited, so charsetswap_enter()/exit() will
+// back up and restore CHARSET_STD around future popups (see charsetswap.h).
 static void ce_snapshot(void)
 {
     volatile uint8_t *g = ce_glyph();
     uint8_t y;
+    charsetswap_mark_changed();
     for (y = 0; y < CHAREDIT_GRID_H; y++) ce_undo[y] = g[y];
 }
 
@@ -111,21 +120,20 @@ static uint8_t ce_parse_hex(const char *s)
 
 static void ce_draw_header(void)
 {
-    cwin_putat_printf(&ce_win, 1, 0, "Character editor   Code:$%02x  Set:%s",
-                      ce_code, ce_altorstd ? "Alt" : "Std");
+    cwin_putat_printf(&ce_win, 0, CE_HEADER_Y, "Code:$%02x", ce_code);
+    cwin_putat_string(&ce_win, 0, CE_SET_Y, ce_altorstd ? "Set:Alt" : "Set:Std");
 
     // Live preview: charset-mode attribute + the screencode itself. Reads
     // back the SAME charset-RAM bytes the grid edits, so it updates as soon
     // as the grid is redrawn -- no separate buffer needed (Strategy A).
-    cwin_putat_char(&ce_win, CE_PREVIEW_ATTR_X, CE_GRID_Y, ce_altorstd ? A_ALT : A_STD);
-    cwin_putat_char(&ce_win, CE_PREVIEW_CHAR_X, CE_GRID_Y, ce_code);
+    cwin_putat_char(&ce_win, CE_PREVIEW_ATTR_X, CE_HEADER_Y, ce_altorstd ? A_ALT : A_STD);
+    cwin_putat_char(&ce_win, CE_PREVIEW_CHAR_X, CE_HEADER_Y, ce_code);
 }
 
 static void ce_draw_favourites(void)
 {
     uint8_t i;
 
-    cwin_putat_string(&ce_win, 1, CE_FAV_Y, "Favourites:");
     for (i = 0; i < FAVOURITES_COUNT; i++)
     {
         cwin_putat_char(&ce_win, CE_FAV_X + i, CE_FAV_Y, (uint8_t)('0' + i));
@@ -150,14 +158,6 @@ static void ce_draw_grid(void)
     }
 }
 
-static void ce_draw_hints(void)
-{
-    cwin_putat_string(&ce_win, 1, 12, "u/d/l/r scroll  h hex row  DEL clear");
-    cwin_putat_string(&ce_win, 1, 13, "+/-/= code  0-9 fav  SHIFT+0-9 store");
-    cwin_putat_string(&ce_win, 1, 14, "SPACE plot  i invert  z undo  s ROM");
-    cwin_putat_string(&ce_win, 1, 15, "a set  c/v copy  x/y mirror  ESC exit");
-}
-
 // -------------------------------------------------------------------------
 // Main loop
 // -------------------------------------------------------------------------
@@ -172,14 +172,13 @@ void charsetedit_run(void)
 
     if (ce_code > ce_max_code()) ce_code = ce_max_code();
 
-    menu_winsave(CE_WIN_SY, CE_WIN_WY);
+    menu_winsave(CE_WIN_SY, CE_WIN_WY, 0);
     cwin_init(&ce_win, CE_WIN_SX, CE_WIN_SY, CE_WIN_WX, CE_WIN_WY, A_FWBLACK, A_BGWHITE);
     cwin_clear(&ce_win);
 
     ce_snapshot();
     ce_draw_header();
     ce_draw_favourites();
-    ce_draw_hints();
     ce_draw_grid();
 
     for (;;)
@@ -253,7 +252,7 @@ void charsetedit_run(void)
         case 'i':
             g = ce_glyph();
             ce_snapshot();
-            for (y = 0; y < CHAREDIT_GRID_H; y++) g[y] ^= 0x3F;
+            charset_glyph_invert(g);
             redraw = 1;
             break;
 
@@ -266,8 +265,7 @@ void charsetedit_run(void)
         case 's':
             if (ce_altorstd == 0)
             {
-                volatile uint8_t *rom = (volatile uint8_t *)
-                    (CHARSETROM + (uint16_t)(ce_code - 0x20) * 8);
+                const uint8_t *rom = charset_rom_glyph(ce_code);
                 g = ce_glyph();
                 ce_snapshot();
                 for (y = 0; y < CHAREDIT_GRID_H; y++) g[y] = rom[y];
@@ -297,74 +295,44 @@ void charsetedit_run(void)
             break;
 
         case 'y':
-        {
-            uint8_t buf[CHAREDIT_GRID_H];
             g = ce_glyph();
             ce_snapshot();
-            for (y = 0; y < CHAREDIT_GRID_H; y++) buf[y] = g[CHAREDIT_GRID_H - 1 - y];
-            for (y = 0; y < CHAREDIT_GRID_H; y++) g[y] = buf[y];
+            charset_glyph_mirror_v(g);
             redraw = 1;
             break;
-        }
 
         case 'x':
             g = ce_glyph();
             ce_snapshot();
-            for (y = 0; y < CHAREDIT_GRID_H; y++)
-            {
-                uint8_t present = g[y];
-                uint8_t v = 0;
-                uint8_t bx;
-                for (bx = 0; bx < CHAREDIT_GRID_W; bx++)
-                    if (present & (1 << (5 - bx))) v |= (uint8_t)(1 << bx);
-                g[y] = v;
-            }
+            charset_glyph_mirror_h(g);
             redraw = 1;
             break;
 
         case 'u':
             g = ce_glyph();
             ce_snapshot();
-            {
-                uint8_t first = g[0];
-                for (y = 0; y < CHAREDIT_GRID_H - 1; y++) g[y] = g[y + 1];
-                g[CHAREDIT_GRID_H - 1] = first;
-            }
+            charset_glyph_scroll_up(g);
             redraw = 1;
             break;
 
         case 'd':
             g = ce_glyph();
             ce_snapshot();
-            {
-                uint8_t last = g[CHAREDIT_GRID_H - 1];
-                for (y = CHAREDIT_GRID_H - 1; y > 0; y--) g[y] = g[y - 1];
-                g[0] = last;
-            }
+            charset_glyph_scroll_down(g);
             redraw = 1;
             break;
 
         case 'r':
             g = ce_glyph();
             ce_snapshot();
-            for (y = 0; y < CHAREDIT_GRID_H; y++)
-            {
-                uint8_t v = g[y] >> 1;
-                if (g[y] & 0x01) v |= 0x20;
-                g[y] = v;
-            }
+            charset_glyph_rotate_right(g);
             redraw = 1;
             break;
 
         case 'l':
             g = ce_glyph();
             ce_snapshot();
-            for (y = 0; y < CHAREDIT_GRID_H; y++)
-            {
-                uint8_t v = (uint8_t)(g[y] << 1);
-                if (g[y] & 0x20) v |= 0x01;
-                g[y] = v & 0x3F;
-            }
+            charset_glyph_rotate_left(g);
             redraw = 1;
             break;
 
@@ -372,14 +340,14 @@ void charsetedit_run(void)
         {
             char hexbuf[3];
             hexbuf[0] = '\0';
-            cwin_putat_string(&ce_win, CE_HEX_LABEL_X, CE_HEX_Y, "Hex row: $");
+            cwin_putat_string(&ce_win, CE_HEX_LABEL_X, CE_HEX_Y, "Hex:$");
             if (cwin_textinput(&ce_win, CE_HEX_INPUT_X, CE_HEX_Y, 2, hexbuf, 2, VINPUT_ALPHA) >= 0)
             {
                 g = ce_glyph();
                 ce_snapshot();
                 g[ce_cy] = (uint8_t)(ce_parse_hex(hexbuf) & 0x3F);
             }
-            cwin_fill_rect(&ce_win, CE_HEX_LABEL_X, CE_HEX_Y, 12, 1, CH_SPACE);
+            cwin_fill_rect(&ce_win, CE_HEX_LABEL_X, CE_HEX_Y, 7, 1, CH_SPACE);
             redraw = 1;
             break;
         }

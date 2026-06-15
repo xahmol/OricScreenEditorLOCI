@@ -94,9 +94,10 @@ DUMP1="$OUT/capture_ce_open.bin"
 run_capture 9480000 '\p1e' "$DUMP1"
 echo ""
 echo "'e' opens character editor on 'A' (\$41, Std)"
-check_found "header shows Code:\$41 Set:Std" "Character editor   Code:\$41  Set:Std" "$DUMP1"
-check_found "favourites label shown"         "Favourites:"                          "$DUMP1"
-check_found "grid shows 'A' crossbar"         "#####"                                "$DUMP1"
+check_found "header shows Code:\$41" "Code:\$41"   "$DUMP1"
+check_found "Set row shows Set:Std"  "Set:Std"     "$DUMP1"
+check_found "favourite digit labels shown" "0123456789" "$DUMP1"
+check_found "grid shows 'A' crossbar" "#####"      "$DUMP1"
 
 # --- Scenario 2: SPACE toggles the pixel under the cursor (0,0) -----------
 DUMP2="$OUT/capture_ce_space.bin"
@@ -104,7 +105,7 @@ run_capture 11680000 '\p1e\p1 \p1\e' "$DUMP2"
 echo ""
 echo "SPACE toggles pixel at cursor (0,0), ESC commits"
 check_bytes "row0 0x08 -> 0x28 (bit5 set)" "28 14 22 22 3e 22 22 00" "$DUMP2"
-check_not_found "popup closed cleanly" "Character editor" "$DUMP2"
+check_not_found "popup closed cleanly" "Code:\$" "$DUMP2"
 
 # --- Scenario 3: i (invert) then z (undo) round-trips to original --------
 DUMP3="$OUT/capture_ce_invert_undo.bin"
@@ -130,8 +131,12 @@ check_bytes "bits reversed" "04 0a 11 11 1f 11 11 00" "$DUMP5"
 # --- Scenario 6: +/-/=  cycle the screencode, @ stores a favourite -------
 # +: $41 -> $42 ('B'); @ (SHIFT+2) stores $42 into favourites[2]
 # (initially '!' = $21); -: $42 -> $41; 2 selects favourites[2] -> $42
+# \p2 (instead of \p1) before '@': the narrow popup's lighter redraw makes
+# cwin_getch() poll faster, and a 1s settle is occasionally too short for
+# the emulator's shift+2 combo to land as '@' rather than '2' -- 2s is
+# reliable. +1,000,000 cycles added to the dump point accordingly.
 DUMP6="$OUT/capture_ce_favourites.bin"
-run_capture 14980000 '\p1e\p1+\p1@\p1-\p12\p1\e' "$DUMP6"
+run_capture 15980000 '\p1e\p1+\p2@\p1-\p12\p1\e' "$DUMP6"
 echo ""
 echo "+/-  cycle the screencode; @ stores, 2 recalls a favourite"
 check_found "ESC commits recalled code to plotscreencode (\$42)" \
@@ -142,7 +147,8 @@ DUMP7="$OUT/capture_ce_altset.bin"
 run_capture 10580000 '\p1e\p1a' "$DUMP7"
 echo ""
 echo "a toggles the active charset bank (Std -> Alt)"
-check_found "header shows Set:Alt" "Character editor   Code:\$41  Set:Alt" "$DUMP7"
+check_found "header still shows Code:\$41" "Code:\$41" "$DUMP7"
+check_found "Set row shows Set:Alt"        "Set:Alt"   "$DUMP7"
 
 echo ""
 echo "==========================================================="

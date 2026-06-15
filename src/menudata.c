@@ -99,7 +99,7 @@ static void resize_dialog(uint8_t is_height)
     uint16_t    cur  = is_height ? curh : curw;
     uint16_t    minval = is_height ? VIEWPORT_HEIGHT : VIEWPORT_WIDTH;
 
-    menu_winsave(5, 12);
+    menu_winsave(5, 12, 1);
     cwin_init(&win, 5, 5, 35, 12, A_FWBLACK, A_BGWHITE);
     cwin_clear(&win);
 
@@ -167,7 +167,7 @@ void menu_run(void)
 {
     uint8_t choice;
 
-    menu_winsave(0, 1);
+    menu_winsave(0, 1, 1);
     menu_placebar(0);
 
     do {

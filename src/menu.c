@@ -89,21 +89,25 @@ static uint16_t      menu_win_ptr;
  * bytes. No-op if the window-save stack (MENU_WIN_DEPTH) is full or the
  * buffer (MENU_WINBUF_SIZE) is exhausted.
  *
- * @param ypos   First screen row to save.
- * @param height Number of rows to save.
+ * @param ypos         First screen row to save.
+ * @param height       Number of rows to save.
+ * @param swap_charset 1 = also call charsetswap_enter() (popup chrome opts
+ *                     in to the ROM-standard charset); 0 = opt out (character
+ *                     editor, so live glyph edits stay visible).
  * @return (none) -- result is written to menu_win_stack[], menu_win_depth,
  *         and menu_win_ptr.
  */
-void menu_winsave(uint8_t ypos, uint8_t height)
+void menu_winsave(uint8_t ypos, uint8_t height, uint8_t swap_charset)
 {
     uint16_t len = (uint16_t)height * (uint16_t)SCREEN_COLS;
 
     if (menu_win_depth >= MENU_WIN_DEPTH) return;
     if ((uint32_t)menu_win_ptr + len > MENU_WINBUF_SIZE) return;
 
-    menu_win_stack[menu_win_depth].offset = menu_win_ptr;
-    menu_win_stack[menu_win_depth].ypos   = ypos;
-    menu_win_stack[menu_win_depth].height = height;
+    menu_win_stack[menu_win_depth].offset       = menu_win_ptr;
+    menu_win_stack[menu_win_depth].ypos         = ypos;
+    menu_win_stack[menu_win_depth].height       = height;
+    menu_win_stack[menu_win_depth].swap_charset = swap_charset;
     menu_win_depth++;
 
     uint8_t *src = MENU_ROW(ypos);
@@ -112,6 +116,8 @@ void menu_winsave(uint8_t ypos, uint8_t height)
         dst[i] = src[i];
 
     menu_win_ptr += len;
+
+    if (swap_charset) charsetswap_enter();
 }
 
 /**
@@ -127,9 +133,10 @@ void menu_winrestore(void)
     if (menu_win_depth == 0) return;
     menu_win_depth--;
 
-    uint16_t offset = menu_win_stack[menu_win_depth].offset;
-    uint8_t  ypos   = menu_win_stack[menu_win_depth].ypos;
-    uint8_t  height = menu_win_stack[menu_win_depth].height;
+    uint16_t offset       = menu_win_stack[menu_win_depth].offset;
+    uint8_t  ypos         = menu_win_stack[menu_win_depth].ypos;
+    uint8_t  height       = menu_win_stack[menu_win_depth].height;
+    uint8_t  swap_charset = menu_win_stack[menu_win_depth].swap_charset;
 
     menu_win_ptr = offset;
 
@@ -139,6 +146,8 @@ void menu_winrestore(void)
 
     for (uint16_t i = 0; i < len; i++)
         dst[i] = src[i];
+
+    if (swap_charset) charsetswap_exit();
 }
 
 /**
@@ -316,7 +325,7 @@ uint8_t menu_pulldown(uint8_t xpos, uint8_t ypos,
         if (l > width) width = l;
     }
 
-    menu_winsave(ypos, height);
+    menu_winsave(ypos, height, 1);
 
     // Draw all items (unselected)
     for (uint8_t y = 0; y < height; y++)
@@ -487,7 +496,7 @@ uint8_t menu_main(void)
 uint8_t menu_areyousure(const char *message)
 {
     uint8_t choice;
-    menu_winsave(8, 6);
+    menu_winsave(8, 6, 1);
     menu_wininit(8, 6);
     menu_screen_puts(7, 9,  message);
     menu_screen_puts(7, 10, MSG_MENU_AREYOUSURE);
@@ -505,7 +514,7 @@ uint8_t menu_areyousure(const char *message)
  */
 void menu_messagepopup(const char *message)
 {
-    menu_winsave(8, 6);
+    menu_winsave(8, 6, 1);
     menu_wininit(8, 6);
     menu_screen_puts(7, 9,  message);
     menu_screen_puts(7, 11, MSG_MENU_PRESSAKEY);

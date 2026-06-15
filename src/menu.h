@@ -22,6 +22,7 @@
 
 #include <stdint.h>
 #include "oric.h"
+#include "charsetswap.h"
 
 // -------------------------------------------------------------------------
 // Capacity constants
@@ -54,9 +55,10 @@
 // -------------------------------------------------------------------------
 
 typedef struct {
-    uint16_t  offset;   // offset into menu_winbuf[] where rows are saved
-    uint8_t   ypos;     // first screen row saved
-    uint8_t   height;   // number of rows saved (each row = SCREEN_COLS bytes)
+    uint16_t  offset;       // offset into menu_winbuf[] where rows are saved
+    uint8_t   ypos;         // first screen row saved
+    uint8_t   height;       // number of rows saved (each row = SCREEN_COLS bytes)
+    uint8_t   swap_charset; // 1 = charsetswap_enter() was called for this save
 } MenuWinRecord;
 
 typedef struct {
@@ -85,7 +87,12 @@ void menu_placebar(uint8_t y);
 
 // Save rows ypos..ypos+height-1 to the main-RAM window-save stack (LIFO).
 // No-op if the stack is full or the buffer is exhausted.
-void menu_winsave(uint8_t ypos, uint8_t height);
+//
+// swap_charset: 1 = also call charsetswap_enter() (opt in -- popup chrome
+// renders with the ROM-standard charset); 0 = opt out (the character editor,
+// so live glyph edits stay visible). menu_winrestore() calls
+// charsetswap_exit() automatically iff this was 1.
+void menu_winsave(uint8_t ypos, uint8_t height, uint8_t swap_charset);
 
 // Restore the most recently saved rows from menu_winsave(). No-op if the
 // stack is empty.
