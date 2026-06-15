@@ -89,18 +89,28 @@ uint8_t           keyb_modifiers;
 static uint8_t     keyb_capslock;
 static uint8_t     prev_key;        // scan code of key held last poll
 static uint16_t    rep_count;       // repeat countdown
-static uint8_t     release_count;   // required no-key polls before next press accepted
+static uint8_t     release_count;   // consecutive no-key polls before release is confirmed
+static uint8_t     candidate;       // not-yet-confirmed new key
+static uint8_t     candidate_count; // consecutive polls candidate has matched ch
 
 // Calibrated to match Oric ROM defaults: KBDLY=$024E=40, KBRPT=$024F=4 (units ~30ms).
 // keyb_scan takes ~370 cycles at 1 MHz with one key held → ~0.37 ms per poll.
 // REP_DELAY=3000 → ~1110 ms (ROM KBDLY=40×30ms=1200ms).
 // REP_RATE=300   → ~110 ms  (ROM KBRPT=4×30ms=120ms).
-// RELEASE_DEBOUNCE: polls of no-key required after each accepted press before a
-// new key is registered. Eliminates switch bounce (< 5 ms) and cross-section
+// RELEASE_DEBOUNCE: consecutive no-key polls required before a held key is
+// considered released. Eliminates switch bounce (< 5 ms) and cross-section
 // carryover without affecting typing speed (20 × ~0.37 ms ≈ 7 ms << 100 ms/char).
-#define REP_DELAY        3000
-#define REP_RATE          300
-#define RELEASE_DEBOUNCE   20
+// PRESS_DEBOUNCE: consecutive identical polls required before a new key is
+// accepted. A 2-key combo (SHIFT+key, FUNCT+digit) sets both matrix bits in
+// one host-side step, but keyb_scan()'s 8-row sweep can straddle that
+// instant and decode the unshifted/un-FUNCT'd key for exactly one poll
+// before the combo's true value appears (and then holds steady) -- 2 polls
+// filters that single-poll artifact at a ~0.7 ms cost, imperceptible to a
+// human typist.
+#define REP_DELAY          3000
+#define REP_RATE            300
+#define RELEASE_DEBOUNCE     20
+#define PRESS_DEBOUNCE        2
 
 // -------------------------------------------------------------------------
 // ZP temporaries used by keyb_scan assembly
@@ -291,11 +301,15 @@ uint8_t keyb_decode(void)
 
 /**
  * Scan and decode the keyboard (via keyb_scan()/keyb_decode()), then apply
- * key-repeat and release-debounce logic: a newly-pressed key is returned
- * immediately and then suppressed for REP_DELAY polls, after which it
- * repeats every REP_RATE polls while held; after any key is released,
- * RELEASE_DEBOUNCE no-key polls must elapse before a new key is accepted.
- * Updates the global keyb_char to the same value as the return value.
+ * press/release-debounce and key-repeat logic: a key is only considered
+ * released once RELEASE_DEBOUNCE consecutive no-key polls have elapsed (a
+ * single spurious no-key poll is treated as a continuation of the held key,
+ * not a release), and a new key is only accepted once it has been decoded
+ * identically for PRESS_DEBOUNCE consecutive polls (filtering a single-poll
+ * torn-matrix-read artifact from a 2-key combo). Once accepted, a key is
+ * returned immediately, suppressed for REP_DELAY polls, then repeats every
+ * REP_RATE polls while held. Updates the global keyb_char to the same value
+ * as the return value.
  *
  * @return Decoded ASCII/KEY_* code for this poll, or KEY_NONE (0) if no key
  *         event should be reported this poll.
@@ -307,19 +321,25 @@ uint8_t keyb_poll(void)
 
     if (!ch)
     {
-        if (release_count > 0) release_count--;
+        candidate       = KEY_NONE;
+        candidate_count = 0;
+        if (release_count > 0)
+        {
+            release_count--;
+            return KEY_NONE;
+        }
         prev_key  = KEY_NONE;
         rep_count = 0;
         keyb_char = KEY_NONE;
         return KEY_NONE;
     }
 
-    // Block new-key detection until release debounce window has elapsed.
-    // release_count only decrements when ch==0, so held-key auto-repeat is unaffected.
-    if (release_count > 0) return KEY_NONE;
+    release_count = RELEASE_DEBOUNCE;
 
     if (ch == prev_key)
     {
+        candidate       = KEY_NONE;
+        candidate_count = 0;
         if (rep_count == 0)
         {
             rep_count = REP_RATE;
@@ -335,10 +355,27 @@ uint8_t keyb_poll(void)
     }
     else
     {
-        prev_key      = ch;
-        rep_count     = REP_DELAY;
-        release_count = RELEASE_DEBOUNCE;
-        keyb_char     = ch;
+        if (ch == candidate)
+        {
+            candidate_count++;
+        }
+        else
+        {
+            candidate       = ch;
+            candidate_count = 1;
+        }
+
+        if (candidate_count < PRESS_DEBOUNCE)
+        {
+            keyb_char = KEY_NONE;
+            return KEY_NONE;
+        }
+
+        prev_key        = ch;
+        rep_count       = REP_DELAY;
+        candidate       = KEY_NONE;
+        candidate_count = 0;
+        keyb_char       = ch;
         return ch;
     }
 }
