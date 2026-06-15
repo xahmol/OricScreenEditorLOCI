@@ -18,10 +18,11 @@ storage device**.
 - Enhanced palette mode that also shows the inverse colour combinations for
   each ink/paper pair
 
-**Status: Phase 3 of 9 complete**, plus charset-swap infrastructure and a
-narrow charset-editor popup (Phase 4 prep; canvas data model + minimal main
-mode + menu bar/Screen menu + character editor + charset-swap mechanism +
-Phosphoric test harness; binary 11382 bytes). A previous CC65-based attempt at this got stuck and is archived
+**Status: Phase 3 of 9 complete**, plus charset-swap infrastructure, a narrow
+charset-editor popup, and EN/FR localisation (Phase 4 prep; canvas data model
++ minimal main mode + menu bar/Screen menu + character editor + charset-swap
+mechanism + Phosphoric test harness; binary 11382 bytes EN / 11435 bytes FR).
+A previous CC65-based attempt at this got stuck and is archived
 in the `nonworkingcc65` branch (full history + uncommitted state). `main` was
 restarted from scratch on the Oscar64 native/bare-metal build chain developed
 for [locifilemanager-v2](https://github.com/xahmol/locifilemanager-v2)
@@ -30,6 +31,12 @@ were copied from verbatim. The remaining 6 phases (palette/colour picker,
 select/move/line-box/write modes, LOCI file I/O, file picker, overlay-RAM
 undo, IJK/help/polish) are tracked in the active plan — see
 `~/.claude/plans/snappy-beaming-lynx.md` or ask Claude for status.
+
+**Other docs**: `ARCHITECTURE.md` (memory map, module layout, dependency
+graph), `libmanual.md`/`libmanual_fr.md` (per-function API reference for
+`oric.h`/`keyboard.h`/`charwin.h`/`ijk.h`/`loci.h`/`charset.h`/`menu.h`),
+`README.md`/`README.pdf`/`README_fr.md` (user-facing feature documentation,
+V1-derived).
 
 ### Canvas architecture (Phase 1 decision)
 
@@ -179,6 +186,18 @@ user's edits.
   4 palette/colour picker etc.) should pass `1` unless they have the same
   live-charset-RAM preview requirement as the character editor.
 
+## Code Style
+
+Every C function definition (including `static` helpers) gets a
+Javadoc-style `/** ... */` doc comment immediately above it, in the `.c`
+file (not the `.h` declaration), following locifilemanager-v2's
+`charwin.c`/`keyboard.c`/`loci.c` convention: a prose description, then
+`@param name  Description` for each parameter and `@return Description`
+(`@return (none)` for `void`). See `libmanual.md`/`libmanual_fr.md` for
+worked examples drawn from `include/charset.c`. This is a cross-project
+convention (see global memory `feedback_function_doc_comments.md`), not
+specific to OSE.
+
 ## Compiler Toolchain
 
 This is an **Oscar64** project. `oscar64manual.md` is in the project root —
@@ -203,18 +222,22 @@ Target: 6502A (Oric Atmos), bare-metal. No VIC-II, SID, or C64 Kernal.
 ## Build and Run
 
 ```
-make              # build build/oseloci.tap
-make run          # build + launch in Oricutron
-make clean        # remove build artifacts
+make              # build build/oseloci.tap (English, LANG=EN default)
+make LANG=FR      # build build/oseloci_fr.tap (French)
+make all-langs    # build both build/oseloci.tap and build/oseloci_fr.tap
+make run          # build + launch in Oricutron (LANG=FR for the French build)
+make clean        # remove build artifacts (both languages)
 make docs         # regenerate README.pdf from README.md (requires pandoc)
 make test         # full automated Phosphoric test suite (test-boot, test-menus,
                   # test-screenresize, test-charsetram-spike, test-charsetedit)
+                  # -- EN only, see "Localisation" below
 make test-boot    # headless boot smoke test (splash + canvas/statusbar render)
 make test-capture CYCLES=N TYPEKEYS='...'
                   # calibration helper: dumps tests/out/capture.bin + .png
 ```
 
-Compiler flags: `-n -tf=bin -rt=include/oric_crt.c -i=include -i=src -O2 -dNOFLOAT`
+Compiler flags: `-n -tf=bin -rt=include/oric_crt.c -i=include -i=src -O2 -dNOFLOAT $(LANGFLAG)`
+(`LANGFLAG` is `-dLANG_FR` for `LANG=FR`, empty for the default `LANG=EN`)
 
 Emulator: `$ORICUTRON_HOME/oricutron -ma --serial none --vsynchack off --turbotape on`
 (Makefile defaults `ORICUTRON_HOME` to `~/oricutron`)
@@ -272,7 +295,10 @@ src/
   charsetswap.c/h Charset-swap mechanism: backs up/restores CHARSET_STD around
                   popups so chrome renders with ROM glyphs (see "Charset-swap
                   mechanism")
-  strings.h       User-visible message strings (MSG_* macros required by loci.c)
+  strings.h       Localisation gateway: #include "strings_en.h" or
+                  "strings_fr.h" depending on LANG_FR (see "Localisation")
+  strings_en.h    All user-visible MSG_* strings, English (default)
+  strings_fr.h    All user-visible MSG_* strings, French (LANG=FR), unaccented
 include/
   oric.h          Hardware constants (VIA, AY, screen, overlay RAM, ASTR_*/CH_*/A_* attrs)
   oric_crt.c      Custom Oscar64 runtime: startup, regions, math stubs
@@ -298,10 +324,51 @@ All library files (`oric_crt.c`, `crt_math.c`, `oric.h`, `charwin.*`,
 locifilemanager-v2 — see that project's CLAUDE.md and `oscar64manual.md` for
 their full API documentation (charwin window model, attribute macros, key
 codes, MIA/TAP register layout, MIA helper calling conventions, etc.).
-`src/strings.h` here is a minimal placeholder (just the two `MSG_*` macros
-`loci.c`'s `get_locicfg()` needs) — locifilemanager-v2's full EN/FR
-`strings.h`/`strings_en.h`/`strings_fr.h` localisation system was deliberately
-**not** copied; revisit if/when localisation is needed.
+`src/strings.h`/`strings_en.h`/`strings_fr.h` follow locifilemanager-v2's
+EN/FR localisation gateway pattern — see "Localisation" below.
+
+## Localisation
+
+OSE follows locifilemanager-v2's EN/FR localisation convention: every
+user-visible string is a `MSG_*` macro, selected at compile time via a
+gateway header.
+
+- **`src/strings.h`** is the gateway: `#ifdef LANG_FR` includes
+  `strings_fr.h`, else `strings_en.h`. Every source file that displays text
+  (`main.c`, `statusbar.c`, `charsetedit.c`, `menudata.c`, plus `loci.c` when
+  it's wired in) `#include "strings.h"` and references only `MSG_*` macros —
+  no raw user-visible string literals in logic files.
+- **`strings_en.h`/`strings_fr.h`** define the same set of `MSG_*` macros in
+  each language. `strings_fr.h` uses **no accented characters** — the Oric
+  ROM charset has no e-acute/e-grave/c-cedilla etc. (e.g. "Deplacer",
+  "Effacer", "Oui"/"Non", "demarrer", "donnees").
+- **Makefile**: `LANG ?= EN`; `LANG=FR` sets `LANGFLAG = -dLANG_FR` (appended
+  to `CFLAGS`) and `LANGSUFFIX = _fr` (so outputs are `build/oseloci_fr.bin`/
+  `.tap`, vs `build/oseloci.bin`/`.tap` for EN). `PROGNAME` (the tape header
+  name `OSELOCI`) is identical for both languages. `make all-langs` builds
+  both. All `test-*`/`sandbox-reset` targets are suffix-aware but their
+  *assertions* (`oric_screen.py --find`) are written against the EN strings,
+  so `make test` only exercises the EN build.
+- **Key bindings are independent of `MSG_*`** — they're hardcoded chars in
+  `switch (cwin_getch())` statements, untouched by language selection. Any
+  future localisation work **must keep key bindings identical across
+  languages**; only displayed labels translate.
+- **Menu-bar layout constraint**: `menu_placebar()` (`src/menu.c`) lays out
+  `menubar.titles[]` dynamically left-to-right with a 1-column gap on each
+  side, and requires `sum(strlen(titles)) + 7 <= 39` (40-column row) or the
+  last item gets clamped and can overlap the previous one. EN
+  ("Screen"/"File"/"Charset"/"Information" = 6+4+7+11=28) has 4 chars of
+  margin; FR's natural translations summed to 33 (1 over), so
+  `MSG_MENU_BAR_CHARSET` is abbreviated `"Caract."` (7, from "Caracteres",
+  10) to bring the FR total to 30. **Any new menu-bar title in either
+  language must keep the 4-item sum <= 32**, or `menu_placebar()`'s clamp
+  will visually merge the last two items.
+- **Other length constraints** (`src/menu.h`): `MENUBAR_MAXLENGTH=12` (11
+  visible chars + NUL) for `menubar.titles[]`; `PULLDOWN_MAXLENGTH=17` (16
+  visible chars + NUL) for `pulldown_titles[][][]`. `pulldown_titles[0][0]`/
+  `[0][1]` ("Width:"/"Height:" or "Largeur:"/"Hauteur:") are placeholders
+  overwritten at runtime by `update_size_titles()` via
+  `MSG_SCREEN_WIDTH_FMT`/`MSG_SCREEN_HEIGHT_FMT`.
 
 ## Oric Screen Model
 

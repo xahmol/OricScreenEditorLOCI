@@ -25,6 +25,7 @@
 #include "statusbar.h"
 #include "charset.h"
 #include "charsetswap.h"
+#include "strings.h"
 #include "charsetedit.h"
 
 // -------------------------------------------------------------------------
@@ -71,22 +72,38 @@ static uint8_t     ce_copy_valid;
 // Helpers
 // -------------------------------------------------------------------------
 
-// Pointer to the 8-byte glyph currently being edited, in live charset RAM.
+/**
+ * Pointer to the 8-byte glyph currently being edited, in live charset RAM
+ * (CHARSET_STD or CHARSET_ALT, selected by ce_altorstd).
+ *
+ * @return Pointer to the 8-byte glyph bitmap for ce_code/ce_altorstd.
+ */
 static volatile uint8_t *ce_glyph(void)
 {
     return (volatile uint8_t *)charset_address(ce_code, ce_altorstd);
 }
 
-// Highest valid screencode for the current charset (std: 0x7F, alt: 0x6F).
+/**
+ * Highest valid screencode for the charset currently selected by
+ * ce_altorstd (std: 0x20+CHAREDIT_STD_COUNT-1 = 0x7F, alt:
+ * 0x20+CHAREDIT_ALT_COUNT-1 = 0x6F).
+ *
+ * @return Highest valid screencode for the current charset.
+ */
 static uint8_t ce_max_code(void)
 {
     return (ce_altorstd == 0) ? (0x20 + CHAREDIT_STD_COUNT - 1)
                                : (0x20 + CHAREDIT_ALT_COUNT - 1);
 }
 
-// Snapshot the current glyph into ce_undo[] (call before any destructive edit).
-// Also marks the charset as user-edited, so charsetswap_enter()/exit() will
-// back up and restore CHARSET_STD around future popups (see charsetswap.h).
+/**
+ * Snapshot the current glyph into ce_undo[] (call before any destructive
+ * edit, so 'z' can restore it) and mark the charset as user-edited via
+ * charsetswap_mark_changed(), so future popups back up/restore CHARSET_STD
+ * around themselves (see charsetswap.h).
+ *
+ * @return (none)
+ */
 static void ce_snapshot(void)
 {
     volatile uint8_t *g = ce_glyph();
@@ -95,6 +112,12 @@ static void ce_snapshot(void)
     for (y = 0; y < CHAREDIT_GRID_H; y++) ce_undo[y] = g[y];
 }
 
+/**
+ * Parse a single hexadecimal digit character.
+ *
+ * @param c Character '0'-'9', 'a'-'f', or 'A'-'F'.
+ * @return Numeric value 0-15, or 0 if c is not a hex digit.
+ */
 static uint8_t ce_hex_digit(char c)
 {
     if (c >= '0' && c <= '9') return (uint8_t)(c - '0');
@@ -103,6 +126,14 @@ static uint8_t ce_hex_digit(char c)
     return 0;
 }
 
+/**
+ * Parse a NUL-terminated string of hexadecimal digits into a byte,
+ * accumulating digit-by-digit (most significant digit first).
+ *
+ * @param s NUL-terminated hex digit string (e.g. up to 2 digits for a
+ *          charset glyph row).
+ * @return Parsed numeric value.
+ */
 static uint8_t ce_parse_hex(const char *s)
 {
     uint8_t v = 0;
@@ -118,10 +149,18 @@ static uint8_t ce_parse_hex(const char *s)
 // Drawing
 // -------------------------------------------------------------------------
 
+/**
+ * Draw the popup's header: "Code:$xx" (CE_HEADER_Y), "Set:Std"/"Set:Alt"
+ * (CE_SET_Y), and the live attribute+character preview
+ * (CE_PREVIEW_ATTR_X/CE_PREVIEW_CHAR_X) for the screencode/charset
+ * currently being edited.
+ *
+ * @return (none)
+ */
 static void ce_draw_header(void)
 {
-    cwin_putat_printf(&ce_win, 0, CE_HEADER_Y, "Code:$%02x", ce_code);
-    cwin_putat_string(&ce_win, 0, CE_SET_Y, ce_altorstd ? "Set:Alt" : "Set:Std");
+    cwin_putat_printf(&ce_win, 0, CE_HEADER_Y, MSG_CE_CODE_FMT, ce_code);
+    cwin_putat_string(&ce_win, 0, CE_SET_Y, ce_altorstd ? MSG_CE_SET_ALT : MSG_CE_SET_STD);
 
     // Live preview: charset-mode attribute + the screencode itself. Reads
     // back the SAME charset-RAM bytes the grid edits, so it updates as soon
@@ -130,6 +169,12 @@ static void ce_draw_header(void)
     cwin_putat_char(&ce_win, CE_PREVIEW_CHAR_X, CE_HEADER_Y, ce_code);
 }
 
+/**
+ * Draw the favourites row: digit labels '0'-'9' (CE_FAV_Y) above the
+ * screencodes currently stored in app.favourites[] (CE_FAV_VALUE_Y).
+ *
+ * @return (none)
+ */
 static void ce_draw_favourites(void)
 {
     uint8_t i;
@@ -141,6 +186,13 @@ static void ce_draw_favourites(void)
     }
 }
 
+/**
+ * Draw the 6x8 pixel grid for the glyph being edited, using the 4-state
+ * pixel/cursor rendering (CH_SPACE / CE_PIXEL_CHAR / their inverse-video
+ * variants) -- see CLAUDE.md "Character editor (Phase 3)".
+ *
+ * @return (none)
+ */
 static void ce_draw_grid(void)
 {
     volatile uint8_t *g = ce_glyph();
@@ -162,6 +214,21 @@ static void ce_draw_grid(void)
 // Main loop
 // -------------------------------------------------------------------------
 
+/**
+ * Character editor popup, entered via 'e' from main mode. Opens a narrow
+ * 13x15 sidebar popup (cols 27-39, rows 0-14) leaving the canvas (cols
+ * 0-26) visible, and loops handling the full V1-derived key-binding set:
+ * cursor keys move within the grid; '+'/'-'/'=' cycle the screencode;
+ * '0'-'9' recall favourites, SHIFT+0-9 store the current code into them;
+ * SPACE toggles a pixel, DEL clears the glyph; 'i' inverts, 'z' undoes the
+ * last edit, 's' restores from CHARSETROM (std only); 'c'/'v' copy/paste a
+ * glyph; 'x'/'y' mirror horizontally/vertically; 'u'/'d'/'l'/'r' scroll/
+ * rotate the glyph; 'h' opens a hex-row input; 'a' toggles Std/Alt; FUNCT+6
+ * toggles the statusbar. ESC commits ce_code/ce_altorstd back to
+ * app.plotscreencode/app.plotaltchar and closes the popup.
+ *
+ * @return (none)
+ */
 void charsetedit_run(void)
 {
     ce_code     = app.plotscreencode;
@@ -340,7 +407,7 @@ void charsetedit_run(void)
         {
             char hexbuf[3];
             hexbuf[0] = '\0';
-            cwin_putat_string(&ce_win, CE_HEX_LABEL_X, CE_HEX_Y, "Hex:$");
+            cwin_putat_string(&ce_win, CE_HEX_LABEL_X, CE_HEX_Y, MSG_CE_HEX_LABEL);
             if (cwin_textinput(&ce_win, CE_HEX_INPUT_X, CE_HEX_Y, 2, hexbuf, 2, VINPUT_ALPHA) >= 0)
             {
                 g = ce_glyph();

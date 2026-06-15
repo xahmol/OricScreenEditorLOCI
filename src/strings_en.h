@@ -1,0 +1,79 @@
+// strings_en.h - OricScreenEditorLOCI user-visible strings (English)
+// All MSG_* macros for the application, in English. Selected via strings.h
+// when LANG_FR is NOT defined (the default build).
+
+#ifndef STRINGS_EN_H
+#define STRINGS_EN_H
+
+// ── LOCI library messages (include/loci.c, get_locicfg()) ────────────────
+// Not yet wired into the build (see ARCHITECTURE.md "LOCI and IJK"), kept
+// for when loci.c is included.
+#define MSG_LOCI_NOT_FOUND  "No LOCI device detected or firmware too old."
+#define MSG_PRESS_KEY_EXIT  "Press any key to exit."
+
+// ── Splash screen (src/main.c) ────────────────────────────────────────────
+#define MSG_SPLASH_TITLE      "OricScreenEditor for LOCI"
+#define MSG_SPLASH_BUILD_FMT  "Oscar64 build v%d.%d.%d"
+#define MSG_SPLASH_PRESSKEY   "Press any key to start"
+
+// ── Menu bar titles (src/menudata.c, menubar.titles) ──────────────────────
+#define MSG_MENU_BAR_SCREEN   "Screen"
+#define MSG_MENU_BAR_FILE     "File"
+#define MSG_MENU_BAR_CHARSET  "Charset"
+#define MSG_MENU_BAR_INFO     "Information"
+
+// ── Pulldown 0 -- Screen ───────────────────────────────────────────────────
+// pulldown_titles[0][0]/[0][1] are rewritten at runtime from
+// MSG_SCREEN_WIDTH_FMT/MSG_SCREEN_HEIGHT_FMT by update_size_titles().
+#define MSG_SCREEN_WIDTH_FMT   "Width:  %3u"
+#define MSG_SCREEN_HEIGHT_FMT  "Height: %3u"
+#define MSG_SCREEN_CLEAR       "Clear"
+#define MSG_SCREEN_FILL        "Fill"
+
+// ── Pulldown 1 -- File ──────────────────────────────────────────────────────
+#define MSG_FILE_SAVE_SCREEN    "Save screen"
+#define MSG_FILE_LOAD_SCREEN    "Load screen"
+#define MSG_FILE_SAVE_PROJECT   "Save project"
+#define MSG_FILE_LOAD_PROJECT   "Load project"
+#define MSG_FILE_SAVE_COMBINED  "Save combined"
+#define MSG_FILE_LOAD_COMBINED  "Load combined"
+
+// ── Pulldown 2 -- Charset ───────────────────────────────────────────────────
+#define MSG_CHARSET_LOAD_STD       "Load standard"
+#define MSG_CHARSET_LOAD_ALT       "Load alternate"
+#define MSG_CHARSET_SAVE_STD       "Save standard"
+#define MSG_CHARSET_SAVE_ALT       "Save alternate"
+#define MSG_CHARSET_LOAD_COMBINED  "Load combined"
+#define MSG_CHARSET_SAVE_COMBINED  "Save combined"
+
+// ── Pulldown 3 -- Information ───────────────────────────────────────────────
+#define MSG_INFO_VERSION  "Version/credits"
+#define MSG_INFO_EXIT     "Exit program"
+
+// ── Pulldown 4 -- Yes/No ─────────────────────────────────────────────────────
+#define MSG_MENU_YN_YES  "Yes"
+#define MSG_MENU_YN_NO   "No"
+
+// ── Menu popup helpers (src/menu.c) ─────────────────────────────────────────
+#define MSG_MENU_AREYOUSURE  "Are you sure?"
+#define MSG_MENU_PRESSAKEY   "Press a key to continue"
+#define MSG_MENU_NOTIMPL     "Not yet implemented"
+#define MSG_MENU_SHRINKWARN  "Shrinking might delete data."
+
+// ── Resize dialog (src/menudata.c, resize_dialog()) ──────────────────────────
+#define MSG_RESIZE_TITLE_WIDTH    "Resize canvas width"
+#define MSG_RESIZE_TITLE_HEIGHT   "Resize canvas height"
+#define MSG_RESIZE_PROMPT_WIDTH   "Enter new width:"
+#define MSG_RESIZE_PROMPT_HEIGHT  "Enter new height:"
+#define MSG_RESIZE_INVALID        "New size unsupported."
+
+// ── Character editor (src/charsetedit.c) ──────────────────────────────────────
+#define MSG_CE_CODE_FMT   "Code:$%02x"
+#define MSG_CE_SET_STD    "Set:Std"
+#define MSG_CE_SET_ALT    "Set:Alt"
+#define MSG_CE_HEX_LABEL  "Hex:$"
+
+// ── Status bar (src/statusbar.c) ────────────────────────────────────────────
+#define MSG_STATUSBAR_MAIN_FMT  "Main  X:%02u Y:%02u  C:$%02x  S:%ux%u"
+
+#endif // STRINGS_EN_H

@@ -50,6 +50,23 @@ VERSION_MINOR = 1
 VERSION_PATCH = 0
 
 # -------------------------------------------------------------------------
+# Localisation
+# -------------------------------------------------------------------------
+# LANG=EN (default) or LANG=FR
+# LANG=EN builds build/oseloci.tap
+# LANG=FR builds build/oseloci_fr.tap
+# make all-langs builds both
+
+LANG ?= EN
+ifeq ($(LANG),FR)
+  LANGFLAG   = -dLANG_FR
+  LANGSUFFIX = _fr
+else
+  LANGFLAG   =
+  LANGSUFFIX =
+endif
+
+# -------------------------------------------------------------------------
 # Project
 # -------------------------------------------------------------------------
 
@@ -71,7 +88,8 @@ CFLAGS = \
   -dNOFLOAT       \
   -dVERSION_MAJOR=$(VERSION_MAJOR) \
   -dVERSION_MINOR=$(VERSION_MINOR) \
-  -dVERSION_PATCH=$(VERSION_PATCH)
+  -dVERSION_PATCH=$(VERSION_PATCH) \
+  $(LANGFLAG)
 
 # -------------------------------------------------------------------------
 # Source dependency lists
@@ -94,7 +112,11 @@ MAIN_SRCS = \
   src/menudata.h        \
   src/charsetedit.c     \
   src/charsetedit.h     \
+  src/charsetswap.c     \
+  src/charsetswap.h     \
   src/strings.h         \
+  src/strings_en.h      \
+  src/strings_fr.h      \
   include/oric_crt.c    \
   include/crt_math.c    \
   include/oric.h        \
@@ -102,6 +124,8 @@ MAIN_SRCS = \
   include/charwin.h      \
   include/keyboard.c     \
   include/keyboard.h     \
+  include/charset.c      \
+  include/charset.h      \
   include/ijk.c          \
   include/ijk.h          \
   include/loci.c         \
@@ -134,27 +158,32 @@ CYCLES   ?= 8000000
 # all: must appear first so it is the default goal
 # =========================================================================
 
-.PHONY: all clean run docs check-phosphoric sandbox-reset test-capture test-boot test-menus test-screenresize test-charsetram-spike test-charsetedit test
+.PHONY: all all-langs clean run docs check-phosphoric sandbox-reset test-capture test-boot test-menus test-screenresize test-charsetram-spike test-charsetedit test
 
-all: build/$(MAIN).tap
+all: build/$(MAIN)$(LANGSUFFIX).tap
 
 # Step 1: compile main app to raw binary
-build/$(MAIN).bin: $(MAIN_SRCS)
+build/$(MAIN)$(LANGSUFFIX).bin: $(MAIN_SRCS)
 	@$(MKDIR) build 2>$(NULLDEV) ; true
-	$(CC) $(CFLAGS) -o=build/$(MAIN).bin src/main.c
+	$(CC) $(CFLAGS) -o=build/$(MAIN)$(LANGSUFFIX).bin src/main.c
 
 # Step 2: wrap binary in Oric tape header
-build/$(MAIN).tap: build/$(MAIN).bin
+build/$(MAIN)$(LANGSUFFIX).tap: build/$(MAIN)$(LANGSUFFIX).bin
 	$(PY) tools/mktap.py \
-	    build/$(MAIN).bin \
-	    build/$(MAIN).tap \
+	    build/$(MAIN)$(LANGSUFFIX).bin \
+	    build/$(MAIN)$(LANGSUFFIX).tap \
 	    $(PROGNAME) \
 	    $(LOAD_ADDR)
 
 # Launch in Oricutron (must cd to oricutron dir -- it loads ROMs from cwd)
-run: build/$(MAIN).tap
+run: build/$(MAIN)$(LANGSUFFIX).tap
 	cd $(ORICUTRON_HOME) && \
-	    $(EMUL) $(EMUFLAG) "$(CURDIR)/build/$(MAIN).tap"
+	    $(EMUL) $(EMUFLAG) "$(CURDIR)/build/$(MAIN)$(LANGSUFFIX).tap"
+
+# Build both language variants
+all-langs:
+	$(MAKE) LANG=EN
+	$(MAKE) LANG=FR
 
 # -------------------------------------------------------------------------
 # Phosphoric automated testing
@@ -177,17 +206,17 @@ check-phosphoric:
 
 # Reset the test sandbox from checked-in fixtures + the freshly built tap,
 # so every test run starts from a known state.
-sandbox-reset: build/$(MAIN).tap
+sandbox-reset: build/$(MAIN)$(LANGSUFFIX).tap
 	$(RMDIR) tests/sandbox 2>$(NULLDEV) ; true
 	$(MKDIR) tests/sandbox 2>$(NULLDEV) ; true
 	cp -r tests/fixtures/. tests/sandbox/
 	find tests/sandbox -name '.gitkeep' -delete
-	cp build/$(MAIN).tap tests/sandbox/
+	cp build/$(MAIN)$(LANGSUFFIX).tap tests/sandbox/
 
 test-capture: check-phosphoric sandbox-reset
 	$(MKDIR) tests/out 2>$(NULLDEV) ; true
 	$(PHOS) -r $(ATMOSROM) \
-	    -t tests/sandbox/$(MAIN).tap -f \
+	    -t tests/sandbox/$(MAIN)$(LANGSUFFIX).tap -f \
 	    --headless -c $(CYCLES) \
 	    $(if $(TYPEKEYS),--type-keys '$(TYPEKEYS)') \
 	    --dump-ram-at $(CYCLES):tests/out/capture.bin \
@@ -198,31 +227,31 @@ test-capture: check-phosphoric sandbox-reset
 test-boot: check-phosphoric sandbox-reset
 	$(MKDIR) tests/out 2>$(NULLDEV) ; true
 	PHOS=$(PHOS) ATMOSROM=$(ATMOSROM) SANDBOX=tests/sandbox OUT=tests/out \
-	    TAPFILE=$(MAIN).tap \
+	    TAPFILE=$(MAIN)$(LANGSUFFIX).tap \
 	    bash tests/scripts/test_boot.sh
 
 test-menus: check-phosphoric sandbox-reset
 	$(MKDIR) tests/out 2>$(NULLDEV) ; true
 	PHOS=$(PHOS) ATMOSROM=$(ATMOSROM) SANDBOX=tests/sandbox OUT=tests/out \
-	    TAPFILE=$(MAIN).tap \
+	    TAPFILE=$(MAIN)$(LANGSUFFIX).tap \
 	    bash tests/scripts/test_menus.sh
 
 test-screenresize: check-phosphoric sandbox-reset
 	$(MKDIR) tests/out 2>$(NULLDEV) ; true
 	PHOS=$(PHOS) ATMOSROM=$(ATMOSROM) SANDBOX=tests/sandbox OUT=tests/out \
-	    TAPFILE=$(MAIN).tap \
+	    TAPFILE=$(MAIN)$(LANGSUFFIX).tap \
 	    bash tests/scripts/test_screenresize.sh
 
 test-charsetram-spike: check-phosphoric sandbox-reset
 	$(MKDIR) tests/out 2>$(NULLDEV) ; true
 	PHOS=$(PHOS) ATMOSROM=$(ATMOSROM) SANDBOX=tests/sandbox OUT=tests/out \
-	    TAPFILE=$(MAIN).tap \
+	    TAPFILE=$(MAIN)$(LANGSUFFIX).tap \
 	    bash tests/scripts/test_charsetram_spike.sh
 
 test-charsetedit: check-phosphoric sandbox-reset
 	$(MKDIR) tests/out 2>$(NULLDEV) ; true
 	PHOS=$(PHOS) ATMOSROM=$(ATMOSROM) SANDBOX=tests/sandbox OUT=tests/out \
-	    TAPFILE=$(MAIN).tap \
+	    TAPFILE=$(MAIN)$(LANGSUFFIX).tap \
 	    bash tests/scripts/test_charsetedit.sh
 
 test:
@@ -256,3 +285,5 @@ README.pdf: README.md
 clean:
 	$(DEL) build/$(MAIN).bin 2>$(NULLDEV) ; true
 	$(DEL) build/$(MAIN).tap 2>$(NULLDEV) ; true
+	$(DEL) build/$(MAIN)_fr.bin 2>$(NULLDEV) ; true
+	$(DEL) build/$(MAIN)_fr.tap 2>$(NULLDEV) ; true

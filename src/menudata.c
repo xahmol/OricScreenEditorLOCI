@@ -21,7 +21,7 @@
 // -------------------------------------------------------------------------
 
 MenuBar menubar = {
-    { "Screen", "File", "Charset", "Information" },
+    { MSG_MENU_BAR_SCREEN, MSG_MENU_BAR_FILE, MSG_MENU_BAR_CHARSET, MSG_MENU_BAR_INFO },
     { 0, 0, 0, 0 },
     0
 };
@@ -32,17 +32,17 @@ char pulldown_options[PULLDOWN_NUMBER] = { 4, 6, 6, 2, 2 };
 
 char pulldown_titles[PULLDOWN_NUMBER][PULLDOWN_MAXOPTIONS][PULLDOWN_MAXLENGTH] = {
     // 0 -- Screen
-    { "Width:  40", "Height: 27", "Clear", "Fill" },
+    { "", "", MSG_SCREEN_CLEAR, MSG_SCREEN_FILL },
     // 1 -- File
-    { "Save screen", "Load screen", "Save project", "Load project",
-      "Save combined", "Load combined" },
+    { MSG_FILE_SAVE_SCREEN, MSG_FILE_LOAD_SCREEN, MSG_FILE_SAVE_PROJECT, MSG_FILE_LOAD_PROJECT,
+      MSG_FILE_SAVE_COMBINED, MSG_FILE_LOAD_COMBINED },
     // 2 -- Charset
-    { "Load standard", "Load alternate", "Save standard", "Save alternate",
-      "Load combined", "Save combined" },
+    { MSG_CHARSET_LOAD_STD, MSG_CHARSET_LOAD_ALT, MSG_CHARSET_SAVE_STD, MSG_CHARSET_SAVE_ALT,
+      MSG_CHARSET_LOAD_COMBINED, MSG_CHARSET_SAVE_COMBINED },
     // 3 -- Information
-    { "Version/credits", "Exit program" },
+    { MSG_INFO_VERSION, MSG_INFO_EXIT },
     // 4 -- Yes/No
-    { "Yes", "No" }
+    { MSG_MENU_YN_YES, MSG_MENU_YN_NO }
 };
 
 // -------------------------------------------------------------------------
@@ -57,8 +57,8 @@ char pulldown_titles[PULLDOWN_NUMBER][PULLDOWN_MAXOPTIONS][PULLDOWN_MAXLENGTH] =
  */
 static void update_size_titles(void)
 {
-    sprintf(pulldown_titles[0][0], "Width:  %3u", app.canvas_width);
-    sprintf(pulldown_titles[0][1], "Height: %3u", app.canvas_height);
+    sprintf(pulldown_titles[0][0], MSG_SCREEN_WIDTH_FMT, app.canvas_width);
+    sprintf(pulldown_titles[0][1], MSG_SCREEN_HEIGHT_FMT, app.canvas_height);
 }
 
 /**
@@ -103,8 +103,8 @@ static void resize_dialog(uint8_t is_height)
     cwin_init(&win, 5, 5, 35, 12, A_FWBLACK, A_BGWHITE);
     cwin_clear(&win);
 
-    cwin_putat_string(&win, 2, 1, is_height ? "Resize canvas height" : "Resize canvas width");
-    cwin_putat_string(&win, 2, 3, is_height ? "Enter new height:" : "Enter new width:");
+    cwin_putat_string(&win, 2, 1, is_height ? MSG_RESIZE_TITLE_HEIGHT : MSG_RESIZE_TITLE_WIDTH);
+    cwin_putat_string(&win, 2, 3, is_height ? MSG_RESIZE_PROMPT_HEIGHT : MSG_RESIZE_PROMPT_WIDTH);
 
     sprintf(buf, "%u", cur);
     if (cwin_textinput(&win, 2, 4, 8, buf, 5, VINPUT_NUMS) >= 0)
@@ -117,7 +117,7 @@ static void resize_dialog(uint8_t is_height)
 
         if (!valid)
         {
-            cwin_putat_string(&win, 2, 6, "New size unsupported.");
+            cwin_putat_string(&win, 2, 6, MSG_RESIZE_INVALID);
             cwin_putat_string(&win, 2, 7, MSG_MENU_PRESSAKEY);
             cwin_getch();
         }

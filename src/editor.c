@@ -12,6 +12,17 @@
 #define PLOT_MIN 0x20
 #define PLOT_MAX 0x7E
 
+/**
+ * Main-mode editor loop. Initialises cursor/viewport/plot state and the
+ * favourites table, draws the canvas and statusbar, then loops reading
+ * keys: cursor keys move the cursor, SPACE/DEL plot/clear the cell under
+ * the cursor with app.plotscreencode/CH_SPACE, '+'/'-' cycle the plot
+ * screencode, FUNCT+6 toggles the statusbar, FUNCT+1 opens the menu bar
+ * (menu_run()), and 'e' opens the character editor (charsetedit_run()).
+ * Never returns.
+ *
+ * @return (none)
+ */
 void editor_run(void)
 {
     uint8_t i;

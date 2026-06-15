@@ -1,15 +1,15 @@
-// strings.h - user-visible message strings
-// Required by include/loci.c (get_locicfg() boot-check messages).
+// strings.h - Localisation gateway
+// Selects the correct language-specific string file at compile time.
+// Usage: #include "strings.h" in any source that displays MSG_* strings.
+// make LANG=FR (-> -dLANG_FR) selects strings_fr.h; default is strings_en.h.
 
 #ifndef STRINGS_H
 #define STRINGS_H
 
-#define MSG_LOCI_NOT_FOUND  "No LOCI device detected or firmware too old."
-#define MSG_PRESS_KEY_EXIT  "Press any key to exit."
-
-#define MSG_MENU_AREYOUSURE "Are you sure?"
-#define MSG_MENU_PRESSAKEY  "Press a key to continue"
-#define MSG_MENU_NOTIMPL    "Not yet implemented"
-#define MSG_MENU_SHRINKWARN "Shrinking might delete data."
-
+#ifdef LANG_FR
+#include "strings_fr.h"
+#else
+#include "strings_en.h"
 #endif
+
+#endif // STRINGS_H

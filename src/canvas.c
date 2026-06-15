@@ -12,6 +12,13 @@ uint8_t screenmap[CANVAS_MAX_SIZE];
 #define CANVAS_MAX_ROW 320
 static uint8_t canvas_rowbuf[CANVAS_MAX_ROW];
 
+/**
+ * Fill the entire canvas buffer (app.canvas_width * app.canvas_height
+ * cells) with a single screencode/attribute value.
+ *
+ * @param value Screencode or attribute byte to write into every cell.
+ * @return (none)
+ */
 void canvas_fill(uint8_t value)
 {
     uint16_t total = app.canvas_width * app.canvas_height;
@@ -19,11 +26,22 @@ void canvas_fill(uint8_t value)
         screenmap[i] = value;
 }
 
+/**
+ * Fill the entire canvas buffer with blank space (CH_SPACE).
+ *
+ * @return (none)
+ */
 void canvas_clear(void)
 {
     canvas_fill(CH_SPACE);
 }
 
+/**
+ * Initialise the canvas to its default size, clear it, and blit the
+ * viewport to screen RAM. Called once at startup.
+ *
+ * @return (none)
+ */
 void canvas_init(void)
 {
     app.canvas_width  = CANVAS_WIDTH;
@@ -32,16 +50,39 @@ void canvas_init(void)
     canvas_blit();
 }
 
+/**
+ * Read a single cell from the canvas buffer.
+ *
+ * @param x Canvas-relative column (0 .. app.canvas_width-1).
+ * @param y Canvas-relative row (0 .. app.canvas_height-1).
+ * @return Screencode/attribute byte stored at (x, y).
+ */
 uint8_t canvas_get(uint16_t x, uint16_t y)
 {
     return screenmap[y * app.canvas_width + x];
 }
 
+/**
+ * Write a single cell in the canvas buffer.
+ *
+ * @param x     Canvas-relative column (0 .. app.canvas_width-1).
+ * @param y     Canvas-relative row (0 .. app.canvas_height-1).
+ * @param value Screencode/attribute byte to store at (x, y).
+ * @return (none)
+ */
 void canvas_put(uint16_t x, uint16_t y, uint8_t value)
 {
     screenmap[y * app.canvas_width + x] = value;
 }
 
+/**
+ * Copy the VIEWPORT_WIDTH x VIEWPORT_HEIGHT window of the canvas starting
+ * at (app.xoffset, app.yoffset) into screen RAM ($BB80), one row at a
+ * time. Bypasses OricCharWin/cwin_viewport_blit -- see CLAUDE.md "Canvas
+ * architecture".
+ *
+ * @return (none)
+ */
 void canvas_blit(void)
 {
     uint8_t *dst = (uint8_t *)TEXTVRAM;
@@ -54,6 +95,15 @@ void canvas_blit(void)
     }
 }
 
+/**
+ * Toggle the inverse-video bit (0x80) of a single screen-RAM cell, for
+ * cursor highlighting. Operates directly on $BB80, in screen/viewport
+ * coordinates (not canvas coordinates).
+ *
+ * @param x Screen column (0 .. VIEWPORT_WIDTH-1).
+ * @param y Screen row (0 .. VIEWPORT_HEIGHT-1).
+ * @return (none)
+ */
 void canvas_cell_invert(uint16_t x, uint16_t y)
 {
     uint8_t *cell = (uint8_t *)TEXTVRAM + y * SCREEN_COLS + x;

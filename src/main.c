@@ -10,9 +10,17 @@
 #include "menu.h"
 #include "menudata.h"
 #include "editor.h"
+#include "strings.h"
 
 AppState app;
 
+/**
+ * Program entry point. Shows the splash screen and waits for a keypress,
+ * then initialises the canvas, statusbar, and menu system before handing
+ * control to the main-mode editor loop (editor_run(), never returns).
+ *
+ * @return 0 (never reached).
+ */
 int main(void)
 {
     OricCharWin splash;
@@ -21,9 +29,9 @@ int main(void)
 
     cwin_init(&splash, 2, 0, 38, 28, A_FWWHITE, A_BGBLACK);
     cwin_clear(&splash);
-    cwin_putat_string(&splash, 0, 0, "OricScreenEditor for LOCI");
-    cwin_putat_printf(&splash, 0, 1, "Oscar64 build v%d.%d.%d", VERSION_MAJOR, VERSION_MINOR, VERSION_PATCH);
-    cwin_putat_string(&splash, 0, 3, "Press any key to start");
+    cwin_putat_string(&splash, 0, 0, MSG_SPLASH_TITLE);
+    cwin_putat_printf(&splash, 0, 1, MSG_SPLASH_BUILD_FMT, VERSION_MAJOR, VERSION_MINOR, VERSION_PATCH);
+    cwin_putat_string(&splash, 0, 3, MSG_SPLASH_PRESSKEY);
     cwin_getch();
 
     canvas_init();
