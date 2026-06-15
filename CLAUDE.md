@@ -18,17 +18,17 @@ storage device**.
 - Enhanced palette mode that also shows the inverse colour combinations for
   each ink/paper pair
 
-**Status: Phase 2 of 9 complete** (canvas data model + minimal main mode +
-menu bar/Screen menu + Phosphoric test harness; binary 9325 bytes). A previous
-CC65-based attempt at this got stuck and is archived in the `nonworkingcc65`
-branch (full history + uncommitted state). `main` was restarted from scratch
-on the Oscar64 native/bare-metal build chain developed for
-[locifilemanager-v2](https://github.com/xahmol/locifilemanager-v2)
+**Status: Phase 3 of 9 complete** (canvas data model + minimal main mode +
+menu bar/Screen menu + character editor + Phosphoric test harness; binary
+11446 bytes). A previous CC65-based attempt at this got stuck and is archived
+in the `nonworkingcc65` branch (full history + uncommitted state). `main` was
+restarted from scratch on the Oscar64 native/bare-metal build chain developed
+for [locifilemanager-v2](https://github.com/xahmol/locifilemanager-v2)
 (`/home/xahmol/git/locifilemanager-v2`), which the runtime and libraries below
-were copied from verbatim. The remaining 7 phases (character editor,
-palette/colour picker, select/move/line-box/write modes, LOCI file I/O, file
-picker, overlay-RAM undo, IJK/help/polish) are tracked in the active plan —
-see `~/.claude/plans/snappy-beaming-lynx.md` or ask Claude for status.
+were copied from verbatim. The remaining 6 phases (palette/colour picker,
+select/move/line-box/write modes, LOCI file I/O, file picker, overlay-RAM
+undo, IJK/help/polish) are tracked in the active plan — see
+`~/.claude/plans/snappy-beaming-lynx.md` or ask Claude for status.
 
 ### Canvas architecture (Phase 1 decision)
 
@@ -54,6 +54,56 @@ select/move/line-box/write modes, file format) — this is the spec the rewrite
 needs to (eventually) match and then extend. `assets/*.bin` (charset/title/
 help screens, Petscii charset) are Oric-format binaries carried over from V1
 and may be reusable as-is.
+
+### Character editor (Phase 3)
+
+`src/charsetedit.c/h` — entered via `e` from main mode, edits the 6x8-pixel
+glyph for `app.plotscreencode`/`app.plotaltchar`.
+
+- **Strategy A (confirmed by the Phase 3a spike, kept as a permanent
+  regression in `tests/scripts/test_charsetram_spike.sh`)**: both
+  `CHARSET_STD` ($B400) and `CHARSET_ALT` ($B800) banks are edited
+  **directly in live charset RAM** — no shadow buffers, no copy-in/copy-out.
+  The ULA re-renders from charset RAM every frame, so the popup's live
+  preview cell (`ce_draw_header`, `CE_PREVIEW_ATTR_X`/`CE_PREVIEW_CHAR_X`)
+  and any on-canvas occurrences of the edited glyph update for free as soon
+  as `ce_draw_grid()` redraws.
+- **Address formula** (`charset_address()`, `src/charsetedit.c`): `base +
+  screencode*8` where `base` = `CHARSET_STD`/`CHARSET_ALT` — **no** `-0x20`
+  offset (full 128-glyph banks, codes 0x00-0x7F). `CHARSETROM` ($FC78, used
+  by the `s` restore-from-ROM command, std charset only) uses the **opposite**
+  convention: `CHARSETROM + (screencode-0x20)*8`, since the ROM table only
+  covers the 96 printable codes 0x20-0x7F. Both conventions are documented in
+  `include/oric.h`.
+- **Popup layout** (38x16, screen rows 1-16, `CE_WIN_SX=2/CE_WIN_SY=1`):
+  header (row 0: `Character editor   Code:$xx  Set:Std|Alt` + live-preview
+  attr/char at `CE_PREVIEW_ATTR_X`/`CE_PREVIEW_CHAR_X`), favourites (rows 1-2,
+  `CE_FAV_Y`/`CE_FAV_VALUE_Y`, digit labels '0'-'9' over `app.favourites[10]`
+  screencodes starting at `CE_FAV_X`), the 6x8 pixel grid (rows 4-11,
+  `CE_GRID_X`/`CE_GRID_Y`, one screen cell per pixel), an inline hex-row input
+  (`CE_HEX_LABEL_X`/`CE_HEX_INPUT_X`, row `CE_HEX_Y`, via `cwin_textinput`),
+  and 4 lines of key hints (rows 12-15).
+- **Pixel/cursor 4-state grid rendering** (`ce_draw_grid`): pixel=0,cursor=0
+  -> `CH_SPACE` (0x20); pixel=1,cursor=0 -> `CE_PIXEL_CHAR` `'#'` (0x23);
+  pixel=0,cursor=1 -> `CH_INVSPACE` (0xA0, = `CH_SPACE ^ 0x80`); pixel=1,
+  cursor=1 -> `0xA3` (= `'#' ^ 0x80`). All 4 are visually distinct, resolving
+  the ambiguity of naively XORing 0x80 onto `CH_SPACE`/`CH_INVSPACE` pairs.
+- **Key bindings** (all implemented; see `README.md` "Character editor" for
+  the full user-facing description): cursor keys move within the grid;
+  `+`/`-`/`=` cycle the screencode (wrapping at the charset's valid range,
+  std 0x20-0x7F / alt 0x20-0x6F via `ce_max_code()`); `0-9` recall
+  `app.favourites[n]`, `SHIFT+0-9` store the current code into it; `SPACE`
+  toggles the pixel under the cursor; `DEL` clears the glyph; `i` inverts
+  (XOR 0x3F); `z` undoes the last destructive edit (single-level snapshot,
+  `ce_undo[]`); `s` restores from `CHARSETROM` (std only); `c`/`v`
+  copy/paste a glyph (`ce_copy[]`); `x`/`y` mirror horizontally/vertically;
+  `u`/`d`/`l`/`r` scroll the glyph up/down/left/right (wrapping); `h` opens a
+  2-digit hex-row input for the cursor's row; `a` toggles Std/Alt; `FUNCT+6`
+  toggles the statusbar; `ESC` commits `ce_code`/`ce_altorstd` back to
+  `app.plotscreencode`/`app.plotaltchar` and closes the popup
+  (`menu_winsave`/`menu_winrestore`, main-RAM window stack — no residue).
+- **Favourites default**: `editor_run()` initialises all 10 slots to `'!'`
+  (0x21); `FAVOURITES_COUNT=10` in `src/appstate.h`.
 
 ## Compiler Toolchain
 
@@ -83,7 +133,8 @@ make              # build build/oseloci.tap
 make run          # build + launch in Oricutron
 make clean        # remove build artifacts
 make docs         # regenerate README.pdf from README.md (requires pandoc)
-make test         # full automated Phosphoric test suite (currently: test-boot)
+make test         # full automated Phosphoric test suite (test-boot, test-menus,
+                  # test-screenresize, test-charsetram-spike, test-charsetedit)
 make test-boot    # headless boot smoke test (splash + canvas/statusbar render)
 make test-capture CYCLES=N TYPEKEYS='...'
                   # calibration helper: dumps tests/out/capture.bin + .png
@@ -137,10 +188,13 @@ src/
                   canvas_resize() (up to CANVAS_MAX_SIZE)
   statusbar.c/h   Row-27 statusbar (OricCharWin, Mode/X,Y/C/S readout)
   editor.c/h      Main-mode loop: cursor move, +/- screencode select, SPACE/DEL plot,
-                  FUNCT+1 opens the menu bar
+                  FUNCT+1 opens the menu bar, 'e' opens the character editor
   menu.c/h        Menu bar/pulldown/popup engine + main-RAM window-save stack
   menudata.c/h    OSE menu tables (Screen/File/Charset/Information) + Screen
                   pulldown dispatch (Width/Height/Clear/Fill)
+  charsetedit.c/h Character editor popup: edits the 6x8 glyph for
+                  app.plotscreencode/app.plotaltchar directly in live charset
+                  RAM (Strategy A -- see "Character editor (Phase 3)")
   strings.h       User-visible message strings (MSG_* macros required by loci.c)
 include/
   oric.h          Hardware constants (VIA, AY, screen, overlay RAM, ASTR_*/CH_*/A_* attrs)
@@ -218,10 +272,18 @@ Beyond `tests/scripts/test_boot.sh`'s pattern (see that file), Phase 2 added
 tests:
 
 - **`\fN` (FUNCT+N, N=0-9)** is a Phosphoric escape **added locally to the
-  PHOSDIR fork** (`/home/xahmol/git/Phosphoric`, uncommitted as of Phase 2) —
-  not yet upstreamed. It holds FUNCT (sentinel `0x84`) and digit N together.
-  If `make test-menus`/`test-screenresize` start failing with "FUNCT does
-  nothing", check whether PHOSDIR points at a checkout with this patch.
+  PHOSDIR fork** (`/home/xahmol/git/Phosphoric`, committed as `a7fc243`,
+  v1.16.85-alpha) — not yet upstreamed. It holds FUNCT (sentinel `0x84`) and
+  digit N together. If `make test-menus`/`test-screenresize` start failing
+  with "FUNCT does nothing", check whether PHOSDIR points at a checkout with
+  this patch.
+- **`+`/`=` keys were unmapped in Phosphoric's `char_map`** (`0x2B`/`0x3D`
+  entries used matrix position `(7,7)`, which is unused in both Oric and OSE
+  decode tables — should be `(7,6)`, the actual `=`/`+` key). Fixed locally in
+  the PHOSDIR fork (`src/io/keyboard.c`, 2-line fix, Phase 3b) — without it,
+  `\p1+`/`\p1-`/`\p1=` in `--type-keys` silently do nothing (the `-` key
+  already worked, mapped correctly to `(3,3)`). If `+`/`-`/`=` stop affecting
+  `ce_code` in `test-charsetedit`, check whether PHOSDIR has this patch.
 - **`\p1` before every distinct key/combo action is mandatory.** OSE's
   `keyb_poll()` (`include/keyboard.c`) sets `release_count=RELEASE_DEBOUNCE
   (20)` when a key is first accepted, and only decrements it on a frame with

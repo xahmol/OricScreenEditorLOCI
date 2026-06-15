@@ -40,7 +40,17 @@ def main():
     ap.add_argument("--find", help="search for STRING in screen text (per-row, attribute bytes stripped)")
     ap.add_argument("--ignore-case", action="store_true")
     ap.add_argument("--row", type=int, help="print only this row (0-27)")
+    ap.add_argument("--bytes", help="dump raw RAM bytes as hex, format ADDR:LEN (e.g. 0xB608:8)")
     args = ap.parse_args()
+
+    if args.bytes is not None:
+        addr_str, len_str = args.bytes.split(":")
+        addr, length = int(addr_str, 0), int(len_str, 0)
+        with open(args.dump, "rb") as f:
+            data = f.read()
+        chunk = data[addr:addr + length]
+        print(" ".join(f"{b:02x}" for b in chunk))
+        return 0
 
     grid = load_grid(args.dump)
 

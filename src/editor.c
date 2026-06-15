@@ -6,6 +6,7 @@
 #include "statusbar.h"
 #include "menu.h"
 #include "menudata.h"
+#include "charsetedit.h"
 #include "editor.h"
 
 #define PLOT_MIN 0x20
@@ -13,11 +14,15 @@
 
 void editor_run(void)
 {
+    uint8_t i;
+
     app.cursor_x = 0;
     app.cursor_y = 0;
     app.xoffset = 0;
     app.yoffset = 0;
     app.plotscreencode = 0x41; // 'A'
+    app.plotaltchar = 0;
+    for (i = 0; i < FAVOURITES_COUNT; i++) app.favourites[i] = 33; // '!'
     app.mode = MODE_MAIN;
     app.showstatusbar = 1;
 
@@ -73,6 +78,10 @@ void editor_run(void)
 
         case KEY_F1:
             menu_run();
+            break;
+
+        case 'e':
+            charsetedit_run();
             break;
 
         default:

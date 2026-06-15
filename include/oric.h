@@ -64,6 +64,28 @@ typedef volatile struct {
 #define SCREEN_SIZE     (SCREEN_COLS * SCREEN_ROWS)   // 1120 bytes
 
 // -------------------------------------------------------------------------
+// Character set RAM ($B400-$BBFF -- see include/oric_crt.c memory layout)
+//
+// Live, ULA-rendered charset RAM. Each bank is 1024 bytes = 128 glyphs
+// (codes 0x00-0x7F) x 8 bytes (one per pixel row); bits 5..0 of each byte
+// are pixels left-to-right (bit5 = leftmost of the 6 visible columns --
+// Oric chars are 6x8). Glyph address = base + code*8 (NO offset -- codes
+// 0x00-0x1F are present in RAM but never displayed, since those screen-RAM
+// byte values trigger attribute mode instead of a glyph lookup). Redefining
+// bytes here takes effect on the next raster line, no special handling needed.
+// -------------------------------------------------------------------------
+
+#define CHARSET_STD     0xB400U    // Standard charset bank base (codes 0x00-0x7F)
+#define CHARSET_ALT     0xB800U    // Alternate charset bank base (codes 0x00-0x7F)
+
+// ROM source for the standard charset ('restore from ROM' command, std only).
+// NOTE the different offset convention: the ROM table only covers the 96
+// printable codes 0x20-0x7F (768 bytes), so glyph address =
+// CHARSETROM + (screencode - 0x20) * 8 -- unlike CHARSET_STD/CHARSET_ALT
+// above, which have NO -0x20 offset (full 128-glyph banks, codes 0x00-0x7F).
+#define CHARSETROM      0xFC78U
+
+// -------------------------------------------------------------------------
 // Serial attribute codes (write to screen RAM with bit 6 = 0)
 // A byte in screen RAM with bit 6 = 0: serial attribute, affects rest of row
 // A byte in screen RAM with bit 6 = 1: display character from character ROM

@@ -16,6 +16,9 @@
 #define CANVAS_HEIGHT    VIEWPORT_HEIGHT
 #define CANVAS_MAX_SIZE  8192
 
+// Character editor favourites (0-9 select, SHIFT+0-9 store).
+#define FAVOURITES_COUNT 10
+
 typedef enum {
     MODE_MAIN = 0
 } EditorMode;
@@ -28,6 +31,8 @@ typedef struct {
     uint16_t   xoffset;         // viewport scroll offset (columns)
     uint16_t   yoffset;         // viewport scroll offset (rows)
     uint8_t    plotscreencode;  // character placed by SPACE
+    uint8_t    plotaltchar;     // 0 = standard charset, 1 = alternate
+    uint8_t    favourites[FAVOURITES_COUNT]; // character-editor favourite screencodes
     EditorMode mode;
     uint8_t    showstatusbar;
 } AppState;

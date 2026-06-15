@@ -92,6 +92,8 @@ MAIN_SRCS = \
   src/menu.h            \
   src/menudata.c        \
   src/menudata.h        \
+  src/charsetedit.c     \
+  src/charsetedit.h     \
   src/strings.h         \
   include/oric_crt.c    \
   include/crt_math.c    \
@@ -132,7 +134,7 @@ CYCLES   ?= 8000000
 # all: must appear first so it is the default goal
 # =========================================================================
 
-.PHONY: all clean run docs check-phosphoric sandbox-reset test-capture test-boot test-menus test-screenresize test
+.PHONY: all clean run docs check-phosphoric sandbox-reset test-capture test-boot test-menus test-screenresize test-charsetram-spike test-charsetedit test
 
 all: build/$(MAIN).tap
 
@@ -211,11 +213,25 @@ test-screenresize: check-phosphoric sandbox-reset
 	    TAPFILE=$(MAIN).tap \
 	    bash tests/scripts/test_screenresize.sh
 
+test-charsetram-spike: check-phosphoric sandbox-reset
+	$(MKDIR) tests/out 2>$(NULLDEV) ; true
+	PHOS=$(PHOS) ATMOSROM=$(ATMOSROM) SANDBOX=tests/sandbox OUT=tests/out \
+	    TAPFILE=$(MAIN).tap \
+	    bash tests/scripts/test_charsetram_spike.sh
+
+test-charsetedit: check-phosphoric sandbox-reset
+	$(MKDIR) tests/out 2>$(NULLDEV) ; true
+	PHOS=$(PHOS) ATMOSROM=$(ATMOSROM) SANDBOX=tests/sandbox OUT=tests/out \
+	    TAPFILE=$(MAIN).tap \
+	    bash tests/scripts/test_charsetedit.sh
+
 test:
 	@status=0; \
 	$(MAKE) test-boot || status=1; \
 	$(MAKE) test-menus || status=1; \
 	$(MAKE) test-screenresize || status=1; \
+	$(MAKE) test-charsetram-spike || status=1; \
+	$(MAKE) test-charsetedit || status=1; \
 	exit $$status
 
 # -------------------------------------------------------------------------
