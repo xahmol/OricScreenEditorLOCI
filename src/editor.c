@@ -163,6 +163,10 @@ void editor_run(void)
             linebox_run();
             break;
 
+        case 's':
+            select_run();
+            break;
+
         default:
             break;
         }

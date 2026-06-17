@@ -4,6 +4,7 @@
 #include <stdint.h>
 
 void linebox_run(void);
+void select_run(void);
 
 #pragma compile("select.c")
 

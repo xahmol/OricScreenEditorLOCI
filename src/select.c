@@ -185,3 +185,62 @@ void linebox_run(void)
 
     canvas_blit();
 }
+
+/**
+ * Select mode, entered via 's' from Main mode. Grows a rectangle
+ * (rect_select(0)); if accepted, prompts for an action: 'd' clears the
+ * rect to CH_SPACE, 'i' fills it with app.plotink, 'p' fills it with
+ * 16+app.plotpaper, 'm' fills it with the modifier-attribute byte for
+ * app.plotaltchar/plotdouble/plotblink (the same bit-packing as oric.h's
+ * A_STD(8)/A_ALT(9)/A_STD2H(10)/.../A_BLINK2HALT(15): base 8, bit0=altchar,
+ * bit1=double, bit2=blink). ESC at either stage leaves the canvas
+ * unchanged. V1's cut/copy ('x'/'c') are deferred to Phase 8 (overlay-RAM
+ * clipboard) -- see CLAUDE.md/the Phase 5 plan.
+ *
+ * @return (none)
+ */
+void select_run(void)
+{
+    uint16_t x, y;
+    uint8_t key, fillvalue;
+
+    if (!rect_select(0)) return;
+
+    app.mode = MODE_SELECT;
+    statusbar_draw();
+
+    do
+    {
+        key = cwin_getch();
+
+        if (key == KEY_F6) statusbar_show((uint8_t)!app.showstatusbar);
+    } while (key != 'd' && key != 'i' && key != 'p' && key != 'm' && key != KEY_ESC);
+
+    app.mode = MODE_MAIN;
+
+    if (key == KEY_ESC)
+    {
+        statusbar_draw();
+        return;
+    }
+
+    switch (key)
+    {
+    case 'd': fillvalue = CH_SPACE;                break;
+    case 'i': fillvalue = app.plotink;              break;
+    case 'p': fillvalue = (uint8_t)(16 + app.plotpaper); break;
+    case 'm':
+    default:
+        fillvalue = (uint8_t)(8 | (app.plotaltchar ? 1 : 0)
+                                 | (app.plotdouble  ? 2 : 0)
+                                 | (app.plotblink   ? 4 : 0));
+        break;
+    }
+
+    for (y = select_starty; y < select_starty + select_height; y++)
+        for (x = select_startx; x < select_startx + select_width; x++)
+            canvas_put(x, y, fillvalue);
+
+    canvas_blit();
+    statusbar_draw();
+}
