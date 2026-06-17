@@ -9,6 +9,7 @@
 #include "charsetedit.h"
 #include "palette.h"
 #include "colourpicker.h"
+#include "select.h"
 #include "editor.h"
 
 #define PLOT_MIN 0x20
@@ -156,6 +157,10 @@ void editor_run(void)
 
         case 'c':
             colourpicker_run();
+            break;
+
+        case 'l':
+            linebox_run();
             break;
 
         default:
