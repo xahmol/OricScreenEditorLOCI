@@ -9,8 +9,8 @@
 #   - the menu bar opens and shows all 4 top-level items
 #   - the Screen pulldown shows Width/Height/Clear/Fill
 #   - ESC at pulldown level then bar level closes the menu with no residue
-#   - selecting a stub item (File pulldown) shows a "Not yet implemented"
-#     popup, which can be dismissed cleanly
+#   - selecting a stub item (Information pulldown) shows a "Not yet
+#     implemented" popup, which can be dismissed cleanly
 #   - the Fill dispatch actually fills the canvas
 #
 # --type-keys notes (see CLAUDE.md "Phosphoric testing notes"):
@@ -98,17 +98,20 @@ echo "ESC (pulldown) + ESC (bar) closes with no residue"
 check_not_found "bar gone"       "Screen" "$DUMP3"
 check_found     "statusbar intact" "Main      XY 0, 0C41A S20I7P0S" "$DUMP3"
 
-# --- Scenario 4: File pulldown stub -> "Not yet implemented" popup --------
+# --- Scenario 4: Information pulldown stub -> "Not yet implemented" popup -
+# (File's items are now wired to real LOCI dispatch as of Phase 6 --
+# src/fileio.c -- so this scenario moved to Information, which stays a
+# stub indefinitely; out of Phase 6's scope.)
 DUMP4="$OUT/capture_menu_notimpl.bin"
-run_capture 13000000 '\p1\f1\p1\r\p1\n\p1\n' "$DUMP4"
+run_capture 15500000 '\p1\f1\p1\r\p1\r\p1\r\p1\n\p1\n' "$DUMP4"
 echo ""
-echo "File pulldown stub shows Not-yet-implemented popup"
+echo "Information pulldown stub shows Not-yet-implemented popup"
 check_found "popup message shown" "Not yet implemented"      "$DUMP4"
 check_found "popup prompt shown"  "Press a key to continue"  "$DUMP4"
 
 # --- Scenario 5: popup dismiss + clean close --------------------------------
 DUMP5="$OUT/capture_menu_notimpl_dismiss.bin"
-run_capture 15300000 '\p1\f1\p1\r\p1\n\p1\n\p1 \p1\e' "$DUMP5"
+run_capture 17500000 '\p1\f1\p1\r\p1\r\p1\r\p1\n\p1\n\p1 \p1\e' "$DUMP5"
 echo ""
 echo "Dismiss popup (SPACE) then ESC closes with no residue"
 check_not_found "popup gone"       "Not yet implemented" "$DUMP5"

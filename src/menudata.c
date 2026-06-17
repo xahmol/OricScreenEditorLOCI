@@ -157,10 +157,11 @@ void menudata_init(void)
 
 /**
  * Open the menu bar (row 0), dispatch Screen menu choices (Width/Height/
- * Clear/Fill), show a "not yet implemented" popup for File/Charset/
- * Information items, and run until ESC is pressed at the bar level (any
- * menu_main() return value >= 99). Restores row 0 and redraws the canvas +
- * statusbar on exit.
+ * Clear/Fill) and File menu Save/Load Screen/Combined (src/fileio.c), show
+ * a "not yet implemented" popup for File Save/Load Project and all
+ * Charset/Information items, and run until ESC is pressed at the bar level
+ * (any menu_main() return value >= 99). Restores row 0 and redraws the
+ * canvas + statusbar on exit.
  *
  * @return (none)
  */
@@ -190,6 +191,22 @@ void menu_run(void)
 
         case 14:
             canvas_fill(app.plotscreencode);
+            break;
+
+        case 21:
+            fileio_save_screen();
+            break;
+
+        case 22:
+            fileio_load_screen();
+            break;
+
+        case 25:
+            fileio_save_combined();
+            break;
+
+        case 26:
+            fileio_load_combined();
             break;
 
         default:

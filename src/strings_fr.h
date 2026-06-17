@@ -48,6 +48,8 @@
 
 // ── File I/O popup (src/fileio.c) ───────────────────────────────────────────
 #define MSG_FILE_PROMPT_FILENAME  "Entrer nom de fichier:"
+#define MSG_FILE_INVALID_FORMAT   "Fichier invalide ou incompatible."
+#define MSG_FILE_NOT_FOUND        "Fichier non trouve."
 
 // ── Pulldown 2 -- Charset / Caracteres ───────────────────────────────────────
 #define MSG_CHARSET_LOAD_STD       "Charger standard"
