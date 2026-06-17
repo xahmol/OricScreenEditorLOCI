@@ -10,7 +10,6 @@
 // attached (editing, and Phosphoric/Oricutron testing of everything else).
 
 #include <stdio.h>
-#include <string.h>
 #include "oric.h"
 #include "charwin.h"
 #include "appstate.h"
@@ -420,4 +419,96 @@ void fileio_load_project(void)
     update_size_titles();
     canvas_blit();
     statusbar_draw();
+}
+
+/**
+ * Look up the Charset menu title and charset-RAM base address for
+ * altorstd (0=std, 1=alt, 2=combined -- combined uses CHARSET_STD as the
+ * base for both load and save, see fileio_load_charset()/
+ * fileio_save_charset()).
+ *
+ * @param altorstd   0/1/2, see above.
+ * @param save       1 for a Save title, 0 for a Load title.
+ * @param base       Out: charset-RAM bank base address.
+ * @return The matching MSG_CHARSET_* title.
+ */
+static const char *fileio_charset_title(uint8_t altorstd, uint8_t save, uint16_t *base)
+{
+    if (altorstd == 1)
+    {
+        *base = CHARSET_ALT;
+        return save ? MSG_CHARSET_SAVE_ALT : MSG_CHARSET_LOAD_ALT;
+    }
+    if (altorstd == 2)
+    {
+        *base = CHARSET_STD;
+        return save ? MSG_CHARSET_SAVE_COMBINED : MSG_CHARSET_LOAD_COMBINED;
+    }
+    *base = CHARSET_STD;
+    return save ? MSG_CHARSET_SAVE_STD : MSG_CHARSET_LOAD_STD;
+}
+
+/**
+ * Charset menu Load Standard/Alternate/Combined ('altorstd' 0/1/2).
+ * Std/Alt load 768 raw bytes directly into that bank's displayable range.
+ * Combined loads into CHARSET_STD then copies the result into CHARSET_ALT
+ * too (charset_load(), include/charset.h) -- see fileio.h's header comment
+ * for why. Sets app.stdchanged/altchanged for whichever bank(s) changed.
+ *
+ * @param altorstd 0=std, 1=alt, 2=combined.
+ * @return (none)
+ */
+void fileio_load_charset(uint8_t altorstd)
+{
+    char     path[FILEIO_PATH_MAXLEN];
+    uint16_t base;
+    const char *title = fileio_charset_title(altorstd, 0, &base);
+
+    if (!loci_check_present()) return;
+    if (!fileio_get_filename(title)) return;
+
+    sprintf(path, "%s.BIN", app.filename);
+    if (file_load(path, (void *)(base + CHARSET_GLYPH_AREA_OFFSET), CHARSET_GLYPH_AREA_SIZE) < 0)
+    {
+        menu_messagepopup(MSG_FILE_NOT_FOUND);
+        return;
+    }
+
+    if (altorstd == 2)
+    {
+        charset_load(CHARSET_ALT, (const uint8_t *)(CHARSET_STD + CHARSET_GLYPH_AREA_OFFSET));
+        app.stdchanged = 1;
+        app.altchanged = 1;
+    }
+    else if (altorstd == 1)
+    {
+        app.altchanged = 1;
+    }
+    else
+    {
+        app.stdchanged = 1;
+    }
+}
+
+/**
+ * Charset menu Save Standard/Alternate/Combined ('altorstd' 0/1/2).
+ * Std/Alt save 768 raw bytes directly from that bank's displayable range.
+ * Combined is identical to Save Std -- CHARSET_STD's range is the only
+ * source there is to save (see fileio.h's header comment).
+ *
+ * @param altorstd 0=std, 1=alt, 2=combined.
+ * @return (none)
+ */
+void fileio_save_charset(uint8_t altorstd)
+{
+    char     path[FILEIO_PATH_MAXLEN];
+    uint16_t base;
+    const char *title = fileio_charset_title(altorstd, 1, &base);
+
+    if (!loci_check_present()) return;
+    if (!fileio_get_filename(title)) return;
+
+    sprintf(path, "%s.BIN", app.filename);
+    if (file_save(path, (const void *)(base + CHARSET_GLYPH_AREA_OFFSET), CHARSET_GLYPH_AREA_SIZE) < 0)
+        menu_messagepopup(MSG_FILE_INVALID_FORMAT);
 }

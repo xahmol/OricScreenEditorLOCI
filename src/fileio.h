@@ -31,6 +31,18 @@ void fileio_load_combined(void);
 void fileio_save_project(void);
 void fileio_load_project(void);
 
+// Charset menu Load/Save Standard/Alternate/Combined: altorstd 0=std,
+// 1=alt, 2=combined (matches V1's stdoralt exactly). Std/Alt read/write
+// 768 raw bytes directly from/to CHARSET_STD/CHARSET_ALT's displayable
+// range. Combined save is identical to Save Std (CHARSET_STD's range is
+// the only source); combined load writes the loaded data into *both*
+// CHARSET_STD and CHARSET_ALT (charset_load(), include/charset.h) -- the
+// closest available equivalent to V1's intent, since the ROM call V1 used
+// to regenerate Alt from Std (jsr $F816) is a no-op on this runtime (see
+// CLAUDE.md "Charset-swap mechanism").
+void fileio_load_charset(uint8_t altorstd);
+void fileio_save_charset(uint8_t altorstd);
+
 #pragma compile("fileio.c")
 
 #endif // FILEIO_H

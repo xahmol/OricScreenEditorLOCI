@@ -158,8 +158,8 @@ void menudata_init(void)
 
 /**
  * Open the menu bar (row 0), dispatch Screen menu choices (Width/Height/
- * Clear/Fill) and all File menu items (src/fileio.c), show a "not yet
- * implemented" popup for Charset/Information items, and run until ESC is
+ * Clear/Fill) and all File/Charset menu items (src/fileio.c), show a "not
+ * yet implemented" popup for Information items, and run until ESC is
  * pressed at the bar level (any menu_main() return value >= 99). Restores
  * row 0 and redraws the canvas + statusbar on exit.
  *
@@ -215,6 +215,30 @@ void menu_run(void)
 
         case 26:
             fileio_load_combined();
+            break;
+
+        case 31:
+            fileio_load_charset(0);
+            break;
+
+        case 32:
+            fileio_load_charset(1);
+            break;
+
+        case 33:
+            fileio_save_charset(0);
+            break;
+
+        case 34:
+            fileio_save_charset(1);
+            break;
+
+        case 35:
+            fileio_load_charset(2);
+            break;
+
+        case 36:
+            fileio_save_charset(2);
             break;
 
         default:
