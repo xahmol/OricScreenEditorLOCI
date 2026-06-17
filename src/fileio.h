@@ -24,6 +24,13 @@ void fileio_load_screen(void);
 void fileio_save_combined(void);
 void fileio_load_combined(void);
 
+// File > Save/Load Project: V1's 4-file scheme, all sharing app.filename --
+// "<name>PJ.BIN" (metadata), "<name>SC.BIN" (screen, same shape as
+// fileio_save_screen()), "<name>CS.BIN"/"<name>CA.BIN" (768-byte raw
+// charset dumps, written/read only if app.stdchanged/altchanged).
+void fileio_save_project(void);
+void fileio_load_project(void);
+
 #pragma compile("fileio.c")
 
 #endif // FILEIO_H

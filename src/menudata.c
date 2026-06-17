@@ -52,11 +52,12 @@ char pulldown_titles[PULLDOWN_NUMBER][PULLDOWN_MAXOPTIONS][PULLDOWN_MAXLENGTH] =
 
 /**
  * Rewrite the Screen > Width:/Height: pulldown titles from the current
- * canvas size.
+ * canvas size. Public (not static) so src/fileio.c can refresh them after
+ * a Project/Screen/Combined load resizes the canvas outside resize_dialog().
  *
  * @return (none) -- result is written to pulldown_titles[0][0]/[0][1].
  */
-static void update_size_titles(void)
+void update_size_titles(void)
 {
     sprintf(pulldown_titles[0][0], MSG_SCREEN_WIDTH_FMT, app.canvas_width);
     sprintf(pulldown_titles[0][1], MSG_SCREEN_HEIGHT_FMT, app.canvas_height);
@@ -157,11 +158,10 @@ void menudata_init(void)
 
 /**
  * Open the menu bar (row 0), dispatch Screen menu choices (Width/Height/
- * Clear/Fill) and File menu Save/Load Screen/Combined (src/fileio.c), show
- * a "not yet implemented" popup for File Save/Load Project and all
- * Charset/Information items, and run until ESC is pressed at the bar level
- * (any menu_main() return value >= 99). Restores row 0 and redraws the
- * canvas + statusbar on exit.
+ * Clear/Fill) and all File menu items (src/fileio.c), show a "not yet
+ * implemented" popup for Charset/Information items, and run until ESC is
+ * pressed at the bar level (any menu_main() return value >= 99). Restores
+ * row 0 and redraws the canvas + statusbar on exit.
  *
  * @return (none)
  */
@@ -199,6 +199,14 @@ void menu_run(void)
 
         case 22:
             fileio_load_screen();
+            break;
+
+        case 23:
+            fileio_save_project();
+            break;
+
+        case 24:
+            fileio_load_project();
             break;
 
         case 25:

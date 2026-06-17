@@ -11,6 +11,11 @@
 // current canvas size). Call once at startup, after canvas_init().
 void menudata_init(void);
 
+// Rewrite the Screen > Width:/Height: pulldown titles from the current
+// canvas size. Call after any canvas_resize() outside resize_dialog()
+// (e.g. src/fileio.c's Project/Screen/Combined load).
+void update_size_titles(void);
+
 // Open the menu bar (row 0) and run it until ESC is pressed at the bar
 // level. Dispatches Screen menu items (Width/Height/Clear/Fill); File/
 // Charset/Information items show a "not yet implemented" popup. Restores

@@ -18,6 +18,7 @@
 #include "statusbar.h"
 #include "charset.h"
 #include "menu.h"
+#include "menudata.h"
 #include "strings.h"
 #include "loci.h"
 #include "fileio.h"
@@ -174,6 +175,7 @@ void fileio_load_screen(void)
     app.cursor_y = 0;
     app.xoffset  = 0;
     app.yoffset  = 0;
+    update_size_titles();
     canvas_blit();
     statusbar_draw();
 }
@@ -255,6 +257,167 @@ void fileio_load_combined(void)
     app.cursor_y = 0;
     app.xoffset  = 0;
     app.yoffset  = 0;
+    update_size_titles();
+    canvas_blit();
+    statusbar_draw();
+}
+
+// Project metadata file ("<name>PJ.BIN"), adapted from V1's 19-byte
+// projbuffer -- trimmed to fields OSE actually has (no separate
+// screen_col/screen_row distinct from cursor_x/cursor_y, no separate
+// screentotal). Written/read as one contiguous struct via file_save()/
+// file_load() (the convenience wrapper fits here, unlike the multi-part
+// Screen/Combined formats).
+typedef struct {
+    uint16_t magic;
+    uint16_t canvas_width, canvas_height;
+    uint16_t cursor_x, cursor_y;
+    uint16_t xoffset, yoffset;
+    uint8_t  plotscreencode, plotaltchar, plotink, plotpaper;
+    uint8_t  plotblink, plotdouble;
+    uint8_t  stdchanged, altchanged;
+} ProjectHeader;
+
+/**
+ * Save the current project to 2-4 LOCI files sharing app.filename as a
+ * base name: "<name>PJ.BIN" (ProjectHeader, via file_save()),
+ * "<name>SC.BIN" (FileHeader + screenmap[], same shape as
+ * fileio_save_screen()), and -- only if that charset was edited this
+ * session (app.stdchanged/altchanged, set from charsetedit.c's
+ * ce_snapshot()) -- "<name>CS.BIN"/"<name>CA.BIN" (768 raw bytes each,
+ * direct from CHARSET_STD/CHARSET_ALT's displayable range).
+ *
+ * @return (none)
+ */
+void fileio_save_project(void)
+{
+    char          path[FILEIO_PATH_MAXLEN];
+    ProjectHeader proj;
+    FileHeader    hdr;
+    int16_t       fd;
+
+    if (!loci_check_present()) return;
+    if (!fileio_get_filename(MSG_FILE_SAVE_PROJECT)) return;
+
+    proj.magic          = FILEIO_MAGIC;
+    proj.canvas_width    = app.canvas_width;
+    proj.canvas_height   = app.canvas_height;
+    proj.cursor_x        = app.cursor_x;
+    proj.cursor_y        = app.cursor_y;
+    proj.xoffset         = app.xoffset;
+    proj.yoffset         = app.yoffset;
+    proj.plotscreencode  = app.plotscreencode;
+    proj.plotaltchar     = app.plotaltchar;
+    proj.plotink         = app.plotink;
+    proj.plotpaper       = app.plotpaper;
+    proj.plotblink       = app.plotblink;
+    proj.plotdouble      = app.plotdouble;
+    proj.stdchanged      = app.stdchanged;
+    proj.altchanged      = app.altchanged;
+
+    sprintf(path, "%sPJ.BIN", app.filename);
+    if (file_save(path, &proj, sizeof(proj)) < 0)
+    {
+        menu_messagepopup(MSG_FILE_INVALID_FORMAT);
+        return;
+    }
+
+    hdr.magic  = FILEIO_MAGIC;
+    hdr.width  = app.canvas_width;
+    hdr.height = app.canvas_height;
+    sprintf(path, "%sSC.BIN", app.filename);
+    fd = loci_open(path, O_WRONLY | O_CREAT | O_TRUNC);
+    if (fd < 0)
+    {
+        menu_messagepopup(MSG_FILE_INVALID_FORMAT);
+        return;
+    }
+    loci_write(fd, &hdr, sizeof(hdr));
+    loci_write(fd, screenmap, (uint16_t)(app.canvas_width * app.canvas_height));
+    loci_close(fd);
+
+    if (app.stdchanged)
+    {
+        sprintf(path, "%sCS.BIN", app.filename);
+        file_save(path, (const void *)(CHARSET_STD + CHARSET_GLYPH_AREA_OFFSET), CHARSET_GLYPH_AREA_SIZE);
+    }
+    if (app.altchanged)
+    {
+        sprintf(path, "%sCA.BIN", app.filename);
+        file_save(path, (const void *)(CHARSET_ALT + CHARSET_GLYPH_AREA_OFFSET), CHARSET_GLYPH_AREA_SIZE);
+    }
+}
+
+/**
+ * Load a project saved by fileio_save_project(). Reads and validates
+ * "<name>PJ.BIN" first (missing/invalid -> error popup, abort before
+ * touching anything else); applies canvas size/cursor/viewport/plot*
+ * fields; reads "<name>SC.BIN" (validated independently, same as
+ * fileio_load_screen()); then, if present, loads "<name>CS.BIN"/
+ * "<name>CA.BIN" into CHARSET_STD/CHARSET_ALT (missing file leaves that
+ * bank untouched, matching V1).
+ *
+ * @return (none)
+ */
+void fileio_load_project(void)
+{
+    char          path[FILEIO_PATH_MAXLEN];
+    ProjectHeader proj;
+    FileHeader    hdr;
+    int16_t       fd;
+
+    if (!loci_check_present()) return;
+    if (!fileio_get_filename(MSG_FILE_LOAD_PROJECT)) return;
+
+    sprintf(path, "%sPJ.BIN", app.filename);
+    if (file_load(path, &proj, sizeof(proj)) < 0 || proj.magic != FILEIO_MAGIC)
+    {
+        menu_messagepopup(MSG_FILE_INVALID_FORMAT);
+        return;
+    }
+
+    sprintf(path, "%sSC.BIN", app.filename);
+    fd = loci_open(path, O_RDONLY);
+    if (fd < 0)
+    {
+        menu_messagepopup(MSG_FILE_NOT_FOUND);
+        return;
+    }
+    loci_read(fd, &hdr, sizeof(hdr));
+    if (!fileio_header_valid(&hdr) || !canvas_resize(hdr.width, hdr.height))
+    {
+        loci_close(fd);
+        menu_messagepopup(MSG_FILE_INVALID_FORMAT);
+        return;
+    }
+    loci_read(fd, screenmap, (uint16_t)(hdr.width * hdr.height));
+    loci_close(fd);
+
+    app.cursor_x       = proj.cursor_x;
+    app.cursor_y       = proj.cursor_y;
+    app.xoffset        = proj.xoffset;
+    app.yoffset        = proj.yoffset;
+    app.plotscreencode = proj.plotscreencode;
+    app.plotaltchar    = proj.plotaltchar;
+    app.plotink        = proj.plotink;
+    app.plotpaper      = proj.plotpaper;
+    app.plotblink      = proj.plotblink;
+    app.plotdouble     = proj.plotdouble;
+
+    sprintf(path, "%sCS.BIN", app.filename);
+    if (file_exists(path))
+    {
+        file_load(path, (void *)(CHARSET_STD + CHARSET_GLYPH_AREA_OFFSET), CHARSET_GLYPH_AREA_SIZE);
+        app.stdchanged = 1;
+    }
+    sprintf(path, "%sCA.BIN", app.filename);
+    if (file_exists(path))
+    {
+        file_load(path, (void *)(CHARSET_ALT + CHARSET_GLYPH_AREA_OFFSET), CHARSET_GLYPH_AREA_SIZE);
+        app.altchanged = 1;
+    }
+
+    update_size_titles();
     canvas_blit();
     statusbar_draw();
 }
