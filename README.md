@@ -545,6 +545,11 @@ Pressing **I**, **P** or **M** will fill the area with resp. ink color, paper co
 
 Leave selection mode by pressing **ESC** . Pressing **FUNCT+8** at any time in this mode will provide a helpscreen with the key commands for this mode (not possible if the selection is grown but not yet accepted).
 
+**OSE note**: Cut (**X**) and Copy (**C**) are not yet implemented in this
+LOCI-based rewrite — they're deferred to a later phase that adds overlay-RAM
+storage for the clipboard. **D**, **I**, **P** and **M** are fully
+implemented as described above.
+
 ## Move mode:
 ([Back to contents](#contents))
 
@@ -557,6 +562,11 @@ It is also important to note that characters that 'fall off' of the screen are l
 Alternative to move mode is using [select mode](#select-mode) and use Cut to move a selection to a new position.
 
 Accept with **RETURN**, cancel with **ESC**. Both will leave this mode and return to main mode.
+
+**OSE note**: in this LOCI-based rewrite, each move is applied directly as
+you press a cursor key (there's no separate scratch copy to roll back from)
+— so **RETURN** and **ESC** behave identically here, both keeping whatever
+shifts you've already made this session.
 
 |Key|Description
 |---|---|

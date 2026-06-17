@@ -17,7 +17,7 @@ local checkout at `/home/xahmol/git/OricScreenEditor`), restarted on the
 Oscar64 native/bare-metal build chain shared with
 [locifilemanager-v2](https://github.com/xahmol/locifilemanager-v2)
 (`/home/xahmol/git/locifilemanager-v2`), which this document's structure is
-adapted from. **OSE is mid-rewrite (Phase 3 of 9 complete)** — several
+adapted from. **OSE is mid-rewrite (Phase 5 of 9 complete)** — several
 sections below describe library code that is present (copied verbatim from
 locifilemanager-v2) but not yet wired into the application; these are marked
 explicitly.
@@ -188,11 +188,20 @@ src/
                   canvas_resize() (up to CANVAS_MAX_SIZE)
   statusbar.c/h   Row-27 statusbar (OricCharWin, Mode/XY/C/S/I/P readout +
                   A/D/B attribute flags, see §6.2/§6.7/§6.8)
-  editor.c/h      Main-mode loop: cursor move, +/- screencode select, SPACE/DEL
-                  plot, ,/.;/' ink/paper cycling, b/d/a attribute toggles,
-                  0-9/SHIFT+0-9 favourites, FUNCT+1 opens the menu bar, 'e'
-                  opens the character editor, 'p' opens the palette popup, 'c'
-                  opens the colour picker
+  editor.c/h      Main-mode loop: cursor move (auto-scroll via
+                  canvas.c's cursor_move_scroll(), §6.2), +/- screencode
+                  select, SPACE/DEL plot, ,/.;/' ink/paper cycling, b/d/a/r
+                  attribute toggles, g grabs the screencode/attr under the
+                  cursor, i/o/u plot ink/paper/modifier, 0-9/SHIFT+0-9
+                  favourites, FUNCT+1 opens the menu bar, 'e' opens the
+                  character editor, 'p'/'c' open the palette/colour picker,
+                  'l'/'s'/'m'/'w' open Line-Box/Select/Move/Write mode (§6.9-§6.12)
+  modes.h/c       EditorMode -> MSG_MODE_* display-name lookup
+                  (mode_name()), shared by statusbar.c and any mode file
+  select.c/h      Shared rectangle-grower (rect_select()) + Line/Box mode
+                  ('l') + Select mode ('s') (§6.9/§6.10)
+  move.c/h        Move mode ('m'): nudges visible canvas content (§6.11)
+  write.c/h       Write mode ('w'): free-typing screencodes (§6.12)
   menu.c/h        Menu bar/pulldown/popup engine + main-RAM window-save stack
   menudata.c/h    OSE menu tables (Screen/File/Charset/Information) + Screen
                   pulldown dispatch (Width/Height/Clear/Fill)
@@ -281,7 +290,13 @@ locifilemanager-v2 for future use.
 #define CANVAS_MAX_SIZE  8192
 #define FAVOURITES_COUNT 10
 
-typedef enum { MODE_MAIN = 0 } EditorMode;
+typedef enum {
+    MODE_MAIN = 0,
+    MODE_WRITE,
+    MODE_SELECT,
+    MODE_MOVE,
+    MODE_LINEBOX
+} EditorMode;
 
 typedef struct {
     uint16_t   canvas_width;
@@ -307,13 +322,17 @@ extern AppState app;
 
 `CANVAS_MAX_SIZE=8192` is a documented, revisable budget (~2.5x V1's
 6655-byte CC65 ceiling), leaving headroom in the ~42.4 KB program region for
-the menu engine and later phases' static buffers. `EditorMode` currently has
-a single value (`MODE_MAIN`) — select/move/line-box/write modes (Phase 5)
-will add more. The Phase 4a fields (`plotink`/`plotpaper`/`plotblink`/
-`plotdouble`/`visualmap`) default to `A_FWWHITE`/`A_FWBLACK`/`0`/`0`/`0` (set
-in `editor_run()`'s init block) and are read/written by the main-mode
-attribute-selection keys, the statusbar, and the palette/colour-picker popups
-(§6.2, §6.7, §6.8).
+the menu engine and later phases' static buffers. `EditorMode` (Phase 5)
+gained `MODE_WRITE`/`MODE_SELECT`/`MODE_MOVE`/`MODE_LINEBOX` alongside
+`MODE_MAIN`, looked up via `mode_name()` (`src/modes.h/c`) for the
+statusbar's Mode field. Select/Line-Box's own rectangle bounds
+(`select_startx`/`endx`/`starty`/`endy`/`width`/`height`) are *not*
+`AppState` fields -- they're file-scope statics in `select.c`, since
+nothing outside that file reads them. The Phase 4a fields (`plotink`/
+`plotpaper`/`plotblink`/`plotdouble`/`visualmap`) default to
+`A_FWWHITE`/`A_FWBLACK`/`0`/`0`/`0` (set in `editor_run()`'s init block) and
+are read/written by the main-mode attribute-selection keys, the statusbar,
+the palette/colour-picker popups, and the Phase 5 modes (§6.2, §6.7-§6.12).
 
 ### 4.3 Canvas (`src/canvas.h`)
 
@@ -328,6 +347,7 @@ void canvas_put(uint16_t x, uint16_t y, uint8_t value);
 void canvas_blit(void);
 void canvas_cell_invert(uint16_t x, uint16_t y);
 uint8_t canvas_resize(uint16_t neww, uint16_t newh);
+void cursor_move_scroll(int8_t dx, int8_t dy);
 ```
 
 `screenmap[]` is a flat, row-major buffer holding raw screen bytes (both
@@ -340,6 +360,13 @@ attribute bytes the user places in columns 0-1 (§4.1).
 `canvas_resize(neww, newh)` validates `(new >= viewport min) && (neww*newh <=
 CANVAS_MAX_SIZE)` before reallocating the logical size (the physical array is
 always `CANVAS_MAX_SIZE` bytes).
+
+`cursor_move_scroll(dx, dy)` (Phase 5) moves `app.cursor_x`/`cursor_y` by one
+cell, except at a viewport edge on a canvas larger than the viewport, where
+it scrolls `app.xoffset`/`yoffset` (and `canvas_blit()`s) instead — fixing a
+pre-Phase-5 gap where cells beyond the 40x27 viewport on a resized canvas
+were unreachable. Used by `editor_run()`'s cursor keys, Select/Line-Box's
+rect-grower (`select.c`), and Write mode (`write.c`).
 
 ### 4.4 Menu system (`src/menu.h`)
 
@@ -431,11 +458,17 @@ main.c
  │   ├─ charsetedit.h (character editor popup)
  │   │   └─ charset.h (glyph addressing + bitmap transforms)
  │   ├─ palette.h     (palette popup: Fav/Std/Alt grid, visualchar[])
- │   └─ colourpicker.h (colour picker popup: 8x8 ink x paper grid)
+ │   ├─ colourpicker.h (colour picker popup: 8x8 ink x paper grid)
+ │   ├─ select.h      (rect_select(), Line/Box + Select mode)
+ │   ├─ move.h         (Move mode: content nudge)
+ │   └─ write.h        (Write mode: free-typing screencodes)
  └─ strings.h    (EN/FR localisation gateway -> strings_en.h/strings_fr.h, §3)
 
+statusbar.c, select.c, move.c, write.c
+ └─ modes.h  (mode_name(): EditorMode -> MSG_MODE_* lookup, standalone)
+
 main.c, canvas.c, statusbar.c, menu.c, menudata.c, editor.c, charsetedit.c,
-charsetswap.c
+charsetswap.c, select.c, move.c, write.c
  └─ charwin.h  (windows, cursor, text input)
       └─ keyboard.h (raw key scan/decode)
  └─ oric.h     (hardware register layout, screen/attr/charset-bank constants)
@@ -495,13 +528,16 @@ for (;;) {
     c = cwin_getch();
     canvas_cell_invert(cursor);              // hide cursor
     switch (c) {
-        case KEY_UP/DOWN/LEFT/RIGHT: move cursor, clamped to VIEWPORT_*
+        case KEY_UP/DOWN/LEFT/RIGHT: cursor_move_scroll(dx, dy)  (Phase 5, §4.3)
         case KEY_SPACE: canvas_put(cursor, app.plotscreencode); canvas_blit();
         case KEY_DEL:   canvas_put(cursor, CH_SPACE); canvas_blit();
         case '+'/'-':   cycle app.plotscreencode in [0x20, 0x7E], wrapping
         case ','/'.':   cycle app.plotink 0-7, wrapping        (Phase 4a)
         case ';'/'\'':  cycle app.plotpaper 0-7, wrapping       (Phase 4a)
         case 'b'/'d'/'a': toggle plotblink/plotdouble/plotaltchar (Phase 4a)
+        case 'r':       app.plotscreencode ^= 0x80               (Phase 5f)
+        case 'g':       grab screencode/attr under cursor into plot* (Phase 5f)
+        case 'i'/'o'/'u': plot ink/paper/modifier at cursor, move down (Phase 5f)
         case '0'-'9':   app.plotscreencode = app.favourites[c-'0'] (Phase 4a)
         case SHIFT+0-9: app.favourites[n] = app.plotscreencode  (Phase 4a)
         case KEY_F6:    statusbar_show(!app.showstatusbar);
@@ -509,14 +545,15 @@ for (;;) {
         case 'e':       charsetedit_run();   // open the character editor
         case 'p':       palette_run();       // open the palette popup (Phase 4b)
         case 'c':       colourpicker_run();  // open the colour picker (Phase 4c)
+        case 'l':       linebox_run();       // Line/Box mode (Phase 5b, §6.9)
+        case 's':       select_run();        // Select mode (Phase 5c, §6.10)
+        case 'm':       move_run();          // Move mode (Phase 5d, §6.11)
+        case 'w':       write_run();         // Write mode (Phase 5e, §6.12)
     }
     statusbar_draw();
     canvas_cell_invert(cursor);              // show cursor at new pos
 }
 ```
-
-`MODE_MAIN` is the only mode so far — select/move/line-box/write modes
-(Phase 5 of the active plan) will extend this `switch` and `AppState.mode`.
 
 ### 6.3 Menu system (three-layer + main-RAM window stack)
 
@@ -689,6 +726,75 @@ feedback concept; the border-drawing cursor is replaced with the simpler
 2-char swatch swap. Opts IN to the charset-swap — swatch glyphs
 (`CH_SPACE`/`CH_INVSPACE`) are plain Std-charset chars.
 
+### 6.9 Shared rectangle-grower (`rect_select()`, `src/select.c`)
+
+Used by both Line/Box and Select mode (§6.10/§6.11 below). Adapted
+from V1's `lineandbox()`. Grows a rectangle from the cursor's starting
+position via cursor keys (using `cursor_move_scroll()`, §4.3/§6.2, so it
+auto-scrolls on oversized canvases too); ENTER accepts (populating
+file-scope statics `select_startx`/`starty`/`endx`/`endy`/`width`/`height`
+in `select.c`, not `AppState` fields) and returns 1; ESC cancels and
+returns 0.
+
+**Simplified vs V1**: rather than tracking which rectangle edge is
+"trailing" the origin and redrawing only the moved edge each keypress, this
+port always recomputes the rectangle fresh as
+`[min(origin,cursor)..max(origin,cursor)]`, and redraws by XOR-toggling
+(`canvas_cell_invert()`) the old perimeter off then the new perimeter on —
+cells in both are toggled twice (no-op, stay highlighted), cells only in
+the old one are un-highlighted, cells only in the new one are highlighted.
+Produces the same visual result without porting V1's four-way trailing-edge
+comparison. When the viewport auto-scrolls mid-grow, `canvas_blit()` (called
+by `cursor_move_scroll()`) already clears the stale highlight, so only the
+new perimeter needs drawing that step.
+
+### 6.10 Line/Box mode (`linebox_run()`, `src/select.c`, entered via `l`)
+
+Calls `rect_select(1)` (`app.mode = MODE_LINEBOX`); if accepted, fills the
+rectangle with `app.plotscreencode` via a `canvas_put()` loop, then
+`canvas_blit()`s. ESC at the rect stage leaves the canvas unchanged.
+
+### 6.11 Select mode (`select_run()`, `src/select.c`, entered via `s`)
+
+Calls `rect_select(0)` (`app.mode = MODE_SELECT`); if cancelled, returns
+immediately with no further prompt (matches V1). If accepted, prompts for
+an action: `d` clears to `CH_SPACE`, `i` fills with `app.plotink`, `p` fills
+with `16+app.plotpaper`, `m` fills with the modifier-attribute byte for
+`app.plotaltchar`/`plotdouble`/`plotblink` (same bit-packing as `A_STD`(8)/
+`A_ALT`(9)/.../`A_BLINK2HALT`(15) in `oric.h`: base 8, bit0=altchar,
+bit1=double, bit2=blink). `FUNCT+6` toggles the statusbar. ESC at either
+stage leaves the canvas unchanged.
+
+V1's cut/copy (`x`/`c`) are **deferred to Phase 8** (overlay-RAM
+clipboard) — V1 uses a screen-RAM scratch buffer OSE has no safe equivalent
+for yet.
+
+### 6.12 Move mode (`move_run()`, `src/move.c`, entered via `m`)
+
+Cursor keys shift the *visible viewport's content* (not the cursor, not
+`app.xoffset`/`yoffset` — distinct from the cursor-auto-scroll fix, §4.3) by
+one row/col directly in `screenmap[]`: leading edge fills with `CH_SPACE`,
+trailing edge's content is lost. `canvas_blit()` after each move.
+`FUNCT+6` toggles the statusbar. ENTER and ESC both exit to Main —
+equivalent here, since every shift is already written directly to
+`screenmap[]` (V1's hardware-scroll-then-bake-back approach has a separate
+scratch buffer to roll back from on ESC; this port doesn't, so ESC does
+*not* roll back shifts already applied this session — a deliberate
+simplification, not a bug).
+
+### 6.13 Write mode (`write_run()`, `src/write.c`, entered via `w`)
+
+Direct port of V1's free-typing key table: cursor keys move (with
+auto-scroll); `CTRL+B`/`CTRL+A`/`CTRL+D` toggle blink/altchar/double;
+`CTRL+Z`/`CTRL+X` cycle ink down/up; `CTRL+C`/`CTRL+V` cycle paper down/up;
+`FUNCT+1`/`FUNCT+2`/`FUNCT+3` plot ink/paper/modifier-attribute at the
+cursor and advance right (`FUNCT+N`, *not* `i`/`o`/`u` — those letters are
+themselves printable characters to type here, see CLAUDE.md's Write mode
+section); `DEL` clears the cell; `CTRL+R` toggles a local reverse-video
+flag; any other printable key plots its screencode (`+0x80` if
+reverse-video) and advances right. `FUNCT+6` toggles the statusbar. ESC
+exits to Main.
+
 ---
 
 ## 7. Testing Infrastructure
@@ -699,7 +805,7 @@ Automated headless testing runs `build/oseloci.tap` under **Phosphoric**
 screen-content assertions via `tests/scripts/oric_screen.py`).
 
 ```
-make test                  # full suite (all 7 targets below)
+make test                  # full suite (all 12 targets below)
 make test-boot              # headless boot smoke test: splash + canvas/statusbar render
 make test-menus              # menu bar/pulldown/Screen-menu regression
 make test-screenresize        # Screen > Width/Height resize + shrink-confirm
@@ -707,6 +813,11 @@ make test-charsetram-spike     # Strategy A charset-RAM edit regression (Phase 3
 make test-charsetedit            # character editor: grid, favourites, transforms, Std/Alt
 make test-palette                 # palette popup: Fav/Std/Alt grid, cursor wrap, select/store/visualmap
 make test-colourpicker              # colour picker: 8x8 grid, cursor wrap, select/ESC
+make test-cursor-autoscroll          # viewport auto-scroll on an oversized canvas (Phase 5a)
+make test-linebox                     # Line/Box mode: rect-grow, ENTER fills, ESC cancels (Phase 5b)
+make test-select                       # Select mode: rect-grow, d/i/p/m fill actions, ESC paths (Phase 5c)
+make test-move                          # Move mode: content nudge, ENTER/ESC both keep the shift (Phase 5d)
+make test-writemode                      # Write mode: typing+advance, FUNCT+1/2/3 (Phase 5e)
 make test-capture CYCLES=N TYPEKEYS='...'  # calibration helper for new scripts
 ```
 
@@ -716,9 +827,15 @@ make test-capture CYCLES=N TYPEKEYS='...'  # calibration helper for new scripts
 - `tests/scripts/oric_screen.py` decodes the 40x28 `$BB80` text screen from a
   `--dump-ram-at` dump, providing `--find`/`--row`/`--bytes` assertions used
   by the shell scripts in `tests/scripts/test_*.sh`.
-- Current totals: 5 + 15 + 8 + 2 + 12 + 14 + 14 = **70/70** (`test-boot` +
+- Current totals: 5+15+8+2+12+14+14+2+6+10+4+6 = **98/98** (`test-boot` +
   `test-menus` + `test-screenresize` + `test-charsetram-spike` +
-  `test-charsetedit` + `test-palette` + `test-colourpicker`).
+  `test-charsetedit` + `test-palette` + `test-colourpicker` +
+  `test-cursor-autoscroll` + `test-linebox` + `test-select` + `test-move` +
+  `test-writemode`).
+- Write mode's `CTRL+letter` toggles and `DEL` have no automated coverage:
+  Phosphoric's `--type-keys` has no CTRL-modifier escape and `DEL` (0x7F) is
+  unmapped in its `char_map` — covered by manual walkthrough + code review
+  instead (see CLAUDE.md's Write mode section).
 - LOCI/overlay-RAM features (§2.4) are not yet present, so nothing here
   exercises them; once wired in, those features will need real-hardware
   verification (Phosphoric/Oricutron cannot emulate overlay RAM).

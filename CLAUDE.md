@@ -18,21 +18,23 @@ storage device**.
 - Enhanced palette mode that also shows the inverse colour combinations for
   each ink/paper pair
 
-**Status: Phase 4 of 9 complete**, plus charset-swap infrastructure, a narrow
-charset-editor popup, palette mode, the colour picker, the main-mode
-attribute-selection keys and a redesigned statusbar, and EN/FR localisation
-(canvas data model + minimal main mode + menu bar/Screen menu + character
-editor + charset-swap mechanism + palette/colour-picker popups + Phosphoric
-test harness; binary 13448 bytes EN / 13501 bytes FR).
+**Status: Phase 5 of 9 complete**, plus charset-swap infrastructure, a narrow
+charset-editor popup, palette mode, the colour picker, Select/Move/Line-Box/
+Write modes, the `G`/`I`/`O`/`U`/`R` main-mode keys, a cursor-auto-scroll fix
+for oversized canvases, the main-mode attribute-selection keys, a redesigned
+statusbar, and EN/FR localisation (canvas data model + minimal main mode +
+menu bar/Screen menu + character editor + charset-swap mechanism + palette/
+colour-picker popups + Select/Move/Line-Box/Write modes + Phosphoric test
+harness; binary 17288 bytes EN / 17341 bytes FR).
 A previous CC65-based attempt at this got stuck and is archived
 in the `nonworkingcc65` branch (full history + uncommitted state). `main` was
 restarted from scratch on the Oscar64 native/bare-metal build chain developed
 for [locifilemanager-v2](https://github.com/xahmol/locifilemanager-v2)
 (`/home/xahmol/git/locifilemanager-v2`), which the runtime and libraries below
-were copied from verbatim. The remaining 5 phases (select/move/line-box/write
-modes, LOCI file I/O, file picker, overlay-RAM undo, IJK/help/polish) are
-tracked in the active plan — see `~/.claude/plans/snappy-beaming-lynx.md` or
-ask Claude for status.
+were copied from verbatim. The remaining 4 phases (LOCI file I/O, file
+picker, overlay-RAM undo incl. Select mode's deferred cut/copy, IJK/help/
+polish) are tracked in the active plan — see
+`~/.claude/plans/snappy-beaming-lynx.md` or ask Claude for status.
 
 **Other docs**: `ARCHITECTURE.md` (memory map, module layout, dependency
 graph), `libmanual.md`/`libmanual_fr.md` (per-function API reference for
@@ -245,6 +247,168 @@ palette mode also showing inverse ink/paper colour combinations"). Popup
 - **Charset-swap**: opts IN — swatch glyphs (`CH_SPACE`/`CH_INVSPACE`) are
   plain Std-charset chars, no live-edit-preview requirement.
 
+**Known issue (parked 2026-06-17, not blocking)**: user-tested on real Oric
+Atmos hardware and reports the colour picker's grid colours do not render
+correctly (screenshot pending — real hardware only, no Oricutron/Phosphoric
+repro available since neither emulates LOCI and the build halts at the
+LOCI-presence check on startup without it). Suspected scope: this popup is
+the first place in the codebase that changes ink *and* paper 8 times each
+within a single 36-column row (16 attribute changes/row) — `cp_draw_grid()`'s
+per-cell `[ink-attr, paper-attr, swatch0, swatch1]` write in
+`src/colourpicker.c`. Everywhere else (statusbar swatches, palette) changes
+colour at most twice per row. Deviations from V1's `colourpicker()` (4-col
+cells with no leading reset byte, vs V1's 5-col `[A_BGWHITE, ink, paper+16,
+'-', '-'+128]`; `CH_SPACE`/`CH_INVSPACE` swatches vs V1's `'-'`/`'-'+128`;
+swap-based cursor vs V1's bordered `colorpicker_cursorplot()`) were reviewed
+and should be colour-neutral under the documented Oric attribute model (ink
+and paper are independent, left-to-right, V1's leading `A_BGWHITE` is
+immediately overwritten by the following `paper+16` so has no effect on
+final cell colour) — so this is suspected to be either a real bug in dense
+per-row attribute writing, or a genuine real-hardware ULA timing quirk not
+present in emulation. Not confirmed either way pending a real-hardware
+screenshot. **Does not block Phase 5**: `app.plotink`/`plotpaper` can already
+be set without this popup via the `,`/`.`/`;`/`'` cycling keys (Phase 4a,
+`src/editor.c`), and Phase 5's write/line-box/select-move modes and the
+deferred `G`/`I`/`O`/`U` serial-attribute-plotting keys write one attribute
+byte at a time into `canvas.c`'s `screenmap[]` — a different, much simpler
+code path than this widget's dense per-row grid, so they're not expected to
+inherit this bug. Revisit once a real-hardware screenshot is available.
+
+### Cursor auto-scroll fix (Phase 5)
+
+Before Phase 5, `editor_run()`'s cursor-move keys clamped to the 40x27
+viewport with no way to reach canvas cells beyond it — a real gap, since
+Screen > Width/Height (Phase 2) already lets the canvas grow past the
+viewport. `cursor_move_scroll(dx, dy)` (`src/canvas.c/h`) fixes this: at a
+viewport edge, if the canvas extends further in that direction, it scrolls
+`app.xoffset`/`yoffset` (and `canvas_blit()`s) instead of refusing to move;
+otherwise it moves the cursor as before. `editor_run()`'s `KEY_UP/DOWN/
+LEFT/RIGHT` cases, and the cursor movement inside Select/Line-Box's
+rect-grower (`select.c`) and Write mode (`write.c`), all call this helper
+rather than clamping `cursor_x`/`cursor_y` directly. Bundled into Phase 5
+(confirmed with the user) rather than filed as a separate fix, since it's
+the same area of code as the new modes and those modes' cursor movement
+needed the same fix anyway. Tested by `tests/scripts/test_cursor_autoscroll.sh`.
+
+Distinct from Move mode (below): auto-scroll changes `xoffset`/`yoffset` to
+navigate a canvas larger than the viewport (the cursor stays on the same
+canvas cell, the *view* moves); Move mode keeps `xoffset`/`yoffset` fixed
+and rewrites cells within the current viewport (the view stays fixed, the
+*content* moves).
+
+### Shared rectangle-grower (Phase 5)
+
+`src/select.c/h`'s `rect_select(draworselect)` is shared by Line/Box and
+Select mode (below) — adapted from V1's `lineandbox()` (local reference at
+`/home/xahmol/git/OricScreenEditor/src/main.c`). Grows a rectangle from the
+cursor's starting position using cursor keys (with auto-scroll, see above);
+ENTER accepts (populating file-scope statics `select_startx/starty/endx/
+endy/width/height` — not `AppState` fields, since nothing outside
+`select.c` reads them) and returns 1; ESC cancels and returns 0.
+
+**Deliberate simplification vs V1**: V1 tracks which rectangle edge is
+"trailing" the fixed origin and redraws only the single edge line that
+moved each keypress. This port instead always recomputes the rectangle
+fresh as `[min(origin,cursor) .. max(origin,cursor)]` on every keypress,
+and redraws by XOR-toggling (`canvas_cell_invert()`) the *old* perimeter off
+then the *new* perimeter on: cells in both perimeters are toggled twice
+(net no-op, stay highlighted), cells only in the old one are toggled once
+(un-highlighted), cells only in the new one are toggled once (highlighted).
+This produces an identical result to V1's edge-tracking without porting its
+four-way trailing-edge comparison logic. When `xoffset`/`yoffset` change
+mid-grow (auto-scroll fired), `cursor_move_scroll()` already
+`canvas_blit()`s, clearing all stale highlight bytes — so only the new
+perimeter needs drawing in that case, not an erase pass first.
+
+### Line/Box mode (Phase 5b)
+
+`linebox_run()` (`src/select.c`), entered via `l` from Main mode. Calls
+`rect_select(1)` (sets `app.mode = MODE_LINEBOX` for the statusbar's Mode
+field); if accepted, fills the rectangle with `app.plotscreencode` via a
+`canvas_put()` loop and `canvas_blit()`s. ESC at the rect stage leaves the
+canvas unchanged.
+
+### Select mode (Phase 5c)
+
+`select_run()` (`src/select.c`), entered via `s` from Main mode. Calls
+`rect_select(0)` (`app.mode = MODE_SELECT`); if cancelled, returns
+immediately with no further prompt (matching V1). If accepted, prompts for
+an action: `d` clears the rect to `CH_SPACE`, `i` fills it with
+`app.plotink`, `p` fills it with `16+app.plotpaper`, `m` fills it with the
+modifier-attribute byte for `app.plotaltchar`/`plotdouble`/`plotblink` (same
+bit-packing as `oric.h`'s `A_STD`(8)/`A_ALT`(9)/.../`A_BLINK2HALT`(15): base
+8, bit0=altchar, bit1=double, bit2=blink). `FUNCT+6` toggles the statusbar.
+ESC at either the rect stage or the action prompt leaves the canvas
+unchanged.
+
+**Cut/copy (`x`/`c` in V1) are deferred to Phase 8** (confirmed with the
+user): V1's cut/copy uses a screen-RAM scratch buffer OSE has no safe
+equivalent for before overlay RAM is wired up.
+
+### Move mode (Phase 5d)
+
+`move_run()` (`src/move.c/h`), entered via `m` from Main mode. Cursor keys
+shift the *visible viewport's content* (not the cursor, not `xoffset`/
+`yoffset` — see "Cursor auto-scroll fix" above for the distinction) by one
+row/col in `screenmap[]` directly: the leading edge fills with `CH_SPACE`,
+the trailing edge's content is lost. `canvas_blit()` after each move shows
+the result live. `FUNCT+6` toggles the statusbar. ENTER and ESC both exit
+to Main — **equivalent here**, since every shift is already written
+directly to `screenmap[]` (no separate scratch buffer the way V1's
+hardware-scroll-then-bake-back approach has one) — so unlike V1, ESC does
+**not** roll back shifts already applied during the session. This is a
+deliberate simplification (V1's own ESC-cancel only worked by the accident
+of not having baked anything back yet either, for the same single-buffer
+reason).
+
+### Write mode (Phase 5e)
+
+`write_run()` (`src/write.c/h`), entered via `w` from Main mode. Direct port
+of V1's free-typing key table: cursor keys move (with auto-scroll); `CTRL+B`/
+`CTRL+A`/`CTRL+D` toggle blink/altchar/double; `CTRL+Z`/`CTRL+X` cycle ink
+down/up; `CTRL+C`/`CTRL+V` cycle paper down/up; `FUNCT+1`/`FUNCT+2`/`FUNCT+3`
+plot ink/paper/modifier-attribute at the cursor and advance right; `DEL`
+clears the cell (no advance); `CTRL+R` toggles a local reverse-video flag;
+any other printable key plots its screencode (`+0x80` if reverse-video is
+on) and advances right. `FUNCT+6` toggles the statusbar. ESC exits to Main.
+
+**Why `FUNCT+1/2/3`, not `i`/`o`/`u`**: Main mode's `i`/`o`/`u` keys
+(below) plot ink/paper/modifier at the cursor, but Write mode can't reuse
+those letters — they're themselves printable characters to type here. V1
+uses `CH_F1/F2/F3` for the same three actions inside `writemode()`; this
+port does the same. Easy to get wrong by copy-pasting Main mode's key
+choices, so flagged explicitly.
+
+`include/keyboard.h`'s Ctrl+letter decode is generic (`letter & 0x1F` in
+`keyboard.c`, not a per-letter lookup table) — confirmed during
+implementation that it works for any letter, not just the 4 that already
+had named `KEY_CTRL_*` constants. Added `KEY_CTRL_B/D/R/V` alongside the
+pre-existing `KEY_CTRL_A/C/X/Z` for readability at Write mode's call sites.
+
+**Not covered by automated Phosphoric tests**: the `CTRL+letter` toggles and
+`DEL`. Phosphoric's `--type-keys` has no CTRL-modifier escape (only Shift,
+via uppercase letters) and `DEL` (0x7F) is unmapped in its `char_map` (see
+"Phosphoric Testing Notes" below). Covered by the manual Oricutron/
+Phosphoric walkthrough instead, and by code review (identical bit-packing/
+cycling logic to the already-tested Main-mode `,`/`.`/`;`/`'`/`b`/`d`/`a`
+handlers).
+
+### `G`/`I`/`O`/`U`/`R` main-mode keys (Phase 5f)
+
+`src/editor.c`, Main mode. `g` "grabs" the screencode/attribute under the
+cursor into the matching `plot*` field: `>31` → `plotscreencode`; `<8` →
+`plotink`; `>15` → `plotpaper` (minus 16); `8-15` → decodes
+`plotaltchar`/`plotdouble`/`plotblink` from bits 0/1/2 of `grab-8` (same
+bit positions as `oric.h`'s `A_STD`/`A_ALT`/.../`A_BLINK2HALT` constants).
+**Bug fix vs V1**: V1 stores the raw 16-23 paper-attribute byte into
+`plotpaper` (instead of subtracting 16) and `grab&2`/`grab&4` (values
+0/2/0/4) into `plotdouble`/`plotblink` (instead of normalising to 0/1) —
+both would violate this codebase's documented `plotpaper` (0-7) and
+`plotdouble`/`plotblink` (0/1) invariants, so this port normalises instead
+of copying the bug. `i`/`o`/`u` plot `plotink`/`16+plotpaper`/the
+modifier-attribute byte at the cursor and move down one row (auto-scrolling
+if needed). `r` toggles reverse-video on `plotscreencode` (XOR 0x80).
+
 ### Charset-swap mechanism
 
 `src/charsetswap.c/h` + `include/charset.c/h` ensure popup chrome (menu bar,
@@ -337,8 +501,9 @@ make clean        # remove build artifacts (both languages)
 make docs         # regenerate README.pdf from README.md (requires pandoc)
 make test         # full automated Phosphoric test suite (test-boot, test-menus,
                   # test-screenresize, test-charsetram-spike, test-charsetedit,
-                  # test-palette, test-colourpicker) -- EN only, see
-                  # "Localisation" below
+                  # test-palette, test-colourpicker, test-cursor-autoscroll,
+                  # test-linebox, test-select, test-move, test-writemode) --
+                  # EN only, see "Localisation" below
 make test-boot    # headless boot smoke test (splash + canvas/statusbar render)
 make test-capture CYCLES=N TYPEKEYS='...'
                   # calibration helper: dumps tests/out/capture.bin + .png
@@ -394,11 +559,27 @@ src/
   statusbar.c/h   Row-27 statusbar (OricCharWin, Mode/XY/C/S/I/P + A/D/B flags,
                   see "Main-mode attribute-selection keys and statusbar
                   redesign (Phase 4a)")
-  editor.c/h      Main-mode loop: cursor move, +/- screencode select, SPACE/DEL
-                  plot, ,/.;/' ink/paper cycling, b/d/a attribute toggles,
-                  0-9/SHIFT+0-9 favourites, FUNCT+1 opens the menu bar, 'e'
-                  opens the character editor, 'p' opens the palette, 'c' opens
-                  the colour picker
+  editor.c/h      Main-mode loop: cursor move (with auto-scroll, see
+                  canvas.c's cursor_move_scroll()), +/- screencode select,
+                  SPACE/DEL plot, ,/.;/' ink/paper cycling, b/d/a/r attribute
+                  toggles, g grabs the screencode/attr under the cursor,
+                  i/o/u plot ink/paper/modifier, 0-9/SHIFT+0-9 favourites,
+                  FUNCT+1 opens the menu bar, 'e' opens the character editor,
+                  'p'/'c' open the palette/colour picker, 'l'/'s'/'m'/'w'
+                  open Line-Box/Select/Move/Write mode (see "Phase 5"
+                  sections above)
+  modes.h/c       EditorMode -> MSG_MODE_* display-name lookup
+                  (mode_name()), shared by statusbar.c and any mode file --
+                  standalone, no dependency in either direction with
+                  editor.c/select.c/move.c/write.c
+  select.c/h      Shared rectangle-grower (rect_select()) + Line/Box mode
+                  ('l', linebox_run()) + Select mode ('s', select_run()) --
+                  see "Shared rectangle-grower"/"Line/Box mode"/"Select mode"
+                  (Phase 5)
+  move.c/h        Move mode ('m'): nudges the visible canvas content by one
+                  row/col (see "Move mode (Phase 5d)")
+  write.c/h       Write mode ('w'): free-typing screencodes with CTRL-key
+                  attribute toggles (see "Write mode (Phase 5e)")
   menu.c/h        Menu bar/pulldown/popup engine + main-RAM window-save stack
   menudata.c/h    OSE menu tables (Screen/File/Charset/Information) + Screen
                   pulldown dispatch (Width/Height/Clear/Fill)

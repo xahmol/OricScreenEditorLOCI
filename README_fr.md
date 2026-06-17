@@ -545,6 +545,12 @@ Appuyer sur **I**, **P** ou **M** remplit la zone avec, respectivement, la coule
 
 Quittez le mode sélection en appuyant sur **ESC**. Appuyer sur **FUNCT+8** à tout moment dans ce mode affiche un écran d'aide avec les commandes clavier de ce mode (impossible si la sélection a été agrandie mais pas encore acceptée).
 
+**Note OSE** : Couper (**X**) et Copier (**C**) ne sont pas encore implémentés
+dans cette réécriture basée sur LOCI -- ces fonctions sont reportées à une
+phase ultérieure qui ajoutera le stockage en RAM d'extension pour le
+presse-papiers. **D**, **I**, **P** et **M** sont entièrement implémentés
+comme décrit ci-dessus.
+
 ## Mode déplacement
 ([Retour au sommaire](#sommaire))
 
@@ -557,6 +563,12 @@ Il est également important de noter que les caractères qui « sortent » de l'
 Une alternative au mode déplacement consiste à utiliser le [mode sélection](#mode-sélection) et la fonction Couper pour déplacer une sélection vers une nouvelle position.
 
 Acceptez avec **RETURN**, annulez avec **ESC**. Les deux quittent ce mode et reviennent au mode principal.
+
+**Note OSE** : dans cette réécriture basée sur LOCI, chaque déplacement est
+appliqué directement dès que vous appuyez sur une touche curseur (il n'y a
+pas de copie de travail séparée pour annuler) -- **RETURN** et **ESC** se
+comportent donc de façon identique ici, conservant les déplacements déjà
+effectués pendant cette session.
 
 |Touche|Description
 |---|---|

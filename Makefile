@@ -114,6 +114,18 @@ MAIN_SRCS = \
   src/charsetedit.h     \
   src/charsetswap.c     \
   src/charsetswap.h     \
+  src/palette.c         \
+  src/palette.h         \
+  src/colourpicker.c    \
+  src/colourpicker.h    \
+  src/modes.c           \
+  src/modes.h           \
+  src/select.c          \
+  src/select.h          \
+  src/move.c            \
+  src/move.h            \
+  src/write.c           \
+  src/write.h           \
   src/strings.h         \
   src/strings_en.h      \
   src/strings_fr.h      \
@@ -158,7 +170,7 @@ CYCLES   ?= 8000000
 # all: must appear first so it is the default goal
 # =========================================================================
 
-.PHONY: all all-langs clean run docs check-phosphoric sandbox-reset test-capture test-boot test-menus test-screenresize test-charsetram-spike test-charsetedit test-palette test-colourpicker test
+.PHONY: all all-langs clean run docs check-phosphoric sandbox-reset test-capture test-boot test-menus test-screenresize test-charsetram-spike test-charsetedit test-palette test-colourpicker test-cursor-autoscroll test-linebox test-select test-move test-writemode test
 
 all: build/$(MAIN)$(LANGSUFFIX).tap
 
@@ -266,6 +278,36 @@ test-colourpicker: check-phosphoric sandbox-reset
 	    TAPFILE=$(MAIN)$(LANGSUFFIX).tap \
 	    bash tests/scripts/test_colourpicker.sh
 
+test-cursor-autoscroll: check-phosphoric sandbox-reset
+	$(MKDIR) tests/out 2>$(NULLDEV) ; true
+	PHOS=$(PHOS) ATMOSROM=$(ATMOSROM) SANDBOX=tests/sandbox OUT=tests/out \
+	    TAPFILE=$(MAIN)$(LANGSUFFIX).tap \
+	    bash tests/scripts/test_cursor_autoscroll.sh
+
+test-linebox: check-phosphoric sandbox-reset
+	$(MKDIR) tests/out 2>$(NULLDEV) ; true
+	PHOS=$(PHOS) ATMOSROM=$(ATMOSROM) SANDBOX=tests/sandbox OUT=tests/out \
+	    TAPFILE=$(MAIN)$(LANGSUFFIX).tap \
+	    bash tests/scripts/test_linebox.sh
+
+test-select: check-phosphoric sandbox-reset
+	$(MKDIR) tests/out 2>$(NULLDEV) ; true
+	PHOS=$(PHOS) ATMOSROM=$(ATMOSROM) SANDBOX=tests/sandbox OUT=tests/out \
+	    TAPFILE=$(MAIN)$(LANGSUFFIX).tap \
+	    bash tests/scripts/test_select.sh
+
+test-move: check-phosphoric sandbox-reset
+	$(MKDIR) tests/out 2>$(NULLDEV) ; true
+	PHOS=$(PHOS) ATMOSROM=$(ATMOSROM) SANDBOX=tests/sandbox OUT=tests/out \
+	    TAPFILE=$(MAIN)$(LANGSUFFIX).tap \
+	    bash tests/scripts/test_move.sh
+
+test-writemode: check-phosphoric sandbox-reset
+	$(MKDIR) tests/out 2>$(NULLDEV) ; true
+	PHOS=$(PHOS) ATMOSROM=$(ATMOSROM) SANDBOX=tests/sandbox OUT=tests/out \
+	    TAPFILE=$(MAIN)$(LANGSUFFIX).tap \
+	    bash tests/scripts/test_writemode.sh
+
 test:
 	@status=0; \
 	$(MAKE) test-boot || status=1; \
@@ -275,6 +317,11 @@ test:
 	$(MAKE) test-charsetedit || status=1; \
 	$(MAKE) test-palette || status=1; \
 	$(MAKE) test-colourpicker || status=1; \
+	$(MAKE) test-cursor-autoscroll || status=1; \
+	$(MAKE) test-linebox || status=1; \
+	$(MAKE) test-select || status=1; \
+	$(MAKE) test-move || status=1; \
+	$(MAKE) test-writemode || status=1; \
 	exit $$status
 
 # -------------------------------------------------------------------------
