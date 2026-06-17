@@ -41,7 +41,11 @@
 
 // Control codes: CTRL + letter = letter & 0x1F
 #define KEY_CTRL_A      0x01
+#define KEY_CTRL_B      0x02
 #define KEY_CTRL_C      0x03
+#define KEY_CTRL_D      0x04
+#define KEY_CTRL_R      0x12
+#define KEY_CTRL_V      0x16
 #define KEY_CTRL_X      0x18
 #define KEY_CTRL_Z      0x1A
 

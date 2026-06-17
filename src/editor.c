@@ -11,6 +11,7 @@
 #include "colourpicker.h"
 #include "select.h"
 #include "move.h"
+#include "write.h"
 #include "editor.h"
 
 #define PLOT_MIN 0x20
@@ -25,9 +26,12 @@
  * 'b'/'d'/'a' toggle plotblink/plotdouble/plotaltchar, '0'-'9' recall a
  * favourite into plotscreencode and SHIFT+0-9 store plotscreencode into a
  * favourite, FUNCT+6 toggles the statusbar, FUNCT+1 opens the menu bar
- * (menu_run()), 'e' opens the character editor (charsetedit_run()), 'p'
- * opens the palette popup (palette_run()), and 'c' opens the colour picker
- * popup (colourpicker_run()). Never returns.
+ * (menu_run()), 'e' opens the character editor (charsetedit_run()), 'p'/'c'
+ * open the palette/colour picker popups, 'l'/'s'/'m'/'w' open Line-Box/
+ * Select/Move/Write mode, 'g' grabs the screencode/attribute under the
+ * cursor into the matching plot* field, 'i'/'o'/'u' plot ink/paper/the
+ * modifier attribute at the cursor and move down, and 'r' toggles
+ * reverse-video on plotscreencode. Never returns.
  *
  * @return (none)
  */
@@ -170,6 +174,70 @@ void editor_run(void)
 
         case 'm':
             move_run();
+            break;
+
+        case 'w':
+            write_run();
+            break;
+
+        // Grab the screencode/attribute under the cursor into the
+        // matching plot* field. Ported from V1 with a bug fix: V1 stores
+        // the raw 16-23 paper-attribute byte into plotpaper (instead of
+        // subtracting 16) and grab&2/grab&4 (0/2/0/4) into
+        // plotdouble/plotblink (instead of normalising to 0/1) -- both
+        // would violate this codebase's documented plotpaper (0-7) and
+        // plotdouble/plotblink (0/1) invariants, so this port normalises.
+        case 'g':
+        {
+            uint8_t grab = canvas_get(app.cursor_x + app.xoffset, app.cursor_y + app.yoffset);
+            if (grab > 31)
+            {
+                app.plotscreencode = grab;
+            }
+            else if (grab < 8)
+            {
+                app.plotink = grab;
+            }
+            else if (grab > 15)
+            {
+                app.plotpaper = (uint8_t)(grab - 16);
+            }
+            else
+            {
+                grab = (uint8_t)(grab - 8);
+                app.plotaltchar = (grab & 1) ? 1 : 0;
+                app.plotdouble  = (grab & 2) ? 1 : 0;
+                app.plotblink   = (grab & 4) ? 1 : 0;
+            }
+            break;
+        }
+
+        // Plot present ink/paper/modifier attribute at the cursor and move
+        // down one row.
+        case 'i':
+            canvas_put(app.cursor_x + app.xoffset, app.cursor_y + app.yoffset, app.plotink);
+            cursor_move_scroll(0, 1);
+            canvas_blit();
+            break;
+
+        case 'o':
+            canvas_put(app.cursor_x + app.xoffset, app.cursor_y + app.yoffset, (uint8_t)(16 + app.plotpaper));
+            cursor_move_scroll(0, 1);
+            canvas_blit();
+            break;
+
+        case 'u':
+            canvas_put(app.cursor_x + app.xoffset, app.cursor_y + app.yoffset,
+                       (uint8_t)(8 | (app.plotaltchar ? 1 : 0)
+                                   | (app.plotdouble  ? 2 : 0)
+                                   | (app.plotblink   ? 4 : 0)));
+            cursor_move_scroll(0, 1);
+            canvas_blit();
+            break;
+
+        // Toggle reverse-video on the current plot screencode.
+        case 'r':
+            app.plotscreencode ^= 0x80;
             break;
 
         default:
