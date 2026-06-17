@@ -267,47 +267,50 @@ Similar to clear, but this will fill the canvas with the present selected screen
 
 ![File menu](https://github.com/xahmol/OricScreenEditor/blob/main/screenshots/OSE%20filemenu.png?raw=true)
 
-In general: pressing **ESC** on a filename input dialogue cancels the file operation. Wildcards can be used in filenames for loading: **\*** for allowing anything afterwards, **?** to allow any character for the given position.
+**OSE-LOCI note**: this rewrite uses the **LOCI mass-storage device** for
+all file I/O instead of V1's tape commands, and asks for a typed filename
+(up to 24 characters) rather than V1's file picker/device-ID dialogues -- a
+full file browser is planned for a later version. If no LOCI device is
+detected, every File/Charset menu item shows a "No LOCI device detected"
+message instead of attempting the operation, so the rest of the editor
+keeps working normally without one attached.
 
-**NB: In the present version, error handling of file operations is ppor, for example entering incorrect / inexisting filenames exit the program to BASIC with poor recovery possibility of unsaved work. Advice is to save often on work in progress versions.**
+*Save screen / Load screen*
 
-*Save screen*
+Saves or loads just the canvas (no character sets) to/from
+`<filename>.BIN` on the LOCI device: a small header recording the canvas
+width/height, followed by the screen data. Loading applies the saved
+width/height automatically -- no need to enter them separately.
 
-This option saves the present canvas to disk. The filename is asked (max 9 characters in length).
+*Save project / Load project*
 
-In case of a file error, a popup will be shown with the error number.
+Saves or loads the canvas together with its metadata (cursor position,
+viewport, ink/paper/blink/double/altchar selection) and, if you've edited
+them this session, both character sets -- as up to four files sharing your
+typed filename: `<filename>PJ.BIN` (metadata), `<filename>SC.BIN` (screen),
+`<filename>CS.BIN` (standard charset, only written/expected if you edited
+it) and `<filename>CA.BIN` (alternate charset, same condition). Loading a
+project that was saved with only one charset edited leaves the other
+charset bank untouched (still whatever was loaded/default beforehand).
 
-![Save screen](https://github.com/xahmol/OricScreenEditor/blob/main/screenshots/OSE%20File%20menu%20-%20save.png?raw=true)
+*Save combined / Load combined*
 
-*Load screen*
-
-With this option you can load a screen from disk. The filename to be loaded can be selected with the file picker showing the files on the disc. Next to the disk name, if the name convention is recognized, filetype is shown for reference. After selecting the file, the width and height in characters will be asked as that can not be read from a standard screen file.
-
-![Load screen](https://github.com/xahmol/OricScreenEditor/blob/main/screenshots/OSE%20File%20menu%20-%20filepicker.png?raw=true)
-
-*Save project*
-
-Similar to save screen, but with this option also the canvas metadata (width, height, present cursor position etc.) and the character sets if altered will be saved. Maximum filename length is now 10 to allow for an .xxxx suffix as it will save up to four files: filename.proj for the metadata, filename.scrn for the screen data, filename.chr1 for the standard charset and filename.chr2 for the alternate charset.
-
-![Save project](https://github.com/xahmol/OricScreenEditor/blob/main/screenshots/OSE%20File%20menu%20-%20projsave.png?raw=true)
-
-*Load project*
-Loads a project: the metadata, the screen and the charsets. Provide the filename with the filepicker (same as with Load Screen). A pop-up will be shown if the filename selected does not meet the name convention for a project (filename has to end with PJ). As the canvas width and height is now read from the metadata, no user input on canvas size is needed.
-
-*Save combined*
-
-This option saves the present canvas and charsets to disk in a single file (First 768 bytes of the standard charset, 256 bytes of empty space (the first 32 non-visible positions of the alternate charset), then 640 bytes of the visible alternate charset, finally the screenmap). Only makes sense for 40x27 standard screens, with the benefit that they can be loaded in one go with $B500 as base address. For the rest exactly similar in dialogue as Save Screen.
-
-*Load combined*
-
-This option loads the present canvas and charsets to disk in a single file (First 768 bytes of the standard charset, 256 bytes of empty space (the first 32 non-visible positions of the alternate charset), then 640 bytes of the visible alternate charset, finally the screenmap). For the rest exactly similar in dialogue as Save Screen.
+Saves or loads the canvas together with the standard character set in a
+single `<filename>.BIN` file (header + the standard charset's 768 bytes +
+the screen data).
 
 **_Charset: Load and save character set_**
 
 ![Charset menu](https://github.com/xahmol/OricScreenEditor/blob/main/screenshots/OSE%20charsetmenu.png?raw=true)
 
-In this menu you can select the options to Load or Save the character sets for either the standard or alternate charsets separately (768 bytes resp. 640 bytes files) or as a combined file for both character sets (768 standard charset, 256 bytes empty space, 640 bytes alternate charset).
-Dialogue of these options is similar to the screen save and load options: enter device ID and filename.
+Load or save the standard or alternate character set separately (768 bytes
+each, `<filename>.BIN`), or "combined": saving combined is identical to
+saving the standard set; loading combined loads the file into **both** the
+standard and alternate banks, so they end up identical. (This differs from
+V1, which used a ROM call to regenerate the alternate set from the
+standard one on load -- that ROM call doesn't work in this rewrite, so
+copying the same data into both banks is the closest available
+equivalent.)
 
 **_Information: Version information, exit program_**
 

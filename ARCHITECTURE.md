@@ -17,7 +17,7 @@ local checkout at `/home/xahmol/git/OricScreenEditor`), restarted on the
 Oscar64 native/bare-metal build chain shared with
 [locifilemanager-v2](https://github.com/xahmol/locifilemanager-v2)
 (`/home/xahmol/git/locifilemanager-v2`), which this document's structure is
-adapted from. **OSE is mid-rewrite (Phase 5 of 9 complete)** — several
+adapted from. **OSE is mid-rewrite (Phase 6 of 9 complete)** — several
 sections below describe library code that is present (copied verbatim from
 locifilemanager-v2) but not yet wired into the application; these are marked
 explicitly.
@@ -88,7 +88,7 @@ locifilemanager-v2, copied verbatim.
 | `$0100–$01FF` | 256 B | 6502 hardware stack (`txs #$FF` at startup) |
 | `$0200–$02FF` | — | Oric ROM system variables (reserved, not used) |
 | `$0300–$030F` | 16 B | **VIA 6522** registers (§2.2) — used by `include/keyboard.c` |
-| `$0310–$04FF` | — | Remaining Oric ROM system variables, incl. `MICRODISCCFG` (`$0314`, overlay-RAM enable) and the LOCI TAP/MIA register block — reserved; `include/loci.c/h` is present (copied from locifilemanager-v2) but **not yet compiled into OSE** (no `#include "loci.h"` in `src/`) — planned for the LOCI file-I/O phase |
+| `$0310–$04FF` | — | Remaining Oric ROM system variables, incl. `MICRODISCCFG` (`$0314`, overlay-RAM enable, still dormant -- Phase 8) and the LOCI TAP/MIA register block, incl. `$0319` (`LOCI_SIGNATURE_ADDR`, `loci_present()`'s detection byte) -- `include/loci.c/h`'s file-I/O API is now compiled into OSE via `src/fileio.c` (Phase 6); the overlay-RAM portion remains dormant |
 | `$0500–$057F` | 128 B | **Startup region** — tape entry point jumps into `oric_startup` |
 | `$0580–$B1FF` | ~42.4 KB | **Program region** — code, data, BSS, heap |
 | `$B200–$B3FF` | 512 B | **Software stack** (`#pragma stacksize(0x0200)`) |
@@ -137,17 +137,20 @@ addressing/copy primitives (`charset_address/save/load/rom_glyph`) and
 in-place glyph-bitmap transforms (`invert/mirror_v/mirror_h/scroll_up/
 scroll_down/rotate_left/rotate_right`) over this layout — see §4.5 and §6.4.
 
-### 2.4 LOCI and IJK (present, not yet wired in)
+### 2.4 LOCI and IJK
 
 `include/loci.h/c` (LOCI mass-storage MIA/TAP/XRAM/file/dir/mount/overlay-RAM
 API) and `include/ijk.h/c` (Raxiss IJK joystick driver, VIA Port A) were
 copied verbatim from locifilemanager-v2 as part of the Oscar64 scaffold
-restart, for use in later phases (LOCI file I/O, file picker, IJK input).
-Neither header is currently `#include`d from any file reachable from
-`src/main.c`, so neither is compiled into `build/oseloci.tap` yet. When they
-are wired in, this section should gain the LOCI MIA op-code/register tables
-and XRAM/overlay-RAM partition layout — see locifilemanager-v2's
-`ARCHITECTURE.md` §2.3-2.5 for the reference material to adapt.
+restart. **`loci.h/c` is now wired in** (Phase 6, `src/fileio.c/h` — see
+§6.9): `loci_present()`/`loci_open/close/read/write()`/`file_save()`/
+`file_load()` back the File/Charset menus. The overlay-RAM portion of
+`loci.h` (`enable_overlay_ram()`/`disable_overlay_ram()`/`xram_*`) and
+`ijk.h/c` remain dormant, for Phase 8 (overlay-RAM undo) and a later
+IJK-input phase respectively — neither is `#include`d from any `src/` file
+yet. When overlay RAM is wired in, this section should gain the XRAM/
+overlay-RAM partition layout — see locifilemanager-v2's `ARCHITECTURE.md`
+§2.3-2.5 for the reference material to adapt.
 
 ### 2.5 Interrupt policy
 
@@ -195,16 +198,17 @@ src/
                   cursor, i/o/u plot ink/paper/modifier, 0-9/SHIFT+0-9
                   favourites, FUNCT+1 opens the menu bar, 'e' opens the
                   character editor, 'p'/'c' open the palette/colour picker,
-                  'l'/'s'/'m'/'w' open Line-Box/Select/Move/Write mode (§6.9-§6.12)
+                  'l'/'s'/'m'/'w' open Line-Box/Select/Move/Write mode (§6.9-§6.13)
   modes.h/c       EditorMode -> MSG_MODE_* display-name lookup
                   (mode_name()), shared by statusbar.c and any mode file
   select.c/h      Shared rectangle-grower (rect_select()) + Line/Box mode
-                  ('l') + Select mode ('s') (§6.9/§6.10)
-  move.c/h        Move mode ('m'): nudges visible canvas content (§6.11)
-  write.c/h       Write mode ('w'): free-typing screencodes (§6.12)
+                  ('l') + Select mode ('s') (§6.9/§6.10/§6.11)
+  move.c/h        Move mode ('m'): nudges visible canvas content (§6.12)
+  write.c/h       Write mode ('w'): free-typing screencodes (§6.13)
+  fileio.c/h      LOCI file I/O backing the File/Charset menus (§6.14)
   menu.c/h        Menu bar/pulldown/popup engine + main-RAM window-save stack
-  menudata.c/h    OSE menu tables (Screen/File/Charset/Information) + Screen
-                  pulldown dispatch (Width/Height/Clear/Fill)
+  menudata.c/h    OSE menu tables (Screen/File/Charset/Information) + Screen/
+                  File/Charset pulldown dispatch
   charsetedit.c/h Character editor popup: edits the 6x8 glyph for
                   app.plotscreencode/app.plotaltchar directly in live charset RAM
   charsetswap.c/h Charset-swap mechanism: backs up/restores CHARSET_STD around
@@ -225,7 +229,8 @@ include/
   charwin.h/c     Character window / menu library (windows, viewports, text input)
   charset.h/c     Generic Oric charset-bank addressing/copy + glyph-bitmap transform
                   primitives (new to this project, not copied from locifilemanager-v2)
-  loci.h/c        LOCI mass-storage API -- present, not yet compiled in (§2.4)
+  loci.h/c        LOCI mass-storage API -- file I/O wired in via src/fileio.c
+                  (§2.4/§6.14); overlay-RAM portion still dormant
   ijk.h/c         Raxiss IJK joystick driver -- present, not yet compiled in (§2.4)
 
 tools/
@@ -289,6 +294,7 @@ locifilemanager-v2 for future use.
 #define CANVAS_HEIGHT    VIEWPORT_HEIGHT
 #define CANVAS_MAX_SIZE  8192
 #define FAVOURITES_COUNT 10
+#define FILENAME_MAXLEN  24
 
 typedef enum {
     MODE_MAIN = 0,
@@ -315,6 +321,9 @@ typedef struct {
     uint8_t    favourites[FAVOURITES_COUNT]; // character-editor favourites
     EditorMode mode;
     uint8_t    showstatusbar;
+    uint8_t    stdchanged;      // 0/1, CHARSET_STD edited this session
+    uint8_t    altchanged;      // 0/1, CHARSET_ALT edited this session
+    char       filename[FILENAME_MAXLEN + 1]; // LOCI base filename
 } AppState;
 
 extern AppState app;
@@ -452,8 +461,9 @@ main.c
  ├─ menu.h       (menu bar, pulldowns, popups, main-RAM window stack)
  │   └─ charsetswap.h (charsetswap_mark_changed/enter/exit)
  │       └─ charset.h (charset_address/save/load/rom_glyph, glyph-bitmap ops)
- ├─ menudata.h   (Screen/File/Charset/Information tables + Screen dispatch)
- │   └─ menu.h, canvas.h, statusbar.h, strings.h
+ ├─ menudata.h   (Screen/File/Charset/Information tables + Screen/File/
+ │                Charset dispatch)
+ │   └─ menu.h, canvas.h, statusbar.h, strings.h, fileio.h
  ├─ editor.h     (main-mode loop)
  │   ├─ charsetedit.h (character editor popup)
  │   │   └─ charset.h (glyph addressing + bitmap transforms)
@@ -464,18 +474,25 @@ main.c
  │   └─ write.h        (Write mode: free-typing screencodes)
  └─ strings.h    (EN/FR localisation gateway -> strings_en.h/strings_fr.h, §3)
 
+menudata.c
+ └─ fileio.h  (LOCI file I/O: filename prompt, presence gate,
+               Screen/Combined/Project/Charset save/load, §6.14)
+      └─ loci.h (LOCI mass-storage API -- file I/O portion now wired in)
+      └─ canvas.h, charset.h, menu.h, menudata.h, statusbar.h
+
 statusbar.c, select.c, move.c, write.c
  └─ modes.h  (mode_name(): EditorMode -> MSG_MODE_* lookup, standalone)
 
 main.c, canvas.c, statusbar.c, menu.c, menudata.c, editor.c, charsetedit.c,
-charsetswap.c, select.c, move.c, write.c
+charsetswap.c, select.c, move.c, write.c, fileio.c
  └─ charwin.h  (windows, cursor, text input)
       └─ keyboard.h (raw key scan/decode)
  └─ oric.h     (hardware register layout, screen/attr/charset-bank constants)
 
 (dormant, not yet #included from src/ -- see §2.4)
-loci.h  -- LOCI mass-storage API
 ijk.h   -- VIA Port A joystick driver
+(loci.h's overlay-RAM portion -- enable_overlay_ram()/xram_* -- also still
+dormant; only the file-I/O portion is wired in, via fileio.h above)
 ```
 
 `charwin.h`, `keyboard.h`, `menu.h`, `menudata.h`, `canvas.h`, `statusbar.h`,
@@ -795,6 +812,42 @@ flag; any other printable key plots its screencode (`+0x80` if
 reverse-video) and advances right. `FUNCT+6` toggles the statusbar. ESC
 exits to Main.
 
+### 6.14 LOCI file I/O (`src/fileio.c`, File/Charset menus, Phase 6)
+
+`menu_run()`'s `switch` (§6.2) dispatches all 12 File (choices 21-26) and
+Charset (31-36) items here, replacing the `default:`-case "not yet
+implemented" popup those used to fall through to (Information, 41-42,
+still falls through — out of Phase 6's scope).
+
+Every entry point calls `loci_check_present()` first (`include/loci.h`'s
+`loci_present()`, a plain `*LOCI_SIGNATURE_ADDR == 'L'` read — always safe
+to call) and aborts with a graceful popup if absent, then
+`fileio_get_filename()` (a `cwin_textinput` popup, same pattern as
+`resize_dialog()`, §6.6) to get/confirm `app.filename`.
+
+- **Save/Load Screen**: `<name>.BIN` = `FileHeader` (magic + width/height)
+  + `screenmap[]`. **Save/Load Combined**: same header + `CHARSET_STD`'s
+  displayable range (768B) + `screenmap[]`. Both write/read each piece
+  directly from where it lives via `loci_open`+`loci_write`/`read`+
+  `loci_close` — no staging buffer (unlike V1, whose combined save relies
+  on `CHARSET_STD` and `SCREENMEMORY` being memory-adjacent in *V1's* map,
+  which doesn't hold for OSE).
+- **Save/Load Project**: V1's literal 4-file scheme — `<name>PJ.BIN`
+  (`ProjectHeader` metadata, via `file_save`/`file_load`'s single-blob
+  convenience wrapper), `<name>SC.BIN` (same shape as Screen),
+  `<name>CS.BIN`/`<name>CA.BIN` (768 raw bytes, written only if
+  `app.stdchanged`/`altchanged`, read only if present).
+- `AppState` gained `stdchanged`/`altchanged`, set in `charsetedit.c`'s
+  `ce_snapshot()` (§6.4) based on `ce_altorstd`.
+- **Charset menu** Load/Save Standard/Alternate/Combined: Std/Alt are 768
+  raw bytes direct to/from `CHARSET_STD`/`CHARSET_ALT`'s displayable
+  range; Combined save = Save Std; Combined load writes into *both* banks
+  (`charset_load()`, §4.5) since the ROM call V1 used to regenerate Alt
+  from Std is a no-op on this runtime (§6.5).
+- Not testable headless beyond the LOCI-absent gate (`test_fileio_no_
+  loci.sh`, §7) — actual byte I/O needs real hardware, same constraint as
+  the colour picker.
+
 ---
 
 ## 7. Testing Infrastructure
@@ -805,7 +858,7 @@ Automated headless testing runs `build/oseloci.tap` under **Phosphoric**
 screen-content assertions via `tests/scripts/oric_screen.py`).
 
 ```
-make test                  # full suite (all 12 targets below)
+make test                  # full suite (all 13 targets below)
 make test-boot              # headless boot smoke test: splash + canvas/statusbar render
 make test-menus              # menu bar/pulldown/Screen-menu regression
 make test-screenresize        # Screen > Width/Height resize + shrink-confirm
@@ -818,6 +871,7 @@ make test-linebox                     # Line/Box mode: rect-grow, ENTER fills, E
 make test-select                       # Select mode: rect-grow, d/i/p/m fill actions, ESC paths (Phase 5c)
 make test-move                          # Move mode: content nudge, ENTER/ESC both keep the shift (Phase 5d)
 make test-writemode                      # Write mode: typing+advance, FUNCT+1/2/3 (Phase 5e)
+make test-fileio-no-loci                  # all 12 File/Charset items show the LOCI-absent popup (Phase 6)
 make test-capture CYCLES=N TYPEKEYS='...'  # calibration helper for new scripts
 ```
 
@@ -827,18 +881,24 @@ make test-capture CYCLES=N TYPEKEYS='...'  # calibration helper for new scripts
 - `tests/scripts/oric_screen.py` decodes the 40x28 `$BB80` text screen from a
   `--dump-ram-at` dump, providing `--find`/`--row`/`--bytes` assertions used
   by the shell scripts in `tests/scripts/test_*.sh`.
-- Current totals: 5+15+8+2+12+14+14+2+6+10+4+6 = **98/98** (`test-boot` +
+- Current totals: 5+15+8+2+12+14+14+2+6+10+4+6+12 = **110/110** (`test-boot` +
   `test-menus` + `test-screenresize` + `test-charsetram-spike` +
   `test-charsetedit` + `test-palette` + `test-colourpicker` +
   `test-cursor-autoscroll` + `test-linebox` + `test-select` + `test-move` +
-  `test-writemode`).
+  `test-writemode` + `test-fileio-no-loci`).
 - Write mode's `CTRL+letter` toggles and `DEL` have no automated coverage:
   Phosphoric's `--type-keys` has no CTRL-modifier escape and `DEL` (0x7F) is
   unmapped in its `char_map` — covered by manual walkthrough + code review
   instead (see CLAUDE.md's Write mode section).
-- LOCI/overlay-RAM features (§2.4) are not yet present, so nothing here
-  exercises them; once wired in, those features will need real-hardware
-  verification (Phosphoric/Oricutron cannot emulate overlay RAM).
+- LOCI's actual file I/O (the byte-level load/save traffic, not just the
+  presence gate) has no automated coverage either, for the same reason:
+  Phosphoric/Oricutron cannot emulate a LOCI device. `test-fileio-no-loci`
+  only confirms the graceful absent-path; real load/save needs a
+  **real-hardware** walkthrough (see the Phase 6 plan), same constraint as
+  the colour picker's hardware-rendering issue.
+- The overlay-RAM portion of `loci.h` (§2.4) is not yet wired in, so
+  nothing here exercises it; once it is (Phase 8), it will need the same
+  real-hardware verification.
 
 ---
 

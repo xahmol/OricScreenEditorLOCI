@@ -18,21 +18,22 @@ storage device**.
 - Enhanced palette mode that also shows the inverse colour combinations for
   each ink/paper pair
 
-**Status: Phase 5 of 9 complete**, plus charset-swap infrastructure, a narrow
+**Status: Phase 6 of 9 complete**, plus charset-swap infrastructure, a narrow
 charset-editor popup, palette mode, the colour picker, Select/Move/Line-Box/
 Write modes, the `G`/`I`/`O`/`U`/`R` main-mode keys, a cursor-auto-scroll fix
-for oversized canvases, the main-mode attribute-selection keys, a redesigned
-statusbar, and EN/FR localisation (canvas data model + minimal main mode +
-menu bar/Screen menu + character editor + charset-swap mechanism + palette/
-colour-picker popups + Select/Move/Line-Box/Write modes + Phosphoric test
-harness; binary 17288 bytes EN / 17341 bytes FR).
+for oversized canvases, LOCI file I/O (File and Charset menus), the
+main-mode attribute-selection keys, a redesigned statusbar, and EN/FR
+localisation (canvas data model + minimal main mode + menu bar/Screen menu
++ character editor + charset-swap mechanism + palette/colour-picker popups
++ Select/Move/Line-Box/Write modes + LOCI file I/O + Phosphoric test
+harness; binary 21181 bytes EN / 21304 bytes FR).
 A previous CC65-based attempt at this got stuck and is archived
 in the `nonworkingcc65` branch (full history + uncommitted state). `main` was
 restarted from scratch on the Oscar64 native/bare-metal build chain developed
 for [locifilemanager-v2](https://github.com/xahmol/locifilemanager-v2)
 (`/home/xahmol/git/locifilemanager-v2`), which the runtime and libraries below
-were copied from verbatim. The remaining 4 phases (LOCI file I/O, file
-picker, overlay-RAM undo incl. Select mode's deferred cut/copy, IJK/help/
+were copied from verbatim. The remaining 3 phases (file picker, overlay-RAM
+undo incl. Select mode's deferred cut/copy, IJK/help/
 polish) are tracked in the active plan — see
 `~/.claude/plans/snappy-beaming-lynx.md` or ask Claude for status.
 
@@ -409,6 +410,66 @@ of copying the bug. `i`/`o`/`u` plot `plotink`/`16+plotpaper`/the
 modifier-attribute byte at the cursor and move down one row (auto-scrolling
 if needed). `r` toggles reverse-video on `plotscreencode` (XOR 0x80).
 
+### LOCI file I/O (Phase 6)
+
+`src/fileio.c/h` wires `include/loci.c/h` (copied verbatim from
+locifilemanager-v2, see "Source Layout" — never `#include`d from any
+`src/` file before this phase) into the File and Charset menus, which
+previously showed "not yet implemented" for every item. Calling-convention
+reference: locifilemanager-v2's `loci_present()`/`file_save()`/
+`file_load()` usage (`src/dir.c` `config_save()`/`config_load()` there).
+
+- **LOCI stays optional, checked per-action** — `loci_check_present()`
+  wraps `loci_present()` with a graceful `MSG_LOCI_NOT_FOUND` popup, called
+  first by every File/Charset action. Unlike locifilemanager-v2 (which
+  requires LOCI to even boot), OSE keeps editing — and Phosphoric/Oricutron
+  testing of everything except the file I/O itself — working with no LOCI
+  device attached. `loci_present()` is a simple memory read (`*LOCI_
+  SIGNATURE_ADDR == 'L'`, `include/loci.c`), so this gate is always safe to
+  call regardless of whether a device is present.
+- **File > Save/Load Screen**: `<name>.BIN`, a 6-byte `FileHeader` (magic +
+  `canvas_width`/`height`) followed by `screenmap[]`. No charset data.
+- **File > Save/Load Combined**: `<name>.BIN`, the same header followed by
+  `CHARSET_STD`'s displayable glyph range (768 bytes) then `screenmap[]`.
+  Both this and Screen write each piece directly from where it already
+  lives (`screenmap[]`, charset RAM) via `loci_open()`+sequential
+  `loci_write()`+`loci_close()` — **no staging buffer**, unlike V1, whose
+  "combined" save works only because `CHARSET_STD` happens to sit directly
+  before `SCREENMEMORY` in *V1's* CC65 memory map (letting it treat both as
+  one contiguous span); OSE's `CHARSET_STD` ($B400) and `screenmap[]`
+  (`$0580-$B1FF` somewhere) aren't adjacent, and `screenmap[]` is
+  variable-size now where V1's was fixed.
+- **File > Save/Load Project**: V1's literal 4-file scheme — `<name>PJ.BIN`
+  (a `ProjectHeader` metadata struct: canvas size, cursor/viewport, plot*
+  attributes, `stdchanged`/`altchanged`, via `file_save()`/`file_load()`'s
+  single-contiguous-blob convenience wrapper), `<name>SC.BIN` (same shape
+  as Screen), and `<name>CS.BIN`/`<name>CA.BIN` (768 raw bytes each,
+  written only if that charset was edited this session, read only if
+  present — a missing file leaves that bank untouched, matching V1).
+- **`AppState` gains `stdchanged`/`altchanged`** (0/1, mirroring V1's
+  `charsetchanged[2]`), set from `charsetedit.c`'s `ce_snapshot()` — the
+  existing chokepoint called before every destructive glyph edit, based on
+  `ce_altorstd` — so Project save knows which charset file(s) to write.
+- **Charset menu Load/Save Standard/Alternate/Combined** (`altorstd`
+  0/1/2, matching V1's `stdoralt` exactly): Std/Alt read/write 768 raw
+  bytes directly from/to `CHARSET_STD`/`CHARSET_ALT`'s displayable range.
+  **Combined save is identical to Save Std** (`CHARSET_STD`'s range is the
+  only source there is to save); **combined load writes into both**
+  `CHARSET_STD` and `CHARSET_ALT` (`charset_load()`, `include/charset.h`)
+  — the closest available equivalent to V1's intent, since V1's ROM call
+  to regenerate Alt from Std (`jsr $F816`) is a no-op on this runtime (see
+  "Charset-swap mechanism" below).
+- **Filenames are typed, not browsed**: `fileio_get_filename()` is a popup
+  reusing `resize_dialog()`'s `cwin_textinput` pattern, persisting
+  `app.filename` (new `AppState` field) across calls as the next prompt's
+  default. A real file-browsing picker is Phase 7's job.
+- **Not testable headless beyond the LOCI-absent path**: Phosphoric/
+  Oricutron can't emulate a LOCI device, so the actual load/save byte
+  traffic needs a **real-hardware** walkthrough (same constraint as the
+  colour-picker hardware-rendering issue) — only `tests/scripts/
+  test_fileio_no_loci.sh` (confirming all 12 File/Charset items correctly
+  show `MSG_LOCI_NOT_FOUND` and return cleanly) is automated.
+
 ### Charset-swap mechanism
 
 `src/charsetswap.c/h` + `include/charset.c/h` ensure popup chrome (menu bar,
@@ -502,8 +563,8 @@ make docs         # regenerate README.pdf from README.md (requires pandoc)
 make test         # full automated Phosphoric test suite (test-boot, test-menus,
                   # test-screenresize, test-charsetram-spike, test-charsetedit,
                   # test-palette, test-colourpicker, test-cursor-autoscroll,
-                  # test-linebox, test-select, test-move, test-writemode) --
-                  # EN only, see "Localisation" below
+                  # test-linebox, test-select, test-move, test-writemode,
+                  # test-fileio-no-loci) -- EN only, see "Localisation" below
 make test-boot    # headless boot smoke test (splash + canvas/statusbar render)
 make test-capture CYCLES=N TYPEKEYS='...'
                   # calibration helper: dumps tests/out/capture.bin + .png
@@ -581,8 +642,14 @@ src/
   write.c/h       Write mode ('w'): free-typing screencodes with CTRL-key
                   attribute toggles (see "Write mode (Phase 5e)")
   menu.c/h        Menu bar/pulldown/popup engine + main-RAM window-save stack
-  menudata.c/h    OSE menu tables (Screen/File/Charset/Information) + Screen
-                  pulldown dispatch (Width/Height/Clear/Fill)
+  menudata.c/h    OSE menu tables (Screen/File/Charset/Information) + Screen/
+                  File/Charset pulldown dispatch (Width/Height/Clear/Fill,
+                  Save/Load Screen/Project/Combined, Charset Load/Save
+                  Std/Alt/Combined)
+  fileio.c/h      LOCI file I/O backing the File/Charset menus: filename
+                  prompt, LOCI-presence gate, Screen/Combined/Project
+                  save/load, Charset Std/Alt/Combined save/load (see "LOCI
+                  file I/O (Phase 6)")
   charsetedit.c/h Character editor popup: edits the 6x8 glyph for
                   app.plotscreencode/app.plotaltchar directly in live charset
                   RAM (Strategy A -- see "Character editor (Phase 3)")

@@ -267,47 +267,54 @@ Comme pour Clear, mais cette option remplit la zone de dessin avec le code écra
 
 ![Menu Fichier](https://github.com/xahmol/OricScreenEditor/blob/main/screenshots/OSE%20filemenu.png?raw=true)
 
-En général : appuyer sur **ESC** dans une boîte de dialogue de saisie de nom de fichier annule l'opération sur le fichier. Des caractères génériques peuvent être utilisés dans les noms de fichiers pour le chargement : **\*** pour autoriser n'importe quoi après, **?** pour autoriser n'importe quel caractère à la position donnée.
+**Note OSE-LOCI** : cette réécriture utilise le **périphérique de stockage
+de masse LOCI** pour toutes les opérations sur fichiers, au lieu des
+commandes cassette de V1, et demande un nom de fichier saisi (24
+caractères maximum) plutôt que le sélecteur de fichiers/ID de périphérique
+de V1 -- un véritable navigateur de fichiers est prévu pour une version
+ultérieure. Si aucun périphérique LOCI n'est détecté, chaque option des
+menus Fichier/Charset affiche un message "Aucun LOCI detecte" au lieu de
+tenter l'opération, le reste de l'éditeur continuant à fonctionner
+normalement sans périphérique connecté.
 
-**NB : dans la version actuelle, la gestion des erreurs des opérations sur fichiers est médiocre. Par exemple, saisir un nom de fichier incorrect ou inexistant fait quitter le programme vers le BASIC, avec peu de possibilités de récupérer le travail non sauvegardé. Il est conseillé de sauvegarder souvent sur les versions en cours de développement.**
+*Save screen / Load screen (sauvegarder/charger l'écran)*
 
-*Save screen (sauvegarder l'écran)*
+Sauvegarde ou charge uniquement la zone de dessin (sans les jeux de
+caractères) dans/depuis `<nomfichier>.BIN` sur le périphérique LOCI : un
+petit en-tête enregistrant la largeur/hauteur de la zone de dessin, suivi
+des données d'écran. Le chargement applique automatiquement la largeur/
+hauteur sauvegardée -- aucune saisie séparée n'est nécessaire.
 
-Cette option sauvegarde la zone de dessin actuelle sur le disque. Le nom de fichier est demandé (9 caractères maximum).
+*Save project / Load project (sauvegarder/charger le projet)*
 
-En cas d'erreur fichier, une fenêtre apparaît avec le numéro d'erreur.
+Sauvegarde ou charge la zone de dessin avec ses métadonnées (position du
+curseur, fenêtre visible, sélection encre/papier/clignotement/double
+hauteur/jeu alternatif) et, si vous les avez modifiés pendant la session,
+les deux jeux de caractères -- sous la forme de jusqu'à quatre fichiers
+partageant le nom saisi : `<nomfichier>PJ.BIN` (métadonnées),
+`<nomfichier>SC.BIN` (écran), `<nomfichier>CS.BIN` (jeu standard, écrit/
+attendu uniquement si vous l'avez modifié) et `<nomfichier>CA.BIN` (jeu
+alternatif, même condition). Charger un projet sauvegardé avec un seul jeu
+modifié laisse l'autre jeu inchangé (tel qu'il était avant le chargement).
 
-![Save screen](https://github.com/xahmol/OricScreenEditor/blob/main/screenshots/OSE%20File%20menu%20-%20save.png?raw=true)
+*Save combined / Load combined (sauvegarder/charger combiné)*
 
-*Load screen (charger l'écran)*
-
-Cette option permet de charger un écran depuis le disque. Le nom de fichier à charger peut être sélectionné avec le sélecteur de fichiers affichant les fichiers du disque. En plus du nom de fichier, si la convention de nom est reconnue, le type de fichier est affiché pour référence. Après sélection du fichier, la largeur et la hauteur en caractères seront demandées, car elles ne peuvent pas être lues depuis un fichier d'écran standard.
-
-![Load screen](https://github.com/xahmol/OricScreenEditor/blob/main/screenshots/OSE%20File%20menu%20-%20filepicker.png?raw=true)
-
-*Save project (sauvegarder le projet)*
-
-Comme pour Save screen, mais cette option sauvegarde également les métadonnées de la zone de dessin (largeur, hauteur, position actuelle du curseur, etc.) et les jeux de caractères s'ils ont été modifiés. La longueur maximale du nom de fichier est maintenant de 10 caractères pour permettre un suffixe .xxxx, car jusqu'à quatre fichiers seront sauvegardés : nomfichier.proj pour les métadonnées, nomfichier.scrn pour les données d'écran, nomfichier.chr1 pour le jeu de caractères standard et nomfichier.chr2 pour le jeu alternatif.
-
-![Save project](https://github.com/xahmol/OricScreenEditor/blob/main/screenshots/OSE%20File%20menu%20-%20projsave.png?raw=true)
-
-*Load project (charger le projet)*
-Charge un projet : les métadonnées, l'écran et les jeux de caractères. Fournissez le nom de fichier avec le sélecteur de fichiers (comme pour Load Screen). Une fenêtre apparaît si le nom de fichier sélectionné ne respecte pas la convention de nommage d'un projet (le nom de fichier doit se terminer par PJ). Comme la largeur et la hauteur de la zone de dessin sont maintenant lues depuis les métadonnées, aucune saisie de taille n'est nécessaire.
-
-*Save combined (sauvegarder combiné)*
-
-Cette option sauvegarde la zone de dessin et les jeux de caractères actuels dans un seul fichier sur le disque (les 768 premiers octets du jeu standard, 256 octets d'espace vide (les 32 premières positions non visibles du jeu alternatif), puis 640 octets du jeu alternatif visible, et enfin le plan d'écran). N'a de sens que pour les écrans standards 40x27, avec l'avantage qu'ils peuvent être chargés en une seule fois avec $B500 comme adresse de base. Pour le reste, le dialogue est exactement identique à Save Screen.
-
-*Load combined (charger combiné)*
-
-Cette option charge la zone de dessin et les jeux de caractères actuels depuis un seul fichier sur le disque (les 768 premiers octets du jeu standard, 256 octets d'espace vide (les 32 premières positions non visibles du jeu alternatif), puis 640 octets du jeu alternatif visible, et enfin le plan d'écran). Pour le reste, le dialogue est exactement identique à Save Screen.
+Sauvegarde ou charge la zone de dessin avec le jeu de caractères standard
+dans un seul fichier `<nomfichier>.BIN` (en-tête + les 768 octets du jeu
+standard + les données d'écran).
 
 **_Charset : charger et sauvegarder le jeu de caractères_**
 
 ![Menu Charset](https://github.com/xahmol/OricScreenEditor/blob/main/screenshots/OSE%20charsetmenu.png?raw=true)
 
-Dans ce menu, vous pouvez sélectionner les options pour charger ou sauvegarder les jeux de caractères, soit séparément pour le jeu standard ou le jeu alternatif (fichiers de 768 resp. 640 octets), soit sous forme de fichier combiné pour les deux jeux (768 octets pour le jeu standard, 256 octets d'espace vide, 640 octets pour le jeu alternatif).
-Le dialogue de ces options est similaire aux options de sauvegarde et chargement d'écran : saisissez l'ID du périphérique et le nom de fichier.
+Chargez ou sauvegardez le jeu standard ou alternatif séparément (768
+octets chacun, `<nomfichier>.BIN`), ou "combiné" : sauvegarder en combiné
+est identique à sauvegarder le jeu standard ; charger en combiné charge le
+fichier dans **les deux** jeux standard et alternatif, qui deviennent donc
+identiques. (Ceci diffère de V1, qui utilisait un appel ROM pour régénérer
+le jeu alternatif à partir du standard au chargement -- cet appel ROM ne
+fonctionne pas dans cette réécriture, donc copier les mêmes données dans
+les deux jeux est l'équivalent le plus proche disponible.)
 
 **_Information : informations de version, quitter le programme_**
 
