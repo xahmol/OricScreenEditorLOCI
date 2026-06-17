@@ -61,19 +61,19 @@ void editor_run(void)
         switch (c)
         {
         case KEY_UP:
-            if (app.cursor_y > 0) app.cursor_y--;
+            cursor_move_scroll(0, -1);
             break;
 
         case KEY_DOWN:
-            if (app.cursor_y < VIEWPORT_HEIGHT - 1) app.cursor_y++;
+            cursor_move_scroll(0, 1);
             break;
 
         case KEY_LEFT:
-            if (app.cursor_x > 0) app.cursor_x--;
+            cursor_move_scroll(-1, 0);
             break;
 
         case KEY_RIGHT:
-            if (app.cursor_x < VIEWPORT_WIDTH - 1) app.cursor_x++;
+            cursor_move_scroll(1, 0);
             break;
 
         case KEY_SPACE:

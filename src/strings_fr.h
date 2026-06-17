@@ -102,8 +102,17 @@
 #define MSG_COLOURPICKER_RESULT    "Result:"
 
 // ── Status bar (src/statusbar.c) ────────────────────────────────────────────
-// "Princ." (Principal) replaces "Main", same 10-column field width (36-col
-// layout -- see strings_en.h for the full column breakdown).
-#define MSG_STATUSBAR_MAIN_FMT  "Princ.    XY%2u,%2uC%02x  S%02xI%u  P%u  %c%c%c"
+// Mode name (cols 0-9) is written separately and blank-padded -- see
+// strings_en.h for the full column breakdown.
+#define MSG_STATUSBAR_MAIN_FMT  "XY%2u,%2uC%02x  S%02xI%u  P%u  %c%c%c"
+
+// ── Mode names (src/editor.c mode_name(), statusbar Mode field) ────────────
+// All <=10 chars (the field width), no accented characters (see CLAUDE.md
+// "Localisation").
+#define MSG_MODE_MAIN     "Princ."
+#define MSG_MODE_WRITE    "Ecrire"
+#define MSG_MODE_SELECT   "Select"
+#define MSG_MODE_MOVE     "Deplacer"
+#define MSG_MODE_LINEBOX  "Ligne/Bte"
 
 #endif // STRINGS_FR_H

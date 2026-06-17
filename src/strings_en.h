@@ -93,9 +93,18 @@
 #define MSG_COLOURPICKER_RESULT    "Result:"
 
 // ── Status bar (src/statusbar.c) ────────────────────────────────────────────
-// 36-col layout: "Main"+6sp, "XY"+cursor x,y, "C"+plotscreencode hex (+glyph
-// at col 20), "S"+screencode under cursor, "I"+plotink (+swatch), "P"+
-// plotpaper (+swatch), then altchar/double/blink flag chars.
-#define MSG_STATUSBAR_MAIN_FMT  "Main      XY%2u,%2uC%02x  S%02xI%u  P%u  %c%c%c"
+// 36-col layout: mode name (cols 0-9, written separately and blank-padded --
+// _cwin_vformat's %s has no width/left-pad support, see modes.h/mode_name()),
+// "XY"+cursor x,y, "C"+plotscreencode hex (+glyph at col 20), "S"+screencode
+// under cursor, "I"+plotink (+swatch), "P"+plotpaper (+swatch), then
+// altchar/double/blink flag chars.
+#define MSG_STATUSBAR_MAIN_FMT  "XY%2u,%2uC%02x  S%02xI%u  P%u  %c%c%c"
+
+// ── Mode names (src/editor.c mode_name(), statusbar Mode field) ────────────
+#define MSG_MODE_MAIN     "Main"
+#define MSG_MODE_WRITE    "Write"
+#define MSG_MODE_SELECT   "Select"
+#define MSG_MODE_MOVE     "Move"
+#define MSG_MODE_LINEBOX  "Line/Box"
 
 #endif // STRINGS_EN_H

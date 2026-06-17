@@ -111,6 +111,43 @@ void canvas_cell_invert(uint16_t x, uint16_t y)
 }
 
 /**
+ * Move app.cursor_x/cursor_y by one cell in the given direction (exactly
+ * one of dx/dy non-zero, the other 0). At a viewport edge on a canvas
+ * larger than the viewport, scrolls app.xoffset/yoffset instead of moving
+ * the cursor (and re-blits), so every cell of an oversized canvas stays
+ * reachable -- ported from V1's cursormove()/plotmove(), adapted to OSE's
+ * pure-software canvas_blit() (no hardware-scroll patch step needed).
+ *
+ * @param dx -1/0/+1 horizontal direction.
+ * @param dy -1/0/+1 vertical direction.
+ * @return (none)
+ */
+void cursor_move_scroll(int8_t dx, int8_t dy)
+{
+    if (dx < 0)
+    {
+        if (app.cursor_x > 0) app.cursor_x--;
+        else if (app.xoffset > 0) { app.xoffset--; canvas_blit(); }
+    }
+    else if (dx > 0)
+    {
+        if (app.cursor_x < VIEWPORT_WIDTH - 1) app.cursor_x++;
+        else if (app.xoffset + VIEWPORT_WIDTH < app.canvas_width) { app.xoffset++; canvas_blit(); }
+    }
+
+    if (dy < 0)
+    {
+        if (app.cursor_y > 0) app.cursor_y--;
+        else if (app.yoffset > 0) { app.yoffset--; canvas_blit(); }
+    }
+    else if (dy > 0)
+    {
+        if (app.cursor_y < VIEWPORT_HEIGHT - 1) app.cursor_y++;
+        else if (app.yoffset + VIEWPORT_HEIGHT < app.canvas_height) { app.yoffset++; canvas_blit(); }
+    }
+}
+
+/**
  * Resize the canvas to neww x newh cells, reflowing existing rows in place
  * via canvas_rowbuf[] when the width changes. Growing height just blanks the
  * new rows (row stride doesn't change); shrinking height needs no data

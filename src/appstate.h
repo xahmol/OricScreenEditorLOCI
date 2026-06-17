@@ -20,7 +20,11 @@
 #define FAVOURITES_COUNT 10
 
 typedef enum {
-    MODE_MAIN = 0
+    MODE_MAIN = 0,
+    MODE_WRITE,
+    MODE_SELECT,
+    MODE_MOVE,
+    MODE_LINEBOX
 } EditorMode;
 
 typedef struct {
