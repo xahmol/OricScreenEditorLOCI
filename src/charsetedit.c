@@ -98,9 +98,11 @@ static uint8_t ce_max_code(void)
 
 /**
  * Snapshot the current glyph into ce_undo[] (call before any destructive
- * edit, so 'z' can restore it) and mark the charset as user-edited via
- * charsetswap_mark_changed(), so future popups back up/restore CHARSET_STD
- * around themselves (see charsetswap.h).
+ * edit, so 'z' can restore it), mark the charset as user-edited via
+ * charsetswap_mark_changed() (so future popups back up/restore CHARSET_STD
+ * around themselves, see charsetswap.h), and set app.stdchanged/altchanged
+ * (so File > Save Project, src/fileio.c, knows which charset file(s) to
+ * write).
  *
  * @return (none)
  */
@@ -109,6 +111,7 @@ static void ce_snapshot(void)
     volatile uint8_t *g = ce_glyph();
     uint8_t y;
     charsetswap_mark_changed();
+    if (ce_altorstd) app.altchanged = 1; else app.stdchanged = 1;
     for (y = 0; y < CHAREDIT_GRID_H; y++) ce_undo[y] = g[y];
 }
 

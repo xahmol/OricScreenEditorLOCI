@@ -46,6 +46,9 @@
 #define MSG_FILE_SAVE_COMBINED  "Sauver combine"
 #define MSG_FILE_LOAD_COMBINED  "Charger combine"
 
+// ── File I/O popup (src/fileio.c) ───────────────────────────────────────────
+#define MSG_FILE_PROMPT_FILENAME  "Entrer nom de fichier:"
+
 // ── Pulldown 2 -- Charset / Caracteres ───────────────────────────────────────
 #define MSG_CHARSET_LOAD_STD       "Charger standard"
 #define MSG_CHARSET_LOAD_ALT       "Charger alterne"

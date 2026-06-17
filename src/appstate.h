@@ -19,6 +19,11 @@
 // Character editor favourites (0-9 select, SHIFT+0-9 store).
 #define FAVOURITES_COUNT 10
 
+// LOCI file-I/O base filename, persisted across File/Charset menu actions
+// as the next prompt's default. LociDirent.d_name (include/loci.h) is 64
+// bytes; 24 leaves comfortable room for the longest suffix ("CA.BIN" = 6).
+#define FILENAME_MAXLEN 24
+
 typedef enum {
     MODE_MAIN = 0,
     MODE_WRITE,
@@ -44,6 +49,9 @@ typedef struct {
     uint8_t    favourites[FAVOURITES_COUNT]; // character-editor favourite screencodes
     EditorMode mode;
     uint8_t    showstatusbar;
+    uint8_t    stdchanged;      // 0/1, CHARSET_STD edited this session (charsetedit.c)
+    uint8_t    altchanged;      // 0/1, CHARSET_ALT edited this session (charsetedit.c)
+    char       filename[FILENAME_MAXLEN + 1]; // LOCI base filename (src/fileio.c)
 } AppState;
 
 extern AppState app;

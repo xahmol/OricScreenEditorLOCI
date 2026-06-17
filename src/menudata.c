@@ -15,6 +15,7 @@
 #include "strings.h"
 #include "menu.h"
 #include "menudata.h"
+#include "fileio.h"
 
 // -------------------------------------------------------------------------
 // Menu bar and pulldown tables

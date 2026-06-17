@@ -53,6 +53,9 @@ void editor_run(void)
     for (i = 0; i < FAVOURITES_COUNT; i++) app.favourites[i] = 33; // '!'
     app.mode = MODE_MAIN;
     app.showstatusbar = 1;
+    app.stdchanged = 0;
+    app.altchanged = 0;
+    app.filename[0] = '\0';
 
     canvas_blit();
     statusbar_draw();

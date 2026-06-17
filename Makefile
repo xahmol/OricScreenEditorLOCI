@@ -126,6 +126,8 @@ MAIN_SRCS = \
   src/move.h            \
   src/write.c           \
   src/write.h           \
+  src/fileio.c          \
+  src/fileio.h          \
   src/strings.h         \
   src/strings_en.h      \
   src/strings_fr.h      \
