@@ -10,6 +10,7 @@
 #include "palette.h"
 #include "colourpicker.h"
 #include "select.h"
+#include "move.h"
 #include "editor.h"
 
 #define PLOT_MIN 0x20
@@ -165,6 +166,10 @@ void editor_run(void)
 
         case 's':
             select_run();
+            break;
+
+        case 'm':
+            move_run();
             break;
 
         default:
