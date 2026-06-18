@@ -15,6 +15,7 @@
 #include "appstate.h"
 #include "canvas.h"
 #include "statusbar.h"
+#include "undo.h"
 #include "write.h"
 
 /**
@@ -78,16 +79,19 @@ void write_run(void)
             break;
 
         case KEY_F1:
+            undo_snapshot(app.cursor_x + app.xoffset, app.cursor_y + app.yoffset, 1, 1);
             canvas_put(app.cursor_x + app.xoffset, app.cursor_y + app.yoffset, app.plotink);
             cursor_move_scroll(1, 0);
             break;
 
         case KEY_F2:
+            undo_snapshot(app.cursor_x + app.xoffset, app.cursor_y + app.yoffset, 1, 1);
             canvas_put(app.cursor_x + app.xoffset, app.cursor_y + app.yoffset, (uint8_t)(16 + app.plotpaper));
             cursor_move_scroll(1, 0);
             break;
 
         case KEY_F3:
+            undo_snapshot(app.cursor_x + app.xoffset, app.cursor_y + app.yoffset, 1, 1);
             canvas_put(app.cursor_x + app.xoffset, app.cursor_y + app.yoffset,
                        (uint8_t)(8 | (app.plotaltchar ? 1 : 0)
                                    | (app.plotdouble  ? 2 : 0)
@@ -96,6 +100,7 @@ void write_run(void)
             break;
 
         case KEY_DEL:
+            undo_snapshot(app.cursor_x + app.xoffset, app.cursor_y + app.yoffset, 1, 1);
             canvas_put(app.cursor_x + app.xoffset, app.cursor_y + app.yoffset, CH_SPACE);
             break;
 
@@ -110,6 +115,7 @@ void write_run(void)
         default:
             if (key >= 0x20 && key <= 0x7E)
             {
+                undo_snapshot(app.cursor_x + app.xoffset, app.cursor_y + app.yoffset, 1, 1);
                 canvas_put(app.cursor_x + app.xoffset, app.cursor_y + app.yoffset,
                            (uint8_t)(key | (rvs ? 0x80 : 0)));
                 cursor_move_scroll(1, 0);

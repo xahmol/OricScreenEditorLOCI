@@ -16,6 +16,7 @@
 #include "menu.h"
 #include "menudata.h"
 #include "fileio.h"
+#include "undo.h"
 
 // -------------------------------------------------------------------------
 // Menu bar and pulldown tables
@@ -186,10 +187,12 @@ void menu_run(void)
             break;
 
         case 13:
+            undo_snapshot(0, 0, app.canvas_width, app.canvas_height);
             canvas_clear();
             break;
 
         case 14:
+            undo_snapshot(0, 0, app.canvas_width, app.canvas_height);
             canvas_fill(app.plotscreencode);
             break;
 

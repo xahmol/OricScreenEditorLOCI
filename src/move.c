@@ -28,6 +28,7 @@
 #include "appstate.h"
 #include "canvas.h"
 #include "statusbar.h"
+#include "undo.h"
 #include "move.h"
 
 /**
@@ -49,6 +50,8 @@ static void move_shift(int8_t dx, int8_t dy)
     uint16_t x, y;
     uint16_t x0 = app.xoffset, x1 = (uint16_t)(app.xoffset + VIEWPORT_WIDTH - 1);
     uint16_t y0 = app.yoffset, y1 = (uint16_t)(app.yoffset + VIEWPORT_HEIGHT - 1);
+
+    undo_snapshot(x0, y0, VIEWPORT_WIDTH, VIEWPORT_HEIGHT);
 
     if (dx > 0)
     {

@@ -24,6 +24,7 @@
 #include "appstate.h"
 #include "canvas.h"
 #include "statusbar.h"
+#include "undo.h"
 #include "select.h"
 
 // Selected/grown rectangle, in absolute canvas coordinates (inclusive
@@ -179,6 +180,8 @@ void linebox_run(void)
 
     if (!rect_select(1)) return;
 
+    undo_snapshot(select_startx, select_starty, select_width, select_height);
+
     for (y = select_starty; y < select_starty + select_height; y++)
         for (x = select_startx; x < select_startx + select_width; x++)
             canvas_put(x, y, app.plotscreencode);
@@ -236,6 +239,8 @@ void select_run(void)
                                  | (app.plotblink   ? 4 : 0));
         break;
     }
+
+    undo_snapshot(select_startx, select_starty, select_width, select_height);
 
     for (y = select_starty; y < select_starty + select_height; y++)
         for (x = select_startx; x < select_startx + select_width; x++)
