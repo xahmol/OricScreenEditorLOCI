@@ -17,7 +17,7 @@ local checkout at `/home/xahmol/git/OricScreenEditor`), restarted on the
 Oscar64 native/bare-metal build chain shared with
 [locifilemanager-v2](https://github.com/xahmol/locifilemanager-v2)
 (`/home/xahmol/git/locifilemanager-v2`), which this document's structure is
-adapted from. **OSE is mid-rewrite (Phase 7 of 9 complete)** — several
+adapted from. **OSE is mid-rewrite (Phase 8 of 9 complete)** — several
 sections below describe library code that is present (copied verbatim from
 locifilemanager-v2) but not yet wired into the application; these are marked
 explicitly.
@@ -88,7 +88,7 @@ locifilemanager-v2, copied verbatim.
 | `$0100–$01FF` | 256 B | 6502 hardware stack (`txs #$FF` at startup) |
 | `$0200–$02FF` | — | Oric ROM system variables (reserved, not used) |
 | `$0300–$030F` | 16 B | **VIA 6522** registers (§2.2) — used by `include/keyboard.c` |
-| `$0310–$04FF` | — | Remaining Oric ROM system variables, incl. `MICRODISCCFG` (`$0314`, Oric-side overlay-RAM enable, still dormant -- Phase 8) and the LOCI TAP/MIA register block, incl. `$0319` (`LOCI_SIGNATURE_ADDR`, `loci_present()`'s detection byte) -- `include/loci.c/h`'s file-I/O API (`src/fileio.c`, Phase 6) and LOCI-device XRAM API (`src/filepicker.c`, Phase 7 -- a different resource from the Oric-side overlay RAM above, see §2.4) are now compiled into OSE; only the Oric-side overlay-RAM portion remains dormant |
+| `$0310–$04FF` | — | Remaining Oric ROM system variables, incl. `MICRODISCCFG` (`$0314`, Oric-side overlay-RAM enable, now wired in -- Phase 8, `src/undo.c`) and the LOCI TAP/MIA register block, incl. `$0319` (`LOCI_SIGNATURE_ADDR`, `loci_present()`'s detection byte) -- `include/loci.c/h`'s file-I/O API (`src/fileio.c`, Phase 6), LOCI-device XRAM API (`src/filepicker.c`, Phase 7 -- a different resource from the Oric-side overlay RAM, see §2.4), and Oric-side overlay-RAM API (`src/undo.c`, Phase 8) are all now compiled into OSE |
 | `$0500–$057F` | 128 B | **Startup region** — tape entry point jumps into `oric_startup` |
 | `$0580–$B1FF` | ~42.4 KB | **Program region** — code, data, BSS, heap |
 | `$B200–$B3FF` | 512 B | **Software stack** (`#pragma stacksize(0x0200)`) |
@@ -142,21 +142,22 @@ scroll_down/rotate_left/rotate_right`) over this layout — see §4.5 and §6.4.
 `include/loci.h/c` (LOCI mass-storage MIA/TAP/XRAM/file/dir/mount/overlay-RAM
 API) and `include/ijk.h/c` (Raxiss IJK joystick driver, VIA Port A) were
 copied verbatim from locifilemanager-v2 as part of the Oscar64 scaffold
-restart. **`loci.h/c` is now wired in**: `loci_present()`/`loci_open/close/
-read/write()`/`file_save()`/`file_load()` (Phase 6, `src/fileio.c/h` — see
-§6.14) back the File/Charset menus, and `xram_peek/poke/memcpy_to/
-memcpy_from()` (Phase 7, `src/filepicker.c/h` — see §6.15) back the
-LOCI directory browser. **Important distinction**: XRAM is RAM *on the
-LOCI device itself* — a completely different resource from the
-Oric-side bank-switched overlay RAM ($C000-$FFFF) `enable_overlay_ram()`/
-`disable_overlay_ram()` control, which **remains dormant** (Phase 8,
-overlay-RAM undo) — XRAM access needs no Oric memory banking and has no
-dependency on Phase 8 (an earlier draft of the Phase 7 plan conflated the
-two; corrected during implementation). `ijk.h/c` also remains dormant, for
-a later IJK-input phase — not `#include`d from any `src/` file yet. When
-overlay RAM is wired in, this section should gain its partition layout —
-see locifilemanager-v2's `ARCHITECTURE.md` §2.3-2.5 for the reference
-material to adapt.
+restart. **`loci.h/c` is now fully wired in**: `loci_present()`/
+`loci_open/close/read/write()`/`file_save()`/`file_load()` (Phase 6,
+`src/fileio.c/h` — see §6.14) back the File/Charset menus; `xram_peek/
+poke/memcpy_to/memcpy_from()` (Phase 7, `src/filepicker.c/h` — see §6.15)
+back the LOCI directory browser; and `enable_overlay_ram()`/
+`disable_overlay_ram()` (Phase 8, `src/undo.c/h` — see §6.16) back canvas
+undo/redo. **Important distinction**: XRAM is RAM *on the LOCI device
+itself* — a completely different resource from the Oric-side
+bank-switched overlay RAM ($C000-$FFFF) `enable_overlay_ram()`/
+`disable_overlay_ram()` control. XRAM access needs no Oric memory
+banking, so Phase 7 had no dependency on Phase 8 wiring up overlay RAM —
+an earlier draft of the Phase 7 plan conflated the two; corrected during
+implementation, and the same distinction came up again (and was corrected
+again) while planning Phase 8's undo eviction policy — see CLAUDE.md's
+"Canvas undo/redo (Phase 8)" section. `ijk.h/c` remains dormant, for a
+later IJK-input phase — not `#include`d from any `src/` file yet.
 
 ### 2.5 Interrupt policy
 
@@ -208,12 +209,15 @@ src/
   modes.h/c       EditorMode -> MSG_MODE_* display-name lookup
                   (mode_name()), shared by statusbar.c and any mode file
   select.c/h      Shared rectangle-grower (rect_select()) + Line/Box mode
-                  ('l') + Select mode ('s') (§6.9/§6.10/§6.11)
+                  ('l') + Select mode ('s', incl. x/c cut/copy)
+                  (§6.9/§6.10/§6.11/§6.17)
   move.c/h        Move mode ('m'): nudges visible canvas content (§6.12)
   write.c/h       Write mode ('w'): free-typing screencodes (§6.13)
   fileio.c/h      LOCI file I/O backing the File/Charset menus (§6.14)
   filepicker.c/h  XRAM-backed LOCI directory browser for every Load
                   action (§6.15)
+  undo.c/h        Canvas-edit undo/redo ('z'/'y'), overlay-RAM-backed
+                  dirty-rect ring buffer (§6.16)
   menu.c/h        Menu bar/pulldown/popup engine + main-RAM window-save stack
   menudata.c/h    OSE menu tables (Screen/File/Charset/Information) + Screen/
                   File/Charset pulldown dispatch
@@ -237,8 +241,10 @@ include/
   charwin.h/c     Character window / menu library (windows, viewports, text input)
   charset.h/c     Generic Oric charset-bank addressing/copy + glyph-bitmap transform
                   primitives (new to this project, not copied from locifilemanager-v2)
-  loci.h/c        LOCI mass-storage API -- file I/O wired in via src/fileio.c
-                  (§2.4/§6.14); overlay-RAM portion still dormant
+  loci.h/c        LOCI mass-storage API -- fully wired in: file I/O via
+                  src/fileio.c (§6.14), LOCI-device XRAM via
+                  src/filepicker.c (§6.15), Oric-side overlay RAM via
+                  src/undo.c (§6.16) -- see §2.4
   ijk.h/c         Raxiss IJK joystick driver -- present, not yet compiled in (§2.4)
 
 tools/
@@ -356,6 +362,9 @@ the palette/colour-picker popups, and the Phase 5 modes (§6.2, §6.7-§6.12).
 ```c
 extern uint8_t screenmap[CANVAS_MAX_SIZE];
 
+#define CANVAS_MAX_ROW 320
+extern uint8_t canvas_rowbuf[CANVAS_MAX_ROW];
+
 void canvas_init(void);
 void canvas_clear(void);
 void canvas_fill(uint8_t value);
@@ -377,6 +386,11 @@ attribute bytes the user places in columns 0-1 (§4.1).
 `canvas_resize(neww, newh)` validates `(new >= viewport min) && (neww*newh <=
 CANVAS_MAX_SIZE)` before reallocating the logical size (the physical array is
 always `CANVAS_MAX_SIZE` bytes).
+
+`canvas_rowbuf[]` (widest possible row) is `canvas_resize()`'s row-reflow
+scratch buffer, made non-`static` in Phase 8 so `select.c`'s cut/copy
+(§6.17) can reuse it for the same overlap-safety purpose -- the two uses
+are mutually exclusive in time, so sharing one 320-byte buffer is safe.
 
 `cursor_move_scroll(dx, dy)` (Phase 5) moves `app.cursor_x`/`cursor_y` by one
 cell, except at a viewport edge on a canvas larger than the viewport, where
@@ -477,10 +491,16 @@ main.c
  │   │   └─ charset.h (glyph addressing + bitmap transforms)
  │   ├─ palette.h     (palette popup: Fav/Std/Alt grid, visualchar[])
  │   ├─ colourpicker.h (colour picker popup: 8x8 ink x paper grid)
- │   ├─ select.h      (rect_select(), Line/Box + Select mode)
+ │   ├─ select.h      (rect_select(), Line/Box + Select mode, cut/copy)
  │   ├─ move.h         (Move mode: content nudge)
- │   └─ write.h        (Write mode: free-typing screencodes)
+ │   ├─ write.h        (Write mode: free-typing screencodes)
+ │   └─ undo.h          (undo/redo, §6.16)
+ │        └─ loci.h (enable_overlay_ram/disable_overlay_ram -- Oric-side
+ │                   overlay RAM, not LOCI-device XRAM, see §2.4)
  └─ strings.h    (EN/FR localisation gateway -> strings_en.h/strings_fr.h, §3)
+
+select.c, move.c, write.c, menudata.c
+ └─ undo.h (undo_snapshot() retrofitted into every destructive edit, §6.16)
 
 menudata.c
  └─ fileio.h  (LOCI file I/O: filename prompt (Save), presence gate,
@@ -578,6 +598,8 @@ for (;;) {
         case 's':       select_run();        // Select mode (Phase 5c, §6.10)
         case 'm':       move_run();          // Move mode (Phase 5d, §6.11)
         case 'w':       write_run();         // Write mode (Phase 5e, §6.12)
+        case 'z':       undo_perform();      // undo last canvas edit (Phase 8, §6.16)
+        case 'y':       redo_perform();      // redo last undone edit (Phase 8, §6.16)
     }
     statusbar_draw();
     canvas_cell_invert(cursor);              // show cursor at new pos
@@ -912,6 +934,69 @@ a Load action that already requires `loci_check_present()` to pass first,
 so `test_fileio_no_loci.sh`'s existing assertions already cover everything
 headless testing can reach here.
 
+### 6.16 Canvas undo/redo (`src/undo.c`, `z`/`y` in Main mode, Phase 8)
+
+Genuinely new functionality — V1 has no canvas-edit undo at all. A
+faithful port of vdcscreeneditor-v2's `undo_new()`/`undo_performundo()`/
+`undo_performredo()` (`/home/xahmol/VDCScreenEditor2/src/main.c`, lines
+739-905), adapted for OSE's single-plane canvas and **Oric-side overlay
+RAM** ($C000-$FFFF, `enable_overlay_ram()`/`disable_overlay_ram()`) — a
+different resource from §6.15's LOCI-device XRAM (see §2.4; this
+distinction was the subject of a planning correction, twice, during
+Phase 7 and again during Phase 8).
+
+A fixed 40-slot ring, each slot independently storing its own
+dirty-rectangle snapshot at its own byte offset in the 16KB region. The
+slot about to be overwritten *next* is invalidated immediately (a
+`valid` flag), so undo/redo always stops cleanly at the true edge of
+history. The byte bump-pointer only resets (taking the slot index with
+it) when the next snapshot would exceed the 16KB budget — a rare event —
+and even then, slots elsewhere in the ring keep their data until a later
+cycle's writes physically reach them, so history degrades gradually
+across a wrap rather than vanishing all at once. Redo data is reserved
+and stored alongside the original snapshot in the same slot;
+`undo_perform()` saves the *current* content into that reserved region
+before restoring the old content, mirroring vdcscreeneditor-v2's
+save-before-restore order.
+
+`undo_snapshot(x, y, w, h)` is called immediately before every
+destructive edit, retrofitted across `editor.c` (Main-mode `SPACE`/`DEL`/
+`i`/`o`/`u`), `select.c` (Line/Box and Select fills, cut/copy), `move.c`
+(per-shift, whole-viewport), `write.c` (every plotted/cleared cell), and
+`menudata.c` (Screen Clear/Fill, whole-canvas). No-ops if
+`!loci_present()` — undo is simply unavailable without a LOCI device.
+`undo_escapeundo()` (vdcscreeneditor-v2's mid-operation-cancel cleanup)
+has no OSE equivalent: every call site here snapshots only once an edit
+is actually about to commit, never speculatively before a cancellable
+step.
+
+Not testable headless beyond the LOCI-absent path (`test_undo_no_loci.sh`)
+— the actual snapshot/restore mechanism needs a real-hardware walkthrough.
+
+### 6.17 Select mode cut/copy (`src/select.c`, `x`/`c`, Phase 8)
+
+Completes V1's full Select prompt key set (`d`/`i`/`p`/`m`/`x`/`c`).
+Turned out not to need overlay RAM: V1's `selectmode()` cut/copy copies
+**one row at a time** through a single-row scratch buffer
+(`SCREENMEMORY`, a reuse of live screen RAM there), choosing row order by
+whether the destination is above or below the source. OSE's
+`canvas_rowbuf[]` (§4.3, already used by `canvas_resize()` for the same
+overlap-safety reason) serves the same role, exposed via `canvas.h`.
+`select_width` can never exceed `CANVAS_MAX_ROW` since `canvas_resize()`
+already bounds `app.canvas_width` — no V1-style explicit size cap needed.
+
+A destination-picking sub-loop (cursor keys, `ENTER` confirms, `ESC`
+cancels, its own cursor highlight) follows picking `x`/`c`; `MSG_SELECT_
+NOFIT` if the destination doesn't fit. `select_paste()` then runs the
+per-row copy (`memcpy` source row into `canvas_rowbuf`, `memset` to blank
+if cutting, `memcpy` into the destination row), in the direction that
+avoids self-overlap corruption. Cutting takes two `undo_snapshot()` calls
+(source + destination), so reverting a cut needs two `z` presses — a
+minor known wrinkle.
+
+Fully testable headless (`test_select_cutcopy.sh`) — no LOCI/overlay RAM
+involved at all.
+
 ---
 
 ## 7. Testing Infrastructure
@@ -936,6 +1021,8 @@ make test-select                       # Select mode: rect-grow, d/i/p/m fill ac
 make test-move                          # Move mode: content nudge, ENTER/ESC both keep the shift (Phase 5d)
 make test-writemode                      # Write mode: typing+advance, FUNCT+1/2/3 (Phase 5e)
 make test-fileio-no-loci                  # all 12 File/Charset items show the LOCI-absent popup (Phase 6)
+make test-select-cutcopy                   # Select x/c: copy/cut/no-fit/ESC (Phase 8c)
+make test-undo-no-loci                      # z/y are graceful no-ops with no LOCI (Phase 8)
 make test-capture CYCLES=N TYPEKEYS='...'  # calibration helper for new scripts
 ```
 
@@ -945,26 +1032,26 @@ make test-capture CYCLES=N TYPEKEYS='...'  # calibration helper for new scripts
 - `tests/scripts/oric_screen.py` decodes the 40x28 `$BB80` text screen from a
   `--dump-ram-at` dump, providing `--find`/`--row`/`--bytes` assertions used
   by the shell scripts in `tests/scripts/test_*.sh`.
-- Current totals: 5+15+8+2+12+14+14+2+6+10+4+6+12 = **110/110** (`test-boot` +
-  `test-menus` + `test-screenresize` + `test-charsetram-spike` +
-  `test-charsetedit` + `test-palette` + `test-colourpicker` +
-  `test-cursor-autoscroll` + `test-linebox` + `test-select` + `test-move` +
-  `test-writemode` + `test-fileio-no-loci`).
+- Current totals: 5+15+8+2+12+14+14+2+6+10+4+6+12+5+4 = **119/119**
+  (`test-boot` + `test-menus` + `test-screenresize` +
+  `test-charsetram-spike` + `test-charsetedit` + `test-palette` +
+  `test-colourpicker` + `test-cursor-autoscroll` + `test-linebox` +
+  `test-select` + `test-move` + `test-writemode` + `test-fileio-no-loci` +
+  `test-select-cutcopy` + `test-undo-no-loci`).
 - Write mode's `CTRL+letter` toggles and `DEL` have no automated coverage:
   Phosphoric's `--type-keys` has no CTRL-modifier escape and `DEL` (0x7F) is
   unmapped in its `char_map` — covered by manual walkthrough + code review
   instead (see CLAUDE.md's Write mode section).
 - LOCI's actual file I/O (the byte-level load/save traffic, not just the
-  presence gate) and the file picker's directory browsing (§6.15) have no
-  automated coverage either, for the same reason: Phosphoric/Oricutron
-  cannot emulate a LOCI device. `test-fileio-no-loci` only confirms the
-  graceful absent-path; real load/save/browsing needs a **real-hardware**
-  walkthrough (see the Phase 6/7 plans), same constraint as the colour
-  picker's hardware-rendering issue.
-- The Oric-side overlay RAM (§2.4, distinct from the LOCI-device XRAM
-  `src/filepicker.c` already uses) is not yet wired in, so nothing here
-  exercises it; once it is (Phase 8), it will need the same real-hardware
-  verification.
+  presence gate), the file picker's directory browsing (§6.15), and
+  canvas undo/redo's actual snapshot/restore (§6.16) have no automated
+  coverage either, for the same reason: Phosphoric/Oricutron cannot
+  emulate a LOCI device or Oric-side overlay RAM. The `*-no-loci` targets
+  only confirm the graceful absent-path; real load/save/browsing/undo
+  needs a **real-hardware** walkthrough (see the Phase 6/7/8 plans), same
+  constraint as the colour picker's hardware-rendering issue. Select
+  mode's cut/copy (§6.17) is the exception — fully covered headless, since
+  it needs neither LOCI nor overlay RAM.
 
 ---
 

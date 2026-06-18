@@ -140,6 +140,8 @@ Appuyez sur ces touches en mode principal pour l'édition :
 |**C**|Aller au sélecteur de couleurs ('**C**olour picker')
 |**T**|Mode d'essai (**T**ry)
 |**R**|Basculer '**R**everse' (vidéo inversée) : bascule l'augmentation/diminution du code écran de 128
+|**Z**|**OSE-LOCI uniquement :** Annuler la dernière modification de la zone de dessin
+|**Y**|**OSE-LOCI uniquement :** Rétablir la dernière modification annulée
 |**FUNCT+1**|Aller au menu principal
 |**FUNCT+6**|Basculer la visibilité de la barre d'état
 |**FUNCT+8**|Écran d'aide
@@ -190,6 +192,17 @@ Ceci ouvre le [mode édition de caractère](#éditeur-de-caractères) et commenc
 
 Appuyez sur **S** ([Mode sélection](#mode-sélection)), **M** ([Mode déplacement](#mode-déplacement)), **L** ([Mode ligne et boîte](#mode-ligne-et-boîte)) ou **W** ([Mode écriture](#mode-écriture)) pour entrer dans le mode d'édition correspondant.
 Référez-vous aux sections spécifiques de ce readme pour ces modes (cliquez sur les liens). Depuis tous les modes, revenez au mode principal en appuyant sur **ESC**.
+
+*Annuler et rétablir (OSE-LOCI uniquement)*
+
+Appuyez sur **Z** pour annuler la dernière modification de la zone de
+dessin (tracé, Ligne/Boîte, remplissages/couper/copier de Sélection,
+Déplacement, mode Écriture, ou Écran > Effacer/Remplir), et **Y** pour
+rétablir la dernière modification annulée. Cette fonction nécessite un
+périphérique LOCI connecté (l'historique d'annulation est stocké dans la
+RAM d'extension de l'Oric, que seul un périphérique LOCI peut activer) --
+sans périphérique, **Z**/**Y** ne font rien. Il n'existe pas d'équivalent
+de cette fonction dans V1.
 
 *Basculer la visibilité de la barre d'état*
 Appuyez sur **FUNCT+6** pour basculer entre la barre d'état visible (par défaut) ou non.
@@ -556,11 +569,12 @@ Appuyer sur **I**, **P** ou **M** remplit la zone avec, respectivement, la coule
 
 Quittez le mode sélection en appuyant sur **ESC**. Appuyer sur **FUNCT+8** à tout moment dans ce mode affiche un écran d'aide avec les commandes clavier de ce mode (impossible si la sélection a été agrandie mais pas encore acceptée).
 
-**Note OSE** : Couper (**X**) et Copier (**C**) ne sont pas encore implémentés
-dans cette réécriture basée sur LOCI -- ces fonctions sont reportées à une
-phase ultérieure qui ajoutera le stockage en RAM d'extension pour le
-presse-papiers. **D**, **I**, **P** et **M** sont entièrement implémentés
-comme décrit ci-dessus.
+**Note OSE** : Couper (**X**) et Copier (**C**) déplacent la sélection
+vers une nouvelle position choisie avec les touches curseur (**ENTER**
+pour confirmer, **ESC** pour annuler) -- Copier laisse l'original en
+place, Couper l'efface. Si la destination dépasse les limites de la zone
+de dessin, un message "Selection hors limites." apparaît et rien n'est
+modifié.
 
 ## Mode déplacement
 ([Retour au sommaire](#sommaire))

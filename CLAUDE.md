@@ -18,24 +18,25 @@ storage device**.
 - Enhanced palette mode that also shows the inverse colour combinations for
   each ink/paper pair
 
-**Status: Phase 7 of 9 complete**, plus charset-swap infrastructure, a narrow
+**Status: Phase 8 of 9 complete**, plus charset-swap infrastructure, a narrow
 charset-editor popup, palette mode, the colour picker, Select/Move/Line-Box/
 Write modes, the `G`/`I`/`O`/`U`/`R` main-mode keys, a cursor-auto-scroll fix
 for oversized canvases, LOCI file I/O (File and Charset menus) with a real
-XRAM-backed directory browser for every Load action, the main-mode
-attribute-selection keys, a redesigned statusbar, and EN/FR localisation
-(canvas data model + minimal main mode + menu bar/Screen menu + character
-editor + charset-swap mechanism + palette/colour-picker popups + Select/
-Move/Line-Box/Write modes + LOCI file I/O + file picker + Phosphoric test
-harness; binary 23997 bytes EN / 24120 bytes FR).
+XRAM-backed directory browser for every Load action, canvas-edit undo/redo
+(`z`/`y`) backed by Oric-side overlay RAM, Select mode cut/copy, the
+main-mode attribute-selection keys, a redesigned statusbar, and EN/FR
+localisation (canvas data model + minimal main mode + menu bar/Screen menu
++ character editor + charset-swap mechanism + palette/colour-picker popups
++ Select/Move/Line-Box/Write modes + LOCI file I/O + file picker + undo/
+redo + Select cut/copy + Phosphoric test harness; binary 26875 bytes EN /
+26960 bytes FR).
 A previous CC65-based attempt at this got stuck and is archived
 in the `nonworkingcc65` branch (full history + uncommitted state). `main` was
 restarted from scratch on the Oscar64 native/bare-metal build chain developed
 for [locifilemanager-v2](https://github.com/xahmol/locifilemanager-v2)
 (`/home/xahmol/git/locifilemanager-v2`), which the runtime and libraries below
-were copied from verbatim. The remaining 2 phases (overlay-RAM undo incl.
-Select mode's deferred cut/copy, IJK/help/
-polish) are tracked in the active plan — see
+were copied from verbatim. The remaining phase (IJK/help/
+polish) is tracked in the active plan — see
 `~/.claude/plans/snappy-beaming-lynx.md` or ask Claude for status.
 
 **Other docs**: `ARCHITECTURE.md` (memory map, module layout, dependency
@@ -343,9 +344,12 @@ bit-packing as `oric.h`'s `A_STD`(8)/`A_ALT`(9)/.../`A_BLINK2HALT`(15): base
 ESC at either the rect stage or the action prompt leaves the canvas
 unchanged.
 
-**Cut/copy (`x`/`c` in V1) are deferred to Phase 8** (confirmed with the
-user): V1's cut/copy uses a screen-RAM scratch buffer OSE has no safe
-equivalent for before overlay RAM is wired up.
+**Cut/copy (`x`/`c`)**: implemented in Phase 8 — see "Select mode cut/copy
+(Phase 8)" below. Turned out not to need overlay RAM at all (the original
+"deferred to Phase 8 because it needs overlay RAM" reasoning was based on
+a wrong assumption about V1's mechanism, corrected during Phase 8's
+research) — bundled into that phase anyway since it's the same "finish
+the deferred editing features" work as undo.
 
 ### Move mode (Phase 5d)
 
@@ -537,6 +541,106 @@ Save — browsing to pick a name to overwrite isn't the same UX problem).
   testing can reach here — the actual browsing needs the same
   real-hardware walkthrough as the rest of Phase 6's file I/O.
 
+### Canvas undo/redo (Phase 8)
+
+`src/undo.c/h`, `z`/`y` in Main mode. Genuinely new functionality — V1 has
+no canvas-edit undo at all (only the character editor's single-glyph
+undo, already ported as `ce_undo[]`). A **faithful port of
+vdcscreeneditor-v2's `undo_new()`/`undo_performundo()`/
+`undo_performredo()`** (`/home/xahmol/VDCScreenEditor2/src/main.c`, lines
+739-905, `struct UndoStruct` in `include/defines.h`) — adapted for OSE's
+single-plane canvas (one byte/cell, vs. VDC RAM's separate screen/
+attribute planes) and **Oric-side overlay RAM** ($C000-$FFFF via
+`enable_overlay_ram()`/`disable_overlay_ram()`, `include/loci.h`) instead
+of bank-switched VDC RAM.
+
+- **Don't confuse this with Phase 7's LOCI-device XRAM** — a completely
+  different resource (RAM *on the LOCI device*, needing the MIA serial
+  protocol) from this Oric-side, plain-pointer-addressable region. This
+  distinction tripped up the first draft of this phase's plan; see the
+  project memory `feedback_dont_oversimplify_ported_designs.md` for the
+  full story of getting this (and the eviction policy below) corrected.
+- **Ring design**: a fixed 40-slot array (matching `Undo[41]`'s 40 active
+  slots), each slot independently storing its own dirty-rectangle
+  snapshot (only the changed bounding box, not the full canvas) at its
+  own byte offset in the 16KB region. The slot about to be overwritten
+  *next* is invalidated immediately (a `valid` flag — not an overloaded
+  `address==0` sentinel the way vdcscreeneditor-v2 does it, since 0 is a
+  legitimate offset here) — this is what lets undo/redo always stop
+  cleanly at the true edge of available history.
+- **The byte bump-pointer only resets** (taking the slot index with it)
+  when the next snapshot would exceed the 16KB budget — a rare event, not
+  a per-snapshot check. Even then, slots elsewhere in the ring keep their
+  data until a *later* cycle's growing writes physically reach them, so
+  history degrades gradually across a wrap, not all at once. **This was
+  the point of the correction above** — an earlier draft proposed
+  discarding all history on overflow, which the user correctly rejected
+  as worse *and* not actually simpler than the real mechanism.
+- **Redo data is stored alongside the original snapshot** in the same
+  slot (`width*height` bytes for the original + another `width*height`
+  for the eventual redo copy, reserved when there's room) — `undo_perform()`
+  saves the *current* live content into that reserved redo region before
+  restoring the old content, exactly mirroring vdcscreeneditor-v2's
+  save-before-restore ordering.
+- **`undo_escapeundo()` has no OSE equivalent**: every call site here
+  takes its snapshot only once an edit is actually about to be committed
+  (after ENTER/confirmation, never speculatively before a cancellable
+  step), so there's nothing to unwind on ESC.
+- **Comprehensive coverage** (confirmed with the user): every destructive
+  action calls `undo_snapshot()` first — Main-mode `SPACE`/`DEL`/`i`/`o`/
+  `u`, Line/Box fill, Select's `d`/`i`/`p`/`m` fills and cut/copy, Move
+  mode's per-keypress shift (whole-viewport snapshot, since a 1-cell shift
+  changes every cell along that axis), Write mode's every plotted/cleared
+  cell, and Screen menu Clear/Fill (whole-canvas snapshot). Dirty-rect
+  snapshots are cheap (a few bytes for a 1-cell edit), so this fits the
+  16KB budget comfortably even for a long Write session.
+- **`undo_snapshot()` no-ops if `!loci_present()`** — undo is simply
+  unavailable without a LOCI device (no popup, since this fires on every
+  keystroke, not an explicit user action).
+- **Bug fixed while retrofitting Main-mode `SPACE`/`DEL`**: they were
+  calling `canvas_put()` with `cursor_x`/`cursor_y` only, missing the
+  `+xoffset`/`+yoffset` that `i`/`o`/`u`/`g` already apply — meant they
+  plotted at the wrong canvas cell once the viewport had auto-scrolled
+  (Phase 5a). `undo_snapshot()` needed the corrected coordinates to
+  snapshot the right cell, so both call sites were fixed together.
+- **Not testable headless beyond the LOCI-absent path** (same constraint
+  as Phases 6-7's LOCI-device features, though this is the Oric-side
+  overlay RAM, not LOCI-device XRAM) — `tests/scripts/
+  test_undo_no_loci.sh` confirms `z`/`y` are graceful no-ops with no LOCI
+  present. The actual snapshot/restore mechanism needs a real-hardware
+  walkthrough (see the Phase 8 plan).
+
+### Select mode cut/copy (Phase 8)
+
+`select_run()` (`src/select.c`) gains `x`/`c`, completing V1's full
+prompt key set (`d`/`i`/`p`/`m`/`x`/`c`). **Turned out not to need overlay
+RAM at all**: V1's `selectmode()` cut/copy doesn't use a full-rectangle
+scratch buffer — it copies **one row at a time** through `SCREENMEMORY`
+(a single-row reuse of live screen RAM), choosing top-to-bottom vs.
+bottom-to-top row order based on whether the destination is below or
+above the source (handles overlap correctly). OSE's existing
+`canvas_rowbuf[CANVAS_MAX_ROW]` (`src/canvas.c`, already used by
+`canvas_resize()`'s row reflow for exactly the same overlap-safety
+reason) serves the same role — exposed via `canvas.h` so `select.c` can
+reuse it (both uses are mutually exclusive in time, so sharing the single
+320-byte buffer is safe). `select_width` can never exceed
+`CANVAS_MAX_ROW` since it's bounded by `app.canvas_width`, which
+`canvas_resize()` already validates — no V1-style explicit
+`select_width>1024` cap needed.
+
+After picking `x`/`c`, a destination-picking sub-loop (cursor keys via
+`cursor_move_scroll()`, `FUNCT+6` toggles the statusbar, `ENTER`
+confirms, `ESC` cancels — same shape as `rect_select()`'s own loop, with
+its own cursor highlight). On `ENTER`, validates the destination fits
+within the canvas (`MSG_SELECT_NOFIT`, "Selection does not fit.", V1's
+exact wording, if not); `undo_snapshot()`s the destination rect (and, for
+cut, the source rect too — **two separate undo slots, so reverting a cut
+needs two `z` presses** — a minor known wrinkle, not fixed) before
+`select_paste()` runs the per-row copy.
+
+Fully testable headless (`tests/scripts/test_select_cutcopy.sh`) — unlike
+undo, this needs no LOCI/overlay RAM at all.
+
 ### Charset-swap mechanism
 
 `src/charsetswap.c/h` + `include/charset.c/h` ensure popup chrome (menu bar,
@@ -631,7 +735,8 @@ make test         # full automated Phosphoric test suite (test-boot, test-menus,
                   # test-screenresize, test-charsetram-spike, test-charsetedit,
                   # test-palette, test-colourpicker, test-cursor-autoscroll,
                   # test-linebox, test-select, test-move, test-writemode,
-                  # test-fileio-no-loci) -- EN only, see "Localisation" below
+                  # test-fileio-no-loci, test-select-cutcopy,
+                  # test-undo-no-loci) -- EN only, see "Localisation" below
 make test-boot    # headless boot smoke test (splash + canvas/statusbar render)
 make test-capture CYCLES=N TYPEKEYS='...'
                   # calibration helper: dumps tests/out/capture.bin + .png
@@ -691,19 +796,21 @@ src/
                   canvas.c's cursor_move_scroll()), +/- screencode select,
                   SPACE/DEL plot, ,/.;/' ink/paper cycling, b/d/a/r attribute
                   toggles, g grabs the screencode/attr under the cursor,
-                  i/o/u plot ink/paper/modifier, 0-9/SHIFT+0-9 favourites,
-                  FUNCT+1 opens the menu bar, 'e' opens the character editor,
-                  'p'/'c' open the palette/colour picker, 'l'/'s'/'m'/'w'
-                  open Line-Box/Select/Move/Write mode (see "Phase 5"
-                  sections above)
+                  i/o/u plot ink/paper/modifier, z/y undo/redo,
+                  0-9/SHIFT+0-9 favourites, FUNCT+1 opens the menu bar,
+                  'e' opens the character editor, 'p'/'c' open the
+                  palette/colour picker, 'l'/'s'/'m'/'w' open Line-Box/
+                  Select/Move/Write mode (see "Phase 5"/"Canvas undo/redo
+                  (Phase 8)" sections)
   modes.h/c       EditorMode -> MSG_MODE_* display-name lookup
                   (mode_name()), shared by statusbar.c and any mode file --
                   standalone, no dependency in either direction with
                   editor.c/select.c/move.c/write.c
   select.c/h      Shared rectangle-grower (rect_select()) + Line/Box mode
-                  ('l', linebox_run()) + Select mode ('s', select_run()) --
-                  see "Shared rectangle-grower"/"Line/Box mode"/"Select mode"
-                  (Phase 5)
+                  ('l', linebox_run()) + Select mode ('s', select_run(),
+                  incl. x/c cut/copy) -- see "Shared rectangle-grower"/
+                  "Line/Box mode"/"Select mode" (Phase 5)/"Select mode
+                  cut/copy (Phase 8)"
   move.c/h        Move mode ('m'): nudges the visible canvas content by one
                   row/col (see "Move mode (Phase 5d)")
   write.c/h       Write mode ('w'): free-typing screencodes with CTRL-key
@@ -720,6 +827,9 @@ src/
   filepicker.c/h  XRAM-backed LOCI directory browser, replaces the
                   filename prompt for every Load action (see "File picker
                   (Phase 7)")
+  undo.c/h        Canvas-edit undo/redo ('z'/'y'), overlay-RAM-backed
+                  dirty-rect ring buffer (see "Canvas undo/redo
+                  (Phase 8)")
   charsetedit.c/h Character editor popup: edits the 6x8 glyph for
                   app.plotscreencode/app.plotaltchar directly in live charset
                   RAM (Strategy A -- see "Character editor (Phase 3)")

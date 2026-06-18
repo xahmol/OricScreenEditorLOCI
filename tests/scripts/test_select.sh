@@ -12,8 +12,8 @@
 #     ink/paper/modifier-attribute)
 #   - ESC at the action prompt leaves the canvas unchanged
 #
-# Cut/copy ('x'/'c') are deferred to Phase 8 (overlay-RAM clipboard) -- not
-# exercised here, see CLAUDE.md/the Phase 5 plan.
+# Cut/copy ('x'/'c') are exercised separately, in test_select_cutcopy.sh
+# (Phase 8).
 #
 # --type-keys notes (see CLAUDE.md "Phosphoric testing notes"):
 #   \p1 = pause 1s (releases all keys). A \p1 MUST precede every distinct

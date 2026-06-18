@@ -140,6 +140,8 @@ Press these keys in main mode for editing:
 |**C**|Go to '**C**olour picker'
 |**T**|**T**ry mode
 |**R**|Toggle '**R**everse': toggle increase/decrease screencode by 128
+|**Z**|**OSE-LOCI only:** Undo the most recent canvas edit
+|**Y**|**OSE-LOCI only:** Redo the most recently undone edit
 |**FUNCT+1**|Go to main menu
 |**FUNCT+6**|Toggle statusbar visibility
 |**FUNT+8**|Help screen
@@ -190,6 +192,15 @@ This will enter [character edit mode](#character-editor) and start with editing 
 
 Press **S** ([Select mode](#select-mode)) , **M** ([Move mode](#move-mode)), **L** ([Line and box mode](#line-and-box-mode)) or **W** ([Write mode](#write-mode)) for entering the corresponding edit modes.
 Reference is made to the specific sections in this readme for these modes (click the links). From all modes, return to main mode by pressing **ESC**.
+
+*Undo and redo (OSE-LOCI only)*
+
+Press **Z** to undo the most recent canvas edit (plotting, Line/Box,
+Select fills/cut/copy, Move, Write mode, or Screen > Clear/Fill), and
+**Y** to redo the most recently undone edit. This needs a LOCI device
+attached (undo history is stored in the Oric's overlay RAM, which only a
+LOCI device can enable) — without one, **Z**/**Y** simply do nothing.
+There is no V1 equivalent of this feature.
 
 *Toggle statusbar visibility*
 Press **FUNCT+6** to toggle between the statusbar being visible (default) or not.
@@ -551,10 +562,11 @@ Pressing **I**, **P** or **M** will fill the area with resp. ink color, paper co
 
 Leave selection mode by pressing **ESC** . Pressing **FUNCT+8** at any time in this mode will provide a helpscreen with the key commands for this mode (not possible if the selection is grown but not yet accepted).
 
-**OSE note**: Cut (**X**) and Copy (**C**) are not yet implemented in this
-LOCI-based rewrite — they're deferred to a later phase that adds overlay-RAM
-storage for the clipboard. **D**, **I**, **P** and **M** are fully
-implemented as described above.
+**OSE note**: Cut (**X**) and Copy (**C**) move the selection to a new
+position you pick with the cursor keys (**ENTER** to confirm, **ESC** to
+cancel) — Copy leaves the original in place, Cut clears it. If the
+destination would extend past the edge of the canvas, a "Selection does
+not fit." message appears and nothing is changed.
 
 ## Move mode:
 ([Back to contents](#contents))
