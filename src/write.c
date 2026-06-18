@@ -8,7 +8,16 @@
 // reuse those letters -- they're themselves printable characters to type
 // here. V1 uses FUNCT+1/2/3 (CH_F1/F2/F3) for the same three actions inside
 // writemode(); this port does the same (KEY_F1/F2/F3).
+//
+// New functionality, no V1 precedent: FUNCT+5 (KEY_F5) opens a hex-direct
+// attribute-entry popup (write_hex_attr()). Picked FUNCT+5 over FUNCT+4
+// deliberately -- include/keyboard.c's decode_funct[] (V1's own physical
+// FUNCT-row mapping) binds KEY_F4 to FUNCT+R, not FUNCT+digit-4, while
+// KEY_F5 is a genuine FUNCT+5. Using FUNCT+4 here would have been
+// untestable via Phosphoric's --type-keys, which only supports \fN for
+// FUNCT+digit combos, not FUNCT+letter.
 
+#include <string.h>
 #include "oric.h"
 #include "keyboard.h"
 #include "charwin.h"
@@ -18,17 +27,84 @@
 #include "undo.h"
 #include "input.h"
 #include "help.h"
+#include "menu.h"
+#include "strings.h"
 #include "write.h"
+
+/**
+ * Parse a single hexadecimal digit character.
+ *
+ * @param c Character '0'-'9', 'a'-'f', or 'A'-'F'.
+ * @return Numeric value 0-15, or 0 if c is not a hex digit.
+ */
+static uint8_t write_hex_digit(char c)
+{
+    if (c >= '0' && c <= '9') return (uint8_t)(c - '0');
+    if (c >= 'a' && c <= 'f') return (uint8_t)(c - 'a' + 10);
+    if (c >= 'A' && c <= 'F') return (uint8_t)(c - 'A' + 10);
+    return 0;
+}
+
+/**
+ * FUNCT+5 in Write mode: an alternate, hex-direct input method alongside
+ * the existing CTRL+Z/X (ink)/CTRL+C/V (paper) cycling and FUNCT+1/2/3
+ * (plot at cursor) -- prompts for which attribute (1=Ink/2=Paper/3=Mod),
+ * then a single hex digit 0-7, and plots the resulting attribute byte at
+ * the cursor exactly like FUNCT+1/2/3 do (advance right after). New
+ * functionality, no V1 precedent.
+ *
+ * @return (none)
+ */
+static void write_hex_attr(void)
+{
+    OricCharWin win;
+    char        buf[2];
+    uint8_t     key, val, attrbyte;
+
+    menu_winsave(5, 8, 1);
+    cwin_init(&win, 5, 5, 30, 8, A_FWBLACK, A_BGWHITE);
+    cwin_clear(&win);
+
+    cwin_putat_string(&win, 2, 1, MSG_WRITE_HEX_TITLE);
+    cwin_putat_string(&win, 2, 3, MSG_WRITE_HEX_PROMPT);
+
+    do
+    {
+        key = key_read();
+        if (key == KEY_ESC) { menu_winrestore(); return; }
+    } while (key != '1' && key != '2' && key != '3');
+
+    cwin_putat_string(&win, 2, 5, MSG_WRITE_HEX_VALUE);
+    strcpy(buf, "0");
+    if (cwin_textinput(&win, 2, 6, 4, buf, 1, VINPUT_NUMS | VINPUT_ALPHA) < 0) { menu_winrestore(); return; }
+
+    menu_winrestore();
+
+    val = write_hex_digit(buf[0]);
+    if (val > 7) val = 7;
+
+    switch (key)
+    {
+    case '1': attrbyte = val;                       break; // Ink
+    case '2': attrbyte = (uint8_t)(16 + val);        break; // Paper
+    default:  attrbyte = (uint8_t)(8 | val);         break; // Modifier (altchar/double/blink bits)
+    }
+
+    undo_snapshot(app.cursor_x + app.xoffset, app.cursor_y + app.yoffset, 1, 1);
+    canvas_put(app.cursor_x + app.xoffset, app.cursor_y + app.yoffset, attrbyte);
+    cursor_move_scroll(1, 0);
+}
 
 /**
  * Write mode, entered via 'w' from Main mode. Cursor keys move (with
  * auto-scroll, cursor_move_scroll()); CTRL+B/A/D toggle blink/altchar/
  * double; CTRL+Z/X cycle ink down/up; CTRL+C/V cycle paper down/up;
  * FUNCT+1/2/3 plot ink/paper/modifier-attribute at the cursor and advance
- * right; DEL clears the cell under the cursor (no advance); CTRL+R toggles
- * a local reverse-video flag; any other printable key plots its screencode
- * (+0x80 if reverse-video is on) and advances right. FUNCT+6 toggles the
- * statusbar. ESC exits to Main.
+ * right; FUNCT+5 is an alternate hex-direct attribute entry (see
+ * write_hex_attr()); DEL clears the cell under the cursor (no advance);
+ * CTRL+R toggles a local reverse-video flag; any other printable key
+ * plots its screencode (+0x80 if reverse-video is on) and advances
+ * right. FUNCT+6 toggles the statusbar. ESC exits to Main.
  *
  * @return (none)
  */
@@ -99,6 +175,10 @@ void write_run(void)
                                    | (app.plotdouble  ? 2 : 0)
                                    | (app.plotblink   ? 4 : 0)));
             cursor_move_scroll(1, 0);
+            break;
+
+        case KEY_F5:
+            write_hex_attr();
             break;
 
         case KEY_DEL:

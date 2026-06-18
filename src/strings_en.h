@@ -103,6 +103,11 @@
 #define MSG_FR_FIND_COLOR      "Find color (0-7):"
 #define MSG_FR_REPLACE_PROMPT  "Replace, ESC=find only:"
 
+// ── Hex attribute entry (src/write.c, FUNCT+4 in Write mode) ─────────────────
+#define MSG_WRITE_HEX_TITLE    "Hex attribute"
+#define MSG_WRITE_HEX_PROMPT   "1=Ink 2=Paper 3=Mod"
+#define MSG_WRITE_HEX_VALUE    "Value (hex 0-7):"
+
 // ── Character editor (src/charsetedit.c) ──────────────────────────────────────
 #define MSG_CE_CODE_FMT   "Code:$%02x"
 #define MSG_CE_SET_STD    "Set:Std"

@@ -189,7 +189,7 @@ CYCLES   ?= 8000000
 # all: must appear first so it is the default goal
 # =========================================================================
 
-.PHONY: all all-langs clean run docs check-phosphoric sandbox-reset test-capture test-boot test-menus test-screenresize test-charsetram-spike test-charsetedit test-palette test-colourpicker test-cursor-autoscroll test-linebox test-select test-move test-writemode test-boot-no-loci test-select-cutcopy test-undo-overflow test-help-funct8 test-fileio-traffic test-findreplace test
+.PHONY: all all-langs clean run docs check-phosphoric sandbox-reset test-capture test-boot test-menus test-screenresize test-charsetram-spike test-charsetedit test-palette test-colourpicker test-cursor-autoscroll test-linebox test-select test-move test-writemode test-boot-no-loci test-select-cutcopy test-undo-overflow test-help-funct8 test-fileio-traffic test-findreplace test-write-hexattr test
 
 all: build/$(MAIN)$(LANGSUFFIX).tap
 
@@ -369,6 +369,12 @@ test-findreplace: check-phosphoric sandbox-reset
 	    TAPFILE=$(MAIN)$(LANGSUFFIX).tap \
 	    bash tests/scripts/test_findreplace.sh
 
+test-write-hexattr: check-phosphoric sandbox-reset
+	$(MKDIR) tests/out 2>$(NULLDEV) ; true
+	PHOS=$(PHOS) ATMOSROM=$(ATMOSROM) SANDBOX=tests/sandbox OUT=tests/out \
+	    TAPFILE=$(MAIN)$(LANGSUFFIX).tap \
+	    bash tests/scripts/test_write_hexattr.sh
+
 test:
 	@status=0; \
 	$(MAKE) test-boot || status=1; \
@@ -389,6 +395,7 @@ test:
 	$(MAKE) test-help-funct8 || status=1; \
 	$(MAKE) test-fileio-traffic || status=1; \
 	$(MAKE) test-findreplace || status=1; \
+	$(MAKE) test-write-hexattr || status=1; \
 	exit $$status
 
 # -------------------------------------------------------------------------

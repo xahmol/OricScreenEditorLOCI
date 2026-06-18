@@ -107,6 +107,11 @@
 #define MSG_FR_FIND_COLOR      "Couleur a trouver (0-7) :"
 #define MSG_FR_REPLACE_PROMPT  "Remplacer, ESC=trouver :"
 
+// ── Saisie hex d'attribut (src/write.c, FUNCT+4 en mode Ecrire) ──────────────
+#define MSG_WRITE_HEX_TITLE    "Attribut hexa"
+#define MSG_WRITE_HEX_PROMPT   "1=Encre 2=Papier 3=Mod"
+#define MSG_WRITE_HEX_VALUE    "Valeur (hexa 0-7) :"
+
 // ── Character editor (src/charsetedit.c) ──────────────────────────────────────
 // "Jeu" (set) keeps Std/Alt identical to the English build -- only the
 // "Code"/"Hex" labels below are already unaccented French/English cognates.
