@@ -231,7 +231,7 @@ void fileio_load_combined(void)
     int16_t    fd;
 
     if (!loci_check_present()) return;
-    if (!fileio_get_filename(MSG_FILE_LOAD_COMBINED)) return;
+    if (!filepicker_run(MSG_FILE_LOAD_COMBINED, PICKER_FILTER_PLAIN)) return;
 
     sprintf(path, "%s.BIN", app.filename);
 
@@ -367,7 +367,7 @@ void fileio_load_project(void)
     int16_t       fd;
 
     if (!loci_check_present()) return;
-    if (!fileio_get_filename(MSG_FILE_LOAD_PROJECT)) return;
+    if (!filepicker_run(MSG_FILE_LOAD_PROJECT, PICKER_FILTER_PROJECT)) return;
 
     sprintf(path, "%sPJ.BIN", app.filename);
     if (file_load(path, &proj, sizeof(proj)) < 0 || proj.magic != FILEIO_MAGIC)
@@ -466,7 +466,7 @@ void fileio_load_charset(uint8_t altorstd)
     const char *title = fileio_charset_title(altorstd, 0, &base);
 
     if (!loci_check_present()) return;
-    if (!fileio_get_filename(title)) return;
+    if (!filepicker_run(title, PICKER_FILTER_PLAIN)) return;
 
     sprintf(path, "%s.BIN", app.filename);
     if (file_load(path, (void *)(base + CHARSET_GLYPH_AREA_OFFSET), CHARSET_GLYPH_AREA_SIZE) < 0)
