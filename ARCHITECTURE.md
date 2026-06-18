@@ -17,7 +17,7 @@ local checkout at `/home/xahmol/git/OricScreenEditor`), restarted on the
 Oscar64 native/bare-metal build chain shared with
 [locifilemanager-v2](https://github.com/xahmol/locifilemanager-v2)
 (`/home/xahmol/git/locifilemanager-v2`), which this document's structure is
-adapted from. **OSE is mid-rewrite (Phase 6 of 9 complete)** — several
+adapted from. **OSE is mid-rewrite (Phase 7 of 9 complete)** — several
 sections below describe library code that is present (copied verbatim from
 locifilemanager-v2) but not yet wired into the application; these are marked
 explicitly.
@@ -88,7 +88,7 @@ locifilemanager-v2, copied verbatim.
 | `$0100–$01FF` | 256 B | 6502 hardware stack (`txs #$FF` at startup) |
 | `$0200–$02FF` | — | Oric ROM system variables (reserved, not used) |
 | `$0300–$030F` | 16 B | **VIA 6522** registers (§2.2) — used by `include/keyboard.c` |
-| `$0310–$04FF` | — | Remaining Oric ROM system variables, incl. `MICRODISCCFG` (`$0314`, overlay-RAM enable, still dormant -- Phase 8) and the LOCI TAP/MIA register block, incl. `$0319` (`LOCI_SIGNATURE_ADDR`, `loci_present()`'s detection byte) -- `include/loci.c/h`'s file-I/O API is now compiled into OSE via `src/fileio.c` (Phase 6); the overlay-RAM portion remains dormant |
+| `$0310–$04FF` | — | Remaining Oric ROM system variables, incl. `MICRODISCCFG` (`$0314`, Oric-side overlay-RAM enable, still dormant -- Phase 8) and the LOCI TAP/MIA register block, incl. `$0319` (`LOCI_SIGNATURE_ADDR`, `loci_present()`'s detection byte) -- `include/loci.c/h`'s file-I/O API (`src/fileio.c`, Phase 6) and LOCI-device XRAM API (`src/filepicker.c`, Phase 7 -- a different resource from the Oric-side overlay RAM above, see §2.4) are now compiled into OSE; only the Oric-side overlay-RAM portion remains dormant |
 | `$0500–$057F` | 128 B | **Startup region** — tape entry point jumps into `oric_startup` |
 | `$0580–$B1FF` | ~42.4 KB | **Program region** — code, data, BSS, heap |
 | `$B200–$B3FF` | 512 B | **Software stack** (`#pragma stacksize(0x0200)`) |
@@ -142,15 +142,21 @@ scroll_down/rotate_left/rotate_right`) over this layout — see §4.5 and §6.4.
 `include/loci.h/c` (LOCI mass-storage MIA/TAP/XRAM/file/dir/mount/overlay-RAM
 API) and `include/ijk.h/c` (Raxiss IJK joystick driver, VIA Port A) were
 copied verbatim from locifilemanager-v2 as part of the Oscar64 scaffold
-restart. **`loci.h/c` is now wired in** (Phase 6, `src/fileio.c/h` — see
-§6.9): `loci_present()`/`loci_open/close/read/write()`/`file_save()`/
-`file_load()` back the File/Charset menus. The overlay-RAM portion of
-`loci.h` (`enable_overlay_ram()`/`disable_overlay_ram()`/`xram_*`) and
-`ijk.h/c` remain dormant, for Phase 8 (overlay-RAM undo) and a later
-IJK-input phase respectively — neither is `#include`d from any `src/` file
-yet. When overlay RAM is wired in, this section should gain the XRAM/
-overlay-RAM partition layout — see locifilemanager-v2's `ARCHITECTURE.md`
-§2.3-2.5 for the reference material to adapt.
+restart. **`loci.h/c` is now wired in**: `loci_present()`/`loci_open/close/
+read/write()`/`file_save()`/`file_load()` (Phase 6, `src/fileio.c/h` — see
+§6.14) back the File/Charset menus, and `xram_peek/poke/memcpy_to/
+memcpy_from()` (Phase 7, `src/filepicker.c/h` — see §6.15) back the
+LOCI directory browser. **Important distinction**: XRAM is RAM *on the
+LOCI device itself* — a completely different resource from the
+Oric-side bank-switched overlay RAM ($C000-$FFFF) `enable_overlay_ram()`/
+`disable_overlay_ram()` control, which **remains dormant** (Phase 8,
+overlay-RAM undo) — XRAM access needs no Oric memory banking and has no
+dependency on Phase 8 (an earlier draft of the Phase 7 plan conflated the
+two; corrected during implementation). `ijk.h/c` also remains dormant, for
+a later IJK-input phase — not `#include`d from any `src/` file yet. When
+overlay RAM is wired in, this section should gain its partition layout —
+see locifilemanager-v2's `ARCHITECTURE.md` §2.3-2.5 for the reference
+material to adapt.
 
 ### 2.5 Interrupt policy
 
@@ -206,6 +212,8 @@ src/
   move.c/h        Move mode ('m'): nudges visible canvas content (§6.12)
   write.c/h       Write mode ('w'): free-typing screencodes (§6.13)
   fileio.c/h      LOCI file I/O backing the File/Charset menus (§6.14)
+  filepicker.c/h  XRAM-backed LOCI directory browser for every Load
+                  action (§6.15)
   menu.c/h        Menu bar/pulldown/popup engine + main-RAM window-save stack
   menudata.c/h    OSE menu tables (Screen/File/Charset/Information) + Screen/
                   File/Charset pulldown dispatch
@@ -294,7 +302,7 @@ locifilemanager-v2 for future use.
 #define CANVAS_HEIGHT    VIEWPORT_HEIGHT
 #define CANVAS_MAX_SIZE  8192
 #define FAVOURITES_COUNT 10
-#define FILENAME_MAXLEN  24
+#define FILENAME_MAXLEN  48
 
 typedef enum {
     MODE_MAIN = 0,
@@ -475,16 +483,20 @@ main.c
  └─ strings.h    (EN/FR localisation gateway -> strings_en.h/strings_fr.h, §3)
 
 menudata.c
- └─ fileio.h  (LOCI file I/O: filename prompt, presence gate,
+ └─ fileio.h  (LOCI file I/O: filename prompt (Save), presence gate,
                Screen/Combined/Project/Charset save/load, §6.14)
       └─ loci.h (LOCI mass-storage API -- file I/O portion now wired in)
       └─ canvas.h, charset.h, menu.h, menudata.h, statusbar.h
+      └─ filepicker.h (LOCI directory browser for Load actions, §6.15)
+           └─ loci.h (xram_peek/poke/memcpy_to/memcpy_from -- LOCI-device
+                      XRAM, not Oric-side overlay RAM, see §2.4)
+           └─ menu.h, statusbar.h
 
 statusbar.c, select.c, move.c, write.c
  └─ modes.h  (mode_name(): EditorMode -> MSG_MODE_* lookup, standalone)
 
 main.c, canvas.c, statusbar.c, menu.c, menudata.c, editor.c, charsetedit.c,
-charsetswap.c, select.c, move.c, write.c, fileio.c
+charsetswap.c, select.c, move.c, write.c, fileio.c, filepicker.c
  └─ charwin.h  (windows, cursor, text input)
       └─ keyboard.h (raw key scan/decode)
  └─ oric.h     (hardware register layout, screen/attr/charset-bank constants)
@@ -848,6 +860,58 @@ to call) and aborts with a graceful popup if absent, then
   loci.sh`, §7) — actual byte I/O needs real hardware, same constraint as
   the colour picker.
 
+### 6.15 File picker (`src/filepicker.c`, every Load action, Phase 7)
+
+`filepicker_run(title, filter)` replaces `fileio_get_filename()` for
+every Load action with a real LOCI directory browser. Save actions are
+unaffected. Adapted from locifilemanager-v2's directory engine
+(`/home/xahmol/git/locifilemanager-v2/src/dir.c`, `struct DirElement`/
+`DirMeta` in `dir.h` — the primary reference for this phase, per explicit
+instruction), simplified for a single-pane, single-select, no-sort,
+dir-vs-file-only picker.
+
+**The full directory listing is read into a linked list stored in
+XRAM** — RAM *on the LOCI device itself* (`include/loci.h`'s `xram_peek/
+poke/memcpy_to/memcpy_from`), not the Oric-side overlay RAM §2.4 covers
+(Phase 8) — so this has **no Phase 8 dependency** (a correction made
+during implementation; an earlier draft of this phase's plan conflated
+the two resources). `PickerMeta{next, prev, isdir, length}` (6 bytes) is
+written immediately before each variable-length name at its XRAM
+address — entries are packed tightly, not fixed-size, matching
+`DirElement`'s layout. `PICKER_DIRBASE = COPYBUF_XRAM_ADDR +
+COPYBUF_XRAM_SIZE` (`0x8800`, matching locifilemanager-v2's `DIR1BASE`),
+`PICKER_DIRSIZE = 0x0C00` (one pane's worth). Building the list stops
+early (silently truncating) if this budget would be exceeded, same guard
+`dir_read()` has.
+
+Scrolling is **O(1) per row**, not a directory re-walk: `picker_firstprint`/
+`picker_present` (XRAM addresses) + `picker_cursorrow` (visible-row index)
+follow `next`/`prev` pointers directly — the same bookkeeping
+locifilemanager-v2's `struct Directory` uses per pane.
+
+**Type filtering** (`PICKER_FILTER_PLAIN`/`PICKER_FILTER_PROJECT`):
+directories always match. `PLAIN` covers Load Screen/Combined and all
+three Charset Load actions (none distinguishable from each other by
+filename alone — matches V1), excluding the four Project sub-file
+suffixes (`PJ/SC/CS/CA.BIN`); `PROJECT` (Load Project) matches only
+`*PJ.BIN`. The matched suffix is stripped on selection before storing
+into `app.filename`, so `fileio.c`'s existing suffix-appending
+composition keeps working unmodified.
+
+**Full subdirectory navigation** (confirmed with the user, overriding the
+simpler flat-listing-only default recommended): ENTER on a directory
+entry descends (`picker_path_descend()`, refusing rather than truncating
+if the result wouldn't fit in `PICKER_PATH_MAXLEN=64`); LEFT goes to the
+parent (`picker_path_ascend()`, no-op at the root). Selecting a file in a
+subdirectory prepends that subdirectory to `app.filename` (relative to
+the LOCI root, e.g. `"DIR1/DIR2/name"`). `FILENAME_MAXLEN` grew from 24 to
+48 (`src/appstate.h`) to leave room for this.
+
+No new automated test coverage: `filepicker_run()` is only reachable from
+a Load action that already requires `loci_check_present()` to pass first,
+so `test_fileio_no_loci.sh`'s existing assertions already cover everything
+headless testing can reach here.
+
 ---
 
 ## 7. Testing Infrastructure
@@ -891,14 +955,16 @@ make test-capture CYCLES=N TYPEKEYS='...'  # calibration helper for new scripts
   unmapped in its `char_map` — covered by manual walkthrough + code review
   instead (see CLAUDE.md's Write mode section).
 - LOCI's actual file I/O (the byte-level load/save traffic, not just the
-  presence gate) has no automated coverage either, for the same reason:
-  Phosphoric/Oricutron cannot emulate a LOCI device. `test-fileio-no-loci`
-  only confirms the graceful absent-path; real load/save needs a
-  **real-hardware** walkthrough (see the Phase 6 plan), same constraint as
-  the colour picker's hardware-rendering issue.
-- The overlay-RAM portion of `loci.h` (§2.4) is not yet wired in, so
-  nothing here exercises it; once it is (Phase 8), it will need the same
-  real-hardware verification.
+  presence gate) and the file picker's directory browsing (§6.15) have no
+  automated coverage either, for the same reason: Phosphoric/Oricutron
+  cannot emulate a LOCI device. `test-fileio-no-loci` only confirms the
+  graceful absent-path; real load/save/browsing needs a **real-hardware**
+  walkthrough (see the Phase 6/7 plans), same constraint as the colour
+  picker's hardware-rendering issue.
+- The Oric-side overlay RAM (§2.4, distinct from the LOCI-device XRAM
+  `src/filepicker.c` already uses) is not yet wired in, so nothing here
+  exercises it; once it is (Phase 8), it will need the same real-hardware
+  verification.
 
 ---
 

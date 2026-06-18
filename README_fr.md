@@ -269,13 +269,17 @@ Comme pour Clear, mais cette option remplit la zone de dessin avec le code écra
 
 **Note OSE-LOCI** : cette réécriture utilise le **périphérique de stockage
 de masse LOCI** pour toutes les opérations sur fichiers, au lieu des
-commandes cassette de V1, et demande un nom de fichier saisi (24
-caractères maximum) plutôt que le sélecteur de fichiers/ID de périphérique
-de V1 -- un véritable navigateur de fichiers est prévu pour une version
-ultérieure. Si aucun périphérique LOCI n'est détecté, chaque option des
-menus Fichier/Charset affiche un message "Aucun LOCI detecte" au lieu de
-tenter l'opération, le reste de l'éditeur continuant à fonctionner
-normalement sans périphérique connecté.
+commandes cassette de V1. Les actions de **sauvegarde** demandent un nom
+de fichier saisi (48 caractères maximum). Les actions de **chargement**
+ouvrent à la place un navigateur de fichiers : une liste défilante du
+répertoire (touches curseur pour se déplacer, ENTER pour entrer dans un
+dossier ou sélectionner le fichier en surbrillance, GAUCHE pour remonter
+au dossier parent, ESC pour annuler) n'affichant que les fichiers
+pertinents pour l'action choisie (par exemple, Charger projet n'affiche
+que les fichiers de projet). Si aucun périphérique LOCI n'est détecté,
+chaque option des menus Fichier/Charset affiche un message "Aucun LOCI
+detecte" au lieu de tenter l'opération, le reste de l'éditeur continuant
+à fonctionner normalement sans périphérique connecté.
 
 *Save screen / Load screen (sauvegarder/charger l'écran)*
 

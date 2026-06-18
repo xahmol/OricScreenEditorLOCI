@@ -268,12 +268,15 @@ Similar to clear, but this will fill the canvas with the present selected screen
 ![File menu](https://github.com/xahmol/OricScreenEditor/blob/main/screenshots/OSE%20filemenu.png?raw=true)
 
 **OSE-LOCI note**: this rewrite uses the **LOCI mass-storage device** for
-all file I/O instead of V1's tape commands, and asks for a typed filename
-(up to 24 characters) rather than V1's file picker/device-ID dialogues -- a
-full file browser is planned for a later version. If no LOCI device is
-detected, every File/Charset menu item shows a "No LOCI device detected"
-message instead of attempting the operation, so the rest of the editor
-keeps working normally without one attached.
+all file I/O instead of V1's tape commands. **Save** actions ask for a
+typed filename (up to 48 characters). **Load** actions open a file
+picker instead: a scrollable directory listing (cursor keys to move,
+ENTER to descend into a folder or select a highlighted file, LEFT to go
+back up to the parent folder, ESC to cancel) showing only the files
+relevant to the action you chose (e.g. Load Project only shows project
+files). If no LOCI device is detected, every File/Charset menu item shows
+a "No LOCI device detected" message instead of attempting the operation,
+so the rest of the editor keeps working normally without one attached.
 
 *Save screen / Load screen*
 

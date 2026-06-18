@@ -18,22 +18,23 @@ storage device**.
 - Enhanced palette mode that also shows the inverse colour combinations for
   each ink/paper pair
 
-**Status: Phase 6 of 9 complete**, plus charset-swap infrastructure, a narrow
+**Status: Phase 7 of 9 complete**, plus charset-swap infrastructure, a narrow
 charset-editor popup, palette mode, the colour picker, Select/Move/Line-Box/
 Write modes, the `G`/`I`/`O`/`U`/`R` main-mode keys, a cursor-auto-scroll fix
-for oversized canvases, LOCI file I/O (File and Charset menus), the
-main-mode attribute-selection keys, a redesigned statusbar, and EN/FR
-localisation (canvas data model + minimal main mode + menu bar/Screen menu
-+ character editor + charset-swap mechanism + palette/colour-picker popups
-+ Select/Move/Line-Box/Write modes + LOCI file I/O + Phosphoric test
-harness; binary 21181 bytes EN / 21304 bytes FR).
+for oversized canvases, LOCI file I/O (File and Charset menus) with a real
+XRAM-backed directory browser for every Load action, the main-mode
+attribute-selection keys, a redesigned statusbar, and EN/FR localisation
+(canvas data model + minimal main mode + menu bar/Screen menu + character
+editor + charset-swap mechanism + palette/colour-picker popups + Select/
+Move/Line-Box/Write modes + LOCI file I/O + file picker + Phosphoric test
+harness; binary 23997 bytes EN / 24120 bytes FR).
 A previous CC65-based attempt at this got stuck and is archived
 in the `nonworkingcc65` branch (full history + uncommitted state). `main` was
 restarted from scratch on the Oscar64 native/bare-metal build chain developed
 for [locifilemanager-v2](https://github.com/xahmol/locifilemanager-v2)
 (`/home/xahmol/git/locifilemanager-v2`), which the runtime and libraries below
-were copied from verbatim. The remaining 3 phases (file picker, overlay-RAM
-undo incl. Select mode's deferred cut/copy, IJK/help/
+were copied from verbatim. The remaining 2 phases (overlay-RAM undo incl.
+Select mode's deferred cut/copy, IJK/help/
 polish) are tracked in the active plan — see
 `~/.claude/plans/snappy-beaming-lynx.md` or ask Claude for status.
 
@@ -459,16 +460,82 @@ reference: locifilemanager-v2's `loci_present()`/`file_save()`/
   — the closest available equivalent to V1's intent, since V1's ROM call
   to regenerate Alt from Std (`jsr $F816`) is a no-op on this runtime (see
   "Charset-swap mechanism" below).
-- **Filenames are typed, not browsed**: `fileio_get_filename()` is a popup
-  reusing `resize_dialog()`'s `cwin_textinput` pattern, persisting
-  `app.filename` (new `AppState` field) across calls as the next prompt's
-  default. A real file-browsing picker is Phase 7's job.
+- **Filenames are typed for Save, browsed for Load**: `fileio_get_filename()`
+  (Save actions) is a popup reusing `resize_dialog()`'s `cwin_textinput`
+  pattern, persisting `app.filename` (new `AppState` field) across calls
+  as the next prompt's default. Load actions use the real directory
+  browser added in Phase 7 (`filepicker_run()`, below) instead.
 - **Not testable headless beyond the LOCI-absent path**: Phosphoric/
   Oricutron can't emulate a LOCI device, so the actual load/save byte
   traffic needs a **real-hardware** walkthrough (same constraint as the
   colour-picker hardware-rendering issue) — only `tests/scripts/
   test_fileio_no_loci.sh` (confirming all 12 File/Charset items correctly
   show `MSG_LOCI_NOT_FOUND` and return cleanly) is automated.
+
+### File picker (Phase 7)
+
+`src/filepicker.c/h`'s `filepicker_run(title, filter)` replaces
+`fileio_get_filename()` for every Load action (`fileio_load_screen/
+combined/project()`, `fileio_load_charset()` for all three `altorstd`
+values) with a real LOCI directory browser. Save actions are unaffected
+(matches V1: `filepickerfromdir()` for Load, `chooseidandfilename()` for
+Save — browsing to pick a name to overwrite isn't the same UX problem).
+
+- **Adapted from locifilemanager-v2's directory engine**
+  (`/home/xahmol/git/locifilemanager-v2/src/dir.c`, `struct DirElement`/
+  `DirMeta` in `dir.h` — the primary reference for this phase, per
+  explicit instruction), simplified for a single-pane, single-select,
+  no-sort, dir-vs-file-only picker (no multi-type classification, no
+  select bit).
+- **The full directory listing is read into a linked list stored in
+  XRAM** — RAM *on the LOCI device itself* (`include/loci.h`'s
+  `xram_peek/poke/memcpy_to/memcpy_from`), a **completely different
+  resource from the Oric-side bank-switched overlay RAM** ($C000-$FFFF)
+  that Phase 8 is about. XRAM access needs no Oric memory banking at all,
+  so this has **no Phase 8 dependency** — flagging this explicitly since
+  an earlier draft of this phase mistakenly assumed XRAM-based storage
+  required waiting for Phase 8's overlay-RAM work, which is wrong; the
+  correction was made during implementation.
+- `PickerMeta{next, prev, isdir, length}` (6 bytes) is written immediately
+  before each (variable-length) name at its XRAM address — entries are
+  packed tightly, not fixed-size, matching `DirElement`'s layout.
+  `PICKER_DIRBASE = COPYBUF_XRAM_ADDR + COPYBUF_XRAM_SIZE` (`0x8800`,
+  matching locifilemanager-v2's `DIR1BASE`), `PICKER_DIRSIZE = 0x0C00`
+  (one pane's worth, since OSE only needs one list). Building the list
+  stops early (silently truncating), if this budget would be exceeded —
+  same guard locifilemanager-v2's `dir_read()` has.
+- **Scrolling is O(1) per row**, not a directory re-walk: `picker_firstprint`/
+  `picker_present` (XRAM addresses) + `picker_cursorrow` (visible-row
+  index) follow `next`/`prev` pointers directly, exactly the bookkeeping
+  locifilemanager-v2's `struct Directory` uses per pane.
+- **Type filtering** (`PICKER_FILTER_PLAIN`/`PICKER_FILTER_PROJECT`):
+  directories always match (so navigation works regardless of filter).
+  `PLAIN` covers Load Screen, Load Combined and all three Charset Load
+  actions — none of these are distinguishable from each other by filename
+  alone (matches V1: a "combined" file and a "screen" file are both bare
+  `<name>.BIN`, only the *content* differs), so they share one filter that
+  excludes the four Project sub-file suffixes (`PJ/SC/CS/CA.BIN`) to avoid
+  clutter/wrong-file-type mistakes. `PROJECT` (Load Project) matches only
+  `*PJ.BIN`. On selection, the matched suffix is stripped before storing
+  into `app.filename`, so `fileio.c`'s existing `sprintf(path,
+  "%s<suffix>", app.filename)`-style composition (Phase 6, unchanged)
+  keeps working without modification.
+- **Full subdirectory navigation** (confirmed with the user — overrode the
+  simpler flat-listing-only default I'd recommended): ENTER on a directory
+  entry descends (`picker_path_descend()`, refusing rather than silently
+  truncating if the resulting path wouldn't fit in `PICKER_PATH_MAXLEN=64`
+  bytes); LEFT goes to the parent (`picker_path_ascend()`, no-op at the
+  root). The path row always shows the current location. Selecting a file
+  inside a subdirectory prepends that subdirectory to `app.filename` (a
+  path relative to the LOCI root, e.g. `"DIR1/DIR2/name"`).
+  `FILENAME_MAXLEN` grew from 24 to 48 (`src/appstate.h`) to leave room
+  for this.
+- **No new automated test coverage**: `filepicker_run()` is only reachable
+  from a Load action that already requires `loci_check_present()` to pass
+  first, so `test_fileio_no_loci.sh`'s existing 12 assertions (every
+  Load/Save action's LOCI-absent path) already cover everything headless
+  testing can reach here — the actual browsing needs the same
+  real-hardware walkthrough as the rest of Phase 6's file I/O.
 
 ### Charset-swap mechanism
 
@@ -647,9 +714,12 @@ src/
                   Save/Load Screen/Project/Combined, Charset Load/Save
                   Std/Alt/Combined)
   fileio.c/h      LOCI file I/O backing the File/Charset menus: filename
-                  prompt, LOCI-presence gate, Screen/Combined/Project
-                  save/load, Charset Std/Alt/Combined save/load (see "LOCI
-                  file I/O (Phase 6)")
+                  prompt (Save), LOCI-presence gate, Screen/Combined/
+                  Project save/load, Charset Std/Alt/Combined save/load
+                  (see "LOCI file I/O (Phase 6)")
+  filepicker.c/h  XRAM-backed LOCI directory browser, replaces the
+                  filename prompt for every Load action (see "File picker
+                  (Phase 7)")
   charsetedit.c/h Character editor popup: edits the 6x8 glyph for
                   app.plotscreencode/app.plotaltchar directly in live charset
                   RAM (Strategy A -- see "Character editor (Phase 3)")
