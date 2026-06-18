@@ -61,8 +61,13 @@ Version v099-20220615-1454:
 
 Oric Screen Editor is an editor to create text based screens for the Oric Atmos. It fully supports using user defined character sets.
 
+**OSE-LOCI note**: this rewrite requires a **LOCI mass-storage device** to
+be attached to even start -- the canvas itself is stored in LOCI-backed
+overlay RAM, not just file loading/saving. If no LOCI device is detected,
+the program shows a message and exits instead of starting the editor.
+
 Main features of the program:
-- Support for screen maps larger than 40x25 characters. Screens can be up to 8 KiB (8.192 bytes), all sizes fitting in that memory with width of 40 at minimum and height of 27 at minimum are supported.
+- Support for screen maps larger than 40x25 characters. Screens can be up to 10 KiB (10,240 bytes), all sizes fitting in that memory with width of 40 at minimum and height of 27 at minimum are supported.
 - Supports resizing canvas size, clear or fill the canvas
 - Support for loading user defined charsets (should be standard charsets of 96 characters of 6 bits width and 8 bits height, alternate charsets of 80 characters or combined charsets of 176 characters).
 - Includes a simple character editor to change characters on the fly and directly see the result in your designed screen.
@@ -256,7 +261,7 @@ Navigation in this menu is performed by the following keys:
 
 *Width: Resize width*
 
-Resize the canvas width by entering the new width. You can both shrink as expand the width. Minimum width is 40, maximum width depends on the canvas height and the result fitting in the maximum of 8 KiB memory size allocation.
+Resize the canvas width by entering the new width. You can both shrink as expand the width. Minimum width is 40, maximum width depends on the canvas height and the result fitting in the maximum of 10 KiB memory size allocation.
 
 Note that with shrinking the width you might loose data, as all characters right of the new width will be lost. That is why on shrinking a pulldown menu will pop-up asking if you are sure. Select the desired answer (yellow highlighted position if using a black background).
 
@@ -264,7 +269,7 @@ Note that with shrinking the width you might loose data, as all characters right
 
 *Height: Resize height*
 
-Similar to resize width, with this option you can resize the height in the same way. Minimum height is 27, maximum again dependent on width given maximum of 8 KiB memory allocation.
+Similar to resize width, with this option you can resize the height in the same way. Minimum height is 27, maximum again dependent on width given maximum of 10 KiB memory allocation.
 
 Also here: on shrinking you might loose data, which is lost if you confirm.
 

@@ -25,6 +25,7 @@
 #include "statusbar.h"
 #include "charset.h"
 #include "charsetswap.h"
+#include "loci.h"
 #include "strings.h"
 #include "input.h"
 #include "help.h"
@@ -340,7 +341,12 @@ void charsetedit_run(void)
                 const uint8_t *rom = charset_rom_glyph(ce_code);
                 g = ce_glyph();
                 ce_snapshot();
+                // CHARSETROM ($FC78) is in $C000-$FFFF, overlay-RAM
+                // territory now (screenmap[]/undo) -- briefly borrow ROM
+                // for this read, same as charsetswap_enter().
+                disable_overlay_ram();
                 for (y = 0; y < CHAREDIT_GRID_H; y++) g[y] = rom[y];
+                enable_overlay_ram();
                 redraw = 1;
             }
             break;

@@ -32,7 +32,8 @@ localisation (canvas data model + minimal main mode + menu bar/Screen menu
 + character editor + charset-swap mechanism + palette/colour-picker popups
 + Select/Move/Line-Box/Write modes + LOCI file I/O + file picker + undo/
 redo + Select cut/copy + IJK/help/Information menu + Phosphoric test
-harness; binary 31645 bytes EN / 31669 bytes FR).
+harness; binary 31494 bytes EN / 31645 bytes FR). LOCI is now required to
+run the program at all (canvas storage moved into overlay RAM).
 A previous CC65-based attempt at this got stuck and is archived
 in the `nonworkingcc65` branch (full history + uncommitted state). `main` was
 restarted from scratch on the Oscar64 native/bare-metal build chain developed
@@ -428,14 +429,21 @@ previously showed "not yet implemented" for every item. Calling-convention
 reference: locifilemanager-v2's `loci_present()`/`file_save()`/
 `file_load()` usage (`src/dir.c` `config_save()`/`config_load()` there).
 
-- **LOCI stays optional, checked per-action** — `loci_check_present()`
-  wraps `loci_present()` with a graceful `MSG_LOCI_NOT_FOUND` popup, called
-  first by every File/Charset action. Unlike locifilemanager-v2 (which
-  requires LOCI to even boot), OSE keeps editing — and Phosphoric/Oricutron
-  testing of everything except the file I/O itself — working with no LOCI
-  device attached. `loci_present()` is a simple memory read (`*LOCI_
-  SIGNATURE_ADDR == 'L'`, `include/loci.c`), so this gate is always safe to
-  call regardless of whether a device is present.
+- **LOCI was optional at the time this phase was written, checked
+  per-action** — `loci_check_present()` wraps `loci_present()` with a
+  graceful `MSG_LOCI_NOT_FOUND` popup, called first by every File/Charset
+  action. **Historical note, since reversed**: this section originally
+  contrasted OSE with locifilemanager-v2 (which requires LOCI to even
+  boot) — that contrast no longer holds. LOCI became mandatory once the
+  canvas itself moved into overlay RAM (see "Canvas storage is overlay
+  RAM, LOCI is required" above) — `src/main.c` now hard-gates on
+  `loci_present()` before Main mode is ever reached, matching
+  locifilemanager-v2's own model after all. `loci_check_present()`'s
+  per-action popup is harmless leftover defensiveness (the check can
+  never actually fail any more) rather than a load-bearing graceful
+  degradation path — left in place since removing it buys nothing.
+  `loci_present()` is a simple memory read (`*LOCI_SIGNATURE_ADDR ==
+  'L'`, `include/loci.c`), always safe to call.
 - **File > Save/Load Screen**: `<name>.BIN`, a 6-byte `FileHeader` (magic +
   `canvas_width`/`height`) followed by `screenmap[]`. No charset data.
 - **File > Save/Load Combined**: `<name>.BIN`, the same header followed by
@@ -572,19 +580,33 @@ of bank-switched VDC RAM.
 - **Ring design**: a fixed 40-slot array (matching `Undo[41]`'s 40 active
   slots), each slot independently storing its own dirty-rectangle
   snapshot (only the changed bounding box, not the full canvas) at its
-  own byte offset in the 16KB region. The slot about to be overwritten
-  *next* is invalidated immediately (a `valid` flag — not an overloaded
-  `address==0` sentinel the way vdcscreeneditor-v2 does it, since 0 is a
-  legitimate offset here) — this is what lets undo/redo always stop
-  cleanly at the true edge of available history.
+  own byte offset in the undo region (6144 bytes, `UNDO_REGION_SIZE` —
+  see "Canvas storage is overlay RAM" above; was 16KB before the canvas
+  itself moved into the other half of `$C000-$FFFF`). The slot about to
+  be overwritten *next* is invalidated immediately (a `valid` flag — not
+  an overloaded `address==0` sentinel the way vdcscreeneditor-v2 does
+  it, since 0 is a legitimate offset here) — this is what lets undo/redo
+  always stop cleanly at the true edge of available history.
 - **The byte bump-pointer only resets** (taking the slot index with it)
-  when the next snapshot would exceed the 16KB budget — a rare event, not
-  a per-snapshot check. Even then, slots elsewhere in the ring keep their
-  data until a *later* cycle's growing writes physically reach them, so
-  history degrades gradually across a wrap, not all at once. **This was
-  the point of the correction above** — an earlier draft proposed
-  discarding all history on overflow, which the user correctly rejected
-  as worse *and* not actually simpler than the real mechanism.
+  when the next snapshot would exceed the region's budget — a rare
+  event, not a per-snapshot check. Even then, slots elsewhere in the
+  ring keep their data until a *later* cycle's growing writes physically
+  reach them, so history degrades gradually across a wrap, not all at
+  once. **This was the point of the correction above** — an earlier
+  draft proposed discarding all history on overflow, which the user
+  correctly rejected as worse *and* not actually simpler than the real
+  mechanism.
+- **Screen > Clear/Fill is now explicitly non-undoable on a large
+  canvas** — a deliberate decision made when the canvas moved into
+  overlay RAM (see "Canvas storage is overlay RAM" above): Clear/Fill is
+  the only operation that snapshots the *entire* canvas, so it can
+  exceed the (now smaller) undo region once the canvas is resized bigger
+  than it. `undo_snapshot()` guards against this explicitly
+  (`if (bytes > UNDO_REGION_SIZE) return;`) rather than corrupting
+  memory — found as a latent overflow bug during that work (the old code
+  would wrap a 16-bit pointer past `$FFFF` into zero page) and fixed
+  alongside it. Regression-tested by `tests/scripts/
+  test_undo_overflow.sh`.
 - **Redo data is stored alongside the original snapshot** in the same
   slot (`width*height` bytes for the original + another `width*height`
   for the eventual redo copy, reserved when there's room) — `undo_perform()`
@@ -599,29 +621,31 @@ of bank-switched VDC RAM.
   action calls `undo_snapshot()` first — Main-mode `SPACE`/`DEL`/`i`/`o`/
   `u`, Line/Box fill, Select's `d`/`i`/`p`/`m` fills and cut/copy, Move
   mode's per-keypress shift (whole-viewport snapshot, since a 1-cell shift
-  changes every cell along that axis), Write mode's every plotted/cleared
-  cell, and Screen menu Clear/Fill (whole-canvas snapshot). Dirty-rect
-  snapshots are cheap (a few bytes for a 1-cell edit), so this fits the
-  16KB budget comfortably even for a long Write session.
-- **`undo_snapshot()` no-ops if `!loci_present()`** — undo is simply
-  unavailable without a LOCI device (no popup, since this fires on every
-  keystroke, not an explicit user action).
+  changes every cell along that axis — bounded by the viewport, not the
+  canvas, so always 1080 bytes regardless of canvas size), Write mode's
+  every plotted/cleared cell, and Screen menu Clear/Fill (whole-canvas
+  snapshot — now explicitly skipped if it would exceed the undo region,
+  see above). Dirty-rect snapshots are cheap (a few bytes for a 1-cell
+  edit), so this fits the undo region's budget comfortably even for a
+  long Write session.
+- **`undo_snapshot()` no-ops if `!loci_present()`** — purely defensive
+  now that LOCI is required to even boot (`loci_present()` is always
+  true by the time any code can call this), kept for safety/clarity.
 - **Bug fixed while retrofitting Main-mode `SPACE`/`DEL`**: they were
   calling `canvas_put()` with `cursor_x`/`cursor_y` only, missing the
   `+xoffset`/`+yoffset` that `i`/`o`/`u`/`g` already apply — meant they
   plotted at the wrong canvas cell once the viewport had auto-scrolled
   (Phase 5a). `undo_snapshot()` needed the corrected coordinates to
   snapshot the right cell, so both call sites were fixed together.
-- **Not testable headless beyond the LOCI-absent path today** (this is
-  the Oric-side overlay RAM, not LOCI-device XRAM, but the same
-  `loci_present()` gate gets in the way) — `tests/scripts/
-  test_undo_no_loci.sh` confirms `z`/`y` are graceful no-ops with no LOCI
-  present. Unlike Phases 6-7's plain file-I/O/directory traffic, this
-  specifically needs Phosphoric's LOCI emulation to *also* model
-  `MICRODISCCFG`-driven overlay-RAM banking, not just the MIA/TAP/XRAM
-  protocol — unconfirmed whether that's modelled; worth checking before
-  assuming a real-hardware walkthrough is the only option (see the
-  Phase 8 plan).
+- **Now fully testable headless**: confirmed (direct Phosphoric spike,
+  see "Canvas storage is overlay RAM" above) that Phosphoric's `--loci`
+  correctly emulates `MICRODISCCFG`-driven overlay-RAM banking, not just
+  the MIA/TAP/XRAM protocol — `make test-*` targets all pass `--loci`
+  now, and undo's actual snapshot/restore mechanism is exercised by the
+  normal test suite (e.g. `test_select_cutcopy.sh`'s cut/copy, `test_
+  undo_overflow.sh`'s Clear/Fill-overflow regression) rather than being
+  stuck behind a real-hardware-only wall. Real hardware remains the
+  authoritative check given Phosphoric's LOCI emulation is alpha-quality.
 
 ### Select mode cut/copy (Phase 8)
 
@@ -682,7 +706,9 @@ screens (1=Main, 2=Character editor, 3=Select/Move/Line-Box, 4=Write —
 ported from V1's `helpscreen_load(screennumber)`), each a raw 1080-byte
 (40x27) screencode dump **embedded at compile time**
 (`assets/OSEforLOCI-Help{1..4}.bin`, Oscar64's `#embed`) rather than
-tape-loaded at runtime like V1 — works even without a LOCI device.
+tape-loaded at runtime like V1 — written when LOCI was still optional,
+since reversed (see "Canvas storage is overlay RAM, LOCI is required");
+the embedding choice stands regardless, just no longer for that reason.
 `charsetswap_enter()`/`exit()` bracket the raw `$BB80` blit (same
 direct-write approach `canvas_blit()` uses, for the same reason: a
 pre-rendered image can use arbitrary attribute bytes in columns 0-1 that
@@ -899,9 +925,12 @@ make test         # full automated Phosphoric test suite (test-boot, test-menus,
                   # test-screenresize, test-charsetram-spike, test-charsetedit,
                   # test-palette, test-colourpicker, test-cursor-autoscroll,
                   # test-linebox, test-select, test-move, test-writemode,
-                  # test-fileio-no-loci, test-select-cutcopy,
-                  # test-undo-no-loci, test-help-funct8) -- EN only, see
-                  # "Localisation" below
+                  # test-boot-no-loci, test-select-cutcopy,
+                  # test-undo-overflow, test-help-funct8) -- EN only, see
+                  # "Localisation" below. All targets pass --loci to
+                  # Phosphoric (LOCI is required, see "Canvas storage is
+                  # overlay RAM, LOCI is required") except test-boot-
+                  # no-loci, which deliberately tests the absent path.
 make test-boot    # headless boot smoke test (splash + canvas/statusbar render)
 make test-capture CYCLES=N TYPEKEYS='...'
                   # calibration helper: dumps tests/out/capture.bin + .png
@@ -945,19 +974,117 @@ rationale are in the file's header comment; summary:
 - `$0100-$01FF` — 6502 hardware stack
 - `$0200-$04FF` — Oric ROM system variables (do not use)
 - `$0500-$057F` — Startup region (tape entry point -> `oric_startup`)
-- `$0580-$B1FF` — Program code, data, BSS, heap (~42.4 KB)
+- `$0580-$B1FF` — Program code, data, BSS (~44.1 KB; `heap` dropped from
+  `oric_crt.c`'s main region section list, see "Help system (Phase 9b)" —
+  `malloc`/`free` are fully stubbed, no real heap is ever used). With
+  `screenmap[]` (the canvas) moved into overlay RAM (below), this region
+  now has ~8.7 KB free, up from ~370 bytes before — see "Canvas storage
+  is overlay RAM, LOCI is required" below for what that headroom is for.
 - `$B200-$B3FF` — Oscar64 software stack (512 bytes)
 - `$B400-$BBFF` — Character set RAM (left untouched — `$B400` is OSDK's
   documented ceiling for user code/data)
 - `$BB80-$FFFF` — Screen RAM (`$BB80`) + ROM (`$C000`)
-- `$C000-$FFFF` — Overlay RAM, **requires LOCI device**, not mapped as code
+- `$C000-$FFFF` — Overlay RAM, **requires LOCI device, and LOCI is now
+  required to run the program at all** (see below). Split in two:
+  `$C000-$E7FF` (10240 bytes, `CANVAS_REGION_BASE`/`CANVAS_MAX_SIZE`,
+  `src/canvas.h`) holds the canvas itself; `$E800-$FFFF` (6144 bytes,
+  `UNDO_REGION_BASE`/`UNDO_REGION_SIZE`, `src/undo.c`) holds undo.
 
 **IRQ convention:** interrupts are left disabled (`SEI`, no `CLI`) — the
-keyboard scanner polls directly, no IRQ handler is installed. Any code that
-must briefly enable IRQs (overlay RAM access via `MICRODISCCFG`, VIA Port A
-access in `ijk.c`) **must** use `PHP; SEI ... PLP`, never `SEI ... CLI` — an
-unconditional `CLI` would permanently re-enable IRQs and let the stock ROM IRQ
-handler corrupt zero page / screen RAM.
+keyboard scanner polls directly, no IRQ handler is installed. Any code
+that must briefly enable IRQs (VIA Port A access in `ijk.c`) **must**
+use `PHP; SEI ... PLP`, never `SEI ... CLI` — an unconditional `CLI`
+would permanently re-enable IRQs and let the stock ROM IRQ handler
+corrupt zero page / screen RAM. `MICRODISCCFG`/overlay-RAM toggles
+(`enable_overlay_ram()`/`disable_overlay_ram()`, used in `src/main.c`,
+`src/undo.c`, `src/charsetswap.c`, `src/charsetedit.c`, `src/info.c`)
+do **not** need this bracket — overlay RAM is enabled once for the
+whole session rather than toggled per access (see "Canvas storage is
+overlay RAM" below), and IRQs are already permanently off globally, so
+a plain register write is sufficient at each site.
+
+### Canvas storage is overlay RAM, LOCI is required (reversal of an
+earlier design decision)
+
+Until this change, `screenmap[]` (`src/canvas.c/h`) was a plain main-RAM
+array, capped at `CANVAS_MAX_SIZE=8192` because the `$0580-$B200` region
+was ~99% full (code, embedded help/title screens, `menu_winbuf`,
+`backup_std`, etc. left only ~370 bytes free). The user confirmed making
+the program **LOCI-only is acceptable — "that was actually how I planned
+it at start"** — reversing every earlier "LOCI stays optional" framing
+in this file (LOCI file I/O, undo, the file picker) for this one specific
+piece of state. This is a deliberate, discussed decision, not an
+accident — don't "fix" it back to main-RAM-only without re-reading this
+section. The pre-change state is tagged `pre-overlay-canvas` (local git
+tag) as a revert point.
+
+- **Split chosen: 10KB canvas / 6KB undo** (`CANVAS_MAX_SIZE=10240` /
+  `UNDO_REGION_SIZE=6144`, summing to all 16384 bytes of `$C000-$FFFF`).
+  Rationale: undo's only canvas-size-scaling consumer is Screen >
+  Clear/Fill (the sole operation that snapshots the *entire* canvas) —
+  it already barely fit in the old 16KB region on an 8192-byte canvas
+  and cannot fit in any sub-16KB region once the canvas is 10240 bytes,
+  so capping undo at 6KB costs nothing extra versus a bigger allocation;
+  Clear/Fill is made explicitly non-undoable either way (see "Canvas
+  undo/redo" below). 6KB comfortably covers Move-mode's per-shift
+  snapshots (bounded by the *viewport*, not the canvas — always 1080
+  bytes regardless of canvas size — 5-6 consecutive shifts) and any
+  realistic Select/Line-Box fill.
+- **`screenmap` is a pointer macro, not a real array**:
+  `#define screenmap ((uint8_t *)CANVAS_REGION_BASE)` (`src/canvas.h`),
+  replacing `extern uint8_t screenmap[CANVAS_MAX_SIZE];`. Every existing
+  `screenmap[i]`/`&screenmap[i]` call site (`canvas.c`'s 5 functions,
+  `select.c`'s cut/copy, `fileio.c`'s 4 `loci_write`/`loci_read` calls,
+  `undo.c`'s `undo_copy_row()`) kept working completely unmodified —
+  verified directly against Oscar64 before committing to this approach.
+  `CANVAS_MAX_ROW` (the row-reflow scratch buffer, stays in main RAM)
+  grew from 320 to 384 to match the bigger canvas.
+- **Overlay RAM is enabled once, for the whole session** (`src/main.c`,
+  right after the boot gate passes), not toggled on/off per access like
+  undo used to do it. This keeps the hot paths (`canvas_get`/`put`/
+  `blit`, called constantly) at zero added overhead. **Real bug found
+  and fixed via direct Phosphoric testing**: `undo.c`'s old `enable_
+  overlay_ram()`/`disable_overlay_ram()` brackets (from when overlay RAM
+  was off by default, briefly on for undo) had to be *removed* — the
+  `disable_overlay_ram()` at the end of each bracket was turning the
+  *whole session's* canvas access off until the next undo call
+  re-enabled it, corrupting every `screenmap[]` read/write in between
+  (reproduced: pressing SPACE in Main mode plotted, then `canvas_blit()`
+  read ROM bytes instead of the canvas). Confirmed fixed by removing
+  those calls from `undo_snapshot()`/`undo_perform()`/`redo_perform()`.
+- **Two places need to briefly *borrow* ROM instead** (the inverse of
+  the old pattern): `CHARSETROM` ($FC78) lives inside `$C000-$FFFF`, so
+  `charsetswap.c`'s `charsetswap_enter()` (`charset_load(CHARSET_STD,
+  CHARSETROM)`) and `charsetedit.c`'s `'s'` key (`charset_rom_glyph()`)
+  each bracket their ROM read with `disable_overlay_ram()` ... `enable_
+  overlay_ram()`. Grepped the whole codebase for any other `$C000-$FFFF`
+  literal — only `CHARSETROM` and the documented-but-never-called
+  `GTORKB` ($EB78) constant exist; nothing else touches ROM there.
+- **`info_exit()`'s RESET jump needs ROM exposed too**: `jmp ($fffc)`
+  reads the RESET vector bytes from ROM — with overlay RAM on by
+  default, `disable_overlay_ram()` is called immediately before the
+  jump, or it would jump to garbage (whatever canvas/undo data happens
+  to sit at that offset) instead of resetting.
+- **Boot gate** (`src/main.c`, before even the title splash): hard
+  `loci_present()` check, adapted from `locifilemanager-v2`'s own
+  `main()` (lines 485-497) — shows `MSG_LOCI_NOT_FOUND` +
+  `MSG_PRESS_KEY_EXIT` and returns if absent (both strings were already
+  defined, unused, pre-staged for exactly this). `enable_overlay_ram()`
+  is called once, right after the gate passes. **`make run` (Oricutron)
+  can now only ever show this gate** — Oricutron has no LOCI emulation
+  at all, so it's only useful for testing the gate/absent path now; use
+  Phosphoric with `--loci` (see "Phosphoric test harness") or real
+  hardware for anything past it.
+- **Test suite**: every `make test-*` target's Phosphoric invocation now
+  passes `--loci` (confirmed via a direct spike that Phosphoric's
+  `--loci` correctly emulates both `loci_present()` and the
+  `MICRODISCCFG` overlay-RAM bank switch — toggle, write, read-back all
+  matched expectations). `test_fileio_no_loci.sh`/`test_undo_no_loci.sh`
+  (which tested graceful degradation that no longer exists, since Main
+  mode is never reached without LOCI) were retired in favour of
+  `test_boot_no_loci.sh` (tests the gate itself) and a new
+  `test_undo_overflow.sh` (regression test for the Clear/Fill-overflow
+  fix below).
 
 ## Source Layout
 

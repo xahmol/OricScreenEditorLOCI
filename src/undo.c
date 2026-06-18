@@ -9,12 +9,24 @@
 // in bank-switched RAM. Adapted here for OSE's single-plane canvas
 // (screenmap[] has one byte per cell, unlike VDC RAM's separate screen/
 // attribute planes, so each snapshot needs width*height bytes, not
-// width*height per plane) and Oric overlay RAM ($C000-$FFFF via
-// include/loci.h's enable_overlay_ram()/disable_overlay_ram()) instead of
+// width*height per plane) and Oric overlay RAM ($C000-$FFFF) instead of
 // bank-switched VDC RAM.
 //
+// LOCI is now required to run the program at all (src/main.c's boot
+// gate), and overlay RAM is enabled once for the whole session right
+// after that gate passes -- screenmap[] (src/canvas.h) itself lives
+// there too now (CANVAS_REGION_BASE, the other half of $C000-$FFFF).
+// This file used to enable_overlay_ram()/disable_overlay_ram() around
+// each snapshot/restore (when overlay RAM was off by default, only
+// turned on briefly for undo); those calls were removed when overlay
+// became the permanent default -- the disable_overlay_ram() at the end
+// of each bracket was turning the *whole session's* canvas access off
+// until the next undo call re-enabled it, corrupting every screenmap[]
+// read/write in between (found via direct Phosphoric testing while
+// wiring up the overlay-RAM canvas).
+//
 // Ring design: a fixed UNDO_MAX_SLOTS-slot array, each slot independently
-// storing its own snapshot at its own byte offset in the 16KB region. The
+// storing its own snapshot at its own byte offset in its region. The
 // slot about to be overwritten *next* is invalidated immediately (a
 // sentinel), so undo/redo always stops cleanly at the true edge of
 // available history. The byte bump-pointer (undo_address) only resets to
@@ -24,6 +36,17 @@
 // in the ring keep their data until a *later* cycle's growing writes
 // physically reach them, so history degrades gradually across a wrap,
 // not all at once.
+//
+// undo_snapshot() also guards against a *single* snapshot bigger than
+// the whole region (impossible before the canvas moved into overlay RAM,
+// since CANVAS_MAX_SIZE was always < UNDO_REGION_SIZE; now Screen >
+// Clear/Fill -- the only operation that snapshots the entire canvas --
+// can exceed UNDO_REGION_SIZE) -- it silently skips taking the snapshot
+// rather than overflowing the copy loop past $FFFF (which would wrap a
+// 16-bit pointer into zero page). This makes Clear/Fill (and any
+// Select/Line-Box fill close to the full canvas) gracefully
+// non-undoable on a large canvas, a deliberate accepted trade-off (see
+// CLAUDE.md "Canvas undo/redo") rather than a crash.
 //
 // undo_escapeundo() (vdcscreeneditor-v2's mid-operation-cancel cleanup)
 // has no OSE equivalent: every call site here takes its snapshot only
@@ -41,8 +64,10 @@
 #define UNDO_MAX_SLOTS    40       // matches vdcscreeneditor-v2's Undo[41]
                                    // (40 active slots; the "+1" there is
                                    // folded into the valid flag here)
-#define UNDO_REGION_BASE  0xC000U
-#define UNDO_REGION_SIZE  0x4000U // 16KB, all of $C000-$FFFF
+#define UNDO_REGION_BASE  (CANVAS_REGION_BASE + CANVAS_MAX_SIZE) // 0xE800
+#define UNDO_REGION_SIZE  0x1800U // 6144 bytes -- the other half of
+                                   // $C000-$FFFF, screenmap[] gets the
+                                   // first 10240 (CANVAS_MAX_SIZE)
 
 typedef struct {
     uint8_t  valid;       // 0 = no data / invalidated -- explicit flag,
@@ -78,9 +103,11 @@ void undo_init(void)
 }
 
 /**
- * Copy a w-byte row between screenmap[] and overlay RAM. Caller must
- * already be inside a PHP/SEI/enable_overlay_ram() ... disable_overlay_
- * ram()/PLP bracket (see undo_snapshot()/undo_perform()/redo_perform()).
+ * Copy a w-byte row between screenmap[] and the undo region. Both sides
+ * are overlay RAM now (screenmap[] and the undo region are two halves of
+ * the same $C000-$FFFF bank, see the file header comment) -- no special
+ * bracketing needed here, overlay RAM is already enabled for the whole
+ * session by the time any caller of this runs.
  *
  * @param canvas_off Offset into screenmap[] (row*canvas_width + x).
  * @param ovl_off    Offset into the UNDO_REGION_BASE+offset overlay slot.
@@ -118,6 +145,9 @@ void undo_snapshot(uint16_t x, uint16_t y, uint16_t w, uint16_t h)
     uint16_t row;
 
     if (!loci_present()) return;
+    if (bytes > UNDO_REGION_SIZE) return; // too big to ever fit -- skip
+                                           // gracefully (Clear/Fill on a
+                                           // large canvas, see file header)
 
     undo_redopossible = 0;
     undo_undopossible  = 1;
@@ -134,14 +164,9 @@ void undo_snapshot(uint16_t x, uint16_t y, uint16_t w, uint16_t h)
 
     if ((uint16_t)(next_addr + bytes) > UNDO_REGION_SIZE) redoroom = 0;
 
-    __asm { php }
-    __asm { sei }
-    enable_overlay_ram();
     for (row = 0; row < h; row++)
         undo_copy_row((uint16_t)((y + row) * app.canvas_width + x),
                       (uint16_t)(undo_address + row * w), w, 1);
-    disable_overlay_ram();
-    __asm { plp }
 
     undo_slots[undo_number - 1].valid       = 1;
     undo_slots[undo_number - 1].address     = undo_address;
@@ -174,9 +199,6 @@ void undo_perform(void)
     slot  = &undo_slots[undo_number - 1];
     bytes = (uint16_t)(slot->width * slot->height);
 
-    __asm { php }
-    __asm { sei }
-    enable_overlay_ram();
     if (slot->redopresent)
         for (row = 0; row < slot->height; row++)
             undo_copy_row((uint16_t)((slot->y + row) * app.canvas_width + slot->x),
@@ -184,8 +206,6 @@ void undo_perform(void)
     for (row = 0; row < slot->height; row++)
         undo_copy_row((uint16_t)((slot->y + row) * app.canvas_width + slot->x),
                       (uint16_t)(slot->address + row * slot->width), slot->width, 0);
-    disable_overlay_ram();
-    __asm { plp }
 
     canvas_blit();
     statusbar_draw();
@@ -223,14 +243,9 @@ void redo_perform(void)
     slot  = &undo_slots[undo_number - 1];
     bytes = (uint16_t)(slot->width * slot->height);
 
-    __asm { php }
-    __asm { sei }
-    enable_overlay_ram();
     for (row = 0; row < slot->height; row++)
         undo_copy_row((uint16_t)((slot->y + row) * app.canvas_width + slot->x),
                       (uint16_t)(slot->address + bytes + row * slot->width), slot->width, 0);
-    disable_overlay_ram();
-    __asm { plp }
 
     canvas_blit();
     statusbar_draw();

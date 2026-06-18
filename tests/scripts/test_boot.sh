@@ -66,12 +66,12 @@ if [ ! -x "$PHOS" ]; then
 fi
 
 "$PHOS" -r "$ATMOSROM" \
-    -t "$SANDBOX/$TAPFILE" -f \
+    -t "$SANDBOX/$TAPFILE" -f --loci \
     --headless -c $SPLASH_CYCLES \
     --dump-ram-at $SPLASH_CYCLES:"$SPLASH_DUMP" >/dev/null 2>&1
 
 "$PHOS" -r "$ATMOSROM" \
-    -t "$SANDBOX/$TAPFILE" -f \
+    -t "$SANDBOX/$TAPFILE" -f --loci \
     --headless -c $MAIN_CYCLES \
     --type-keys "$DISMISS_AT: " \
     --dump-ram-at $MAIN_CYCLES:"$MAIN_DUMP" >/dev/null 2>&1

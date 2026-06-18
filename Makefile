@@ -187,7 +187,7 @@ CYCLES   ?= 8000000
 # all: must appear first so it is the default goal
 # =========================================================================
 
-.PHONY: all all-langs clean run docs check-phosphoric sandbox-reset test-capture test-boot test-menus test-screenresize test-charsetram-spike test-charsetedit test-palette test-colourpicker test-cursor-autoscroll test-linebox test-select test-move test-writemode test-fileio-no-loci test-select-cutcopy test-undo-no-loci test-help-funct8 test
+.PHONY: all all-langs clean run docs check-phosphoric sandbox-reset test-capture test-boot test-menus test-screenresize test-charsetram-spike test-charsetedit test-palette test-colourpicker test-cursor-autoscroll test-linebox test-select test-move test-writemode test-boot-no-loci test-select-cutcopy test-undo-overflow test-help-funct8 test
 
 all: build/$(MAIN)$(LANGSUFFIX).tap
 
@@ -204,7 +204,13 @@ build/$(MAIN)$(LANGSUFFIX).tap: build/$(MAIN)$(LANGSUFFIX).bin
 	    $(PROGNAME) \
 	    $(LOAD_ADDR)
 
-# Launch in Oricutron (must cd to oricutron dir -- it loads ROMs from cwd)
+# Launch in Oricutron (must cd to oricutron dir -- it loads ROMs from cwd).
+# NOTE: Oricutron cannot emulate LOCI at all, and LOCI is now required to
+# even boot (screenmap[] lives in overlay RAM) -- `make run` will only
+# ever show the "No LOCI device detected" gate, never the editor itself.
+# That's still useful for testing the gate/Oricutron-absent path; for
+# anything past it, use Phosphoric with --loci (see "Phosphoric test
+# harness" in CLAUDE.md) or real LOCI hardware.
 run: build/$(MAIN)$(LANGSUFFIX).tap
 	cd $(ORICUTRON_HOME) && \
 	    $(EMUL) $(EMUFLAG) "$(CURDIR)/build/$(MAIN)$(LANGSUFFIX).tap"
@@ -245,7 +251,7 @@ sandbox-reset: build/$(MAIN)$(LANGSUFFIX).tap
 test-capture: check-phosphoric sandbox-reset
 	$(MKDIR) tests/out 2>$(NULLDEV) ; true
 	$(PHOS) -r $(ATMOSROM) \
-	    -t tests/sandbox/$(MAIN)$(LANGSUFFIX).tap -f \
+	    -t tests/sandbox/$(MAIN)$(LANGSUFFIX).tap -f --loci \
 	    --headless -c $(CYCLES) \
 	    $(if $(TYPEKEYS),--type-keys '$(TYPEKEYS)') \
 	    --dump-ram-at $(CYCLES):tests/out/capture.bin \
@@ -325,11 +331,11 @@ test-writemode: check-phosphoric sandbox-reset
 	    TAPFILE=$(MAIN)$(LANGSUFFIX).tap \
 	    bash tests/scripts/test_writemode.sh
 
-test-fileio-no-loci: check-phosphoric sandbox-reset
+test-boot-no-loci: check-phosphoric sandbox-reset
 	$(MKDIR) tests/out 2>$(NULLDEV) ; true
 	PHOS=$(PHOS) ATMOSROM=$(ATMOSROM) SANDBOX=tests/sandbox OUT=tests/out \
 	    TAPFILE=$(MAIN)$(LANGSUFFIX).tap \
-	    bash tests/scripts/test_fileio_no_loci.sh
+	    bash tests/scripts/test_boot_no_loci.sh
 
 test-select-cutcopy: check-phosphoric sandbox-reset
 	$(MKDIR) tests/out 2>$(NULLDEV) ; true
@@ -337,11 +343,11 @@ test-select-cutcopy: check-phosphoric sandbox-reset
 	    TAPFILE=$(MAIN)$(LANGSUFFIX).tap \
 	    bash tests/scripts/test_select_cutcopy.sh
 
-test-undo-no-loci: check-phosphoric sandbox-reset
+test-undo-overflow: check-phosphoric sandbox-reset
 	$(MKDIR) tests/out 2>$(NULLDEV) ; true
 	PHOS=$(PHOS) ATMOSROM=$(ATMOSROM) SANDBOX=tests/sandbox OUT=tests/out \
 	    TAPFILE=$(MAIN)$(LANGSUFFIX).tap \
-	    bash tests/scripts/test_undo_no_loci.sh
+	    bash tests/scripts/test_undo_overflow.sh
 
 test-help-funct8: check-phosphoric sandbox-reset
 	$(MKDIR) tests/out 2>$(NULLDEV) ; true
@@ -363,9 +369,9 @@ test:
 	$(MAKE) test-select || status=1; \
 	$(MAKE) test-move || status=1; \
 	$(MAKE) test-writemode || status=1; \
-	$(MAKE) test-fileio-no-loci || status=1; \
+	$(MAKE) test-boot-no-loci || status=1; \
 	$(MAKE) test-select-cutcopy || status=1; \
-	$(MAKE) test-undo-no-loci || status=1; \
+	$(MAKE) test-undo-overflow || status=1; \
 	$(MAKE) test-help-funct8 || status=1; \
 	exit $$status
 

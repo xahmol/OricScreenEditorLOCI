@@ -52,13 +52,13 @@ if [ ! -x "$PHOS" ]; then
 fi
 
 "$PHOS" -r "$ATMOSROM" \
-    -t "$SANDBOX/$TAPFILE" -f \
+    -t "$SANDBOX/$TAPFILE" -f --loci \
     --headless -c $BEFORE_CYCLES \
     --type-keys "$DISMISS_AT: " \
     --dump-ram-at $BEFORE_CYCLES:"$BEFORE_DUMP" >/dev/null 2>&1
 
 "$PHOS" -r "$ATMOSROM" \
-    -t "$SANDBOX/$TAPFILE" -f \
+    -t "$SANDBOX/$TAPFILE" -f --loci \
     --headless -c $AFTER_CYCLES \
     --type-keys "$DISMISS_AT: \p1e\p1i\p1\e" \
     --dump-ram-at $AFTER_CYCLES:"$AFTER_DUMP" >/dev/null 2>&1

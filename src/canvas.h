@@ -2,14 +2,28 @@
 #define CANVAS_H
 
 #include <stdint.h>
+#include "oric.h"
 #include "appstate.h"
 
-extern uint8_t screenmap[CANVAS_MAX_SIZE];
+// screenmap[] lives in overlay RAM, not main RAM: a pointer macro into
+// CANVAS_REGION_BASE rather than a real array. Every existing
+// screenmap[i]/&screenmap[i] call site keeps working unmodified (C
+// array-indexing is pointer arithmetic either way) -- verified against
+// Oscar64 directly. This is what frees the ~10KB this used to cost in
+// main RAM; see CLAUDE.md "Memory Layout". Requires overlay RAM to
+// already be enabled (src/main.c's boot gate enables it once, for the
+// whole session, right after confirming loci_present()) -- accessing
+// screenmap[] with overlay RAM disabled silently reads/writes ROM
+// instead, with no error.
+#define CANVAS_REGION_BASE OVERLAY_BASE
+#define screenmap ((uint8_t *)CANVAS_REGION_BASE)
 
-// Widest possible canvas row (CANVAS_MAX_SIZE / VIEWPORT_HEIGHT ~= 303,
+// Widest possible canvas row (CANVAS_MAX_SIZE / VIEWPORT_HEIGHT ~= 379,
 // rounded up). canvas_resize() and select.c's cut/copy both reuse this
-// single scratch buffer (mutually exclusive in time).
-#define CANVAS_MAX_ROW 320
+// single scratch buffer (mutually exclusive in time). Stays in main RAM
+// (a small staging buffer, not the canvas itself) -- no overlay-RAM
+// concerns here.
+#define CANVAS_MAX_ROW 384
 extern uint8_t canvas_rowbuf[CANVAS_MAX_ROW];
 
 void canvas_init(void);

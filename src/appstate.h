@@ -8,13 +8,15 @@
 #define VIEWPORT_HEIGHT  27
 
 // Canvas size: starts at the viewport size, resizable up to CANVAS_MAX_SIZE
-// cells (Screen > Width/Height, canvas_resize()). 8192 is a documented,
-// revisable budget -- about 2.5x V1's 6655-byte CC65 ceiling, leaving ~34KB
-// of the ~42.4KB main-RAM region for the menu engine and later phases'
-// static buffers.
+// cells (Screen > Width/Height, canvas_resize()). screenmap[] (src/canvas.h)
+// lives in Oric-side overlay RAM ($C000-$FFFF, OVERLAY_BASE/OVERLAY_SIZE in
+// oric.h) rather than main RAM -- LOCI is required to run the program at
+// all (see src/main.c's boot gate). 10240 (0x2800) is the canvas's share of
+// the 16KB overlay region; the remaining 6144 (0x1800) bytes go to undo
+// (src/undo.c's UNDO_REGION_SIZE) -- see CLAUDE.md "Memory Layout".
 #define CANVAS_WIDTH     VIEWPORT_WIDTH
 #define CANVAS_HEIGHT    VIEWPORT_HEIGHT
-#define CANVAS_MAX_SIZE  8192
+#define CANVAS_MAX_SIZE  10240
 
 // Character editor favourites (0-9 select, SHIFT+0-9 store).
 #define FAVOURITES_COUNT 10

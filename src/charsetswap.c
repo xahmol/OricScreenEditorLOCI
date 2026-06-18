@@ -7,6 +7,7 @@
 
 #include "oric.h"
 #include "charset.h"
+#include "loci.h"
 #include "charsetswap.h"
 
 static uint8_t swap_depth;
@@ -34,6 +35,12 @@ void charsetswap_mark_changed(void)
  * nested popups share one backup buffer safely. No-op until
  * charsetswap_mark_changed() has been called at least once.
  *
+ * CHARSETROM ($FC78) lives inside $C000-$FFFF, the same address range
+ * screenmap[]/undo now occupy as overlay RAM (enabled for the whole
+ * session, see src/main.c) -- briefly disable_overlay_ram() to expose
+ * the real ROM for this read, then enable_overlay_ram() again
+ * immediately after, so canvas/undo access keeps working everywhere else.
+ *
  * @return (none)
  */
 void charsetswap_enter(void)
@@ -41,7 +48,9 @@ void charsetswap_enter(void)
     if (swap_depth == 0 && charset_changed)
     {
         charset_save(CHARSET_STD, backup_std);
+        disable_overlay_ram();
         charset_load(CHARSET_STD, (const uint8_t *)CHARSETROM);
+        enable_overlay_ram();
     }
     swap_depth++;
 }

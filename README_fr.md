@@ -62,7 +62,7 @@ Version v099-20220615-1454 :
 Oric Screen Editor est un éditeur permettant de créer des écrans textuels pour l'Oric Atmos. Il prend entièrement en charge l'utilisation de jeux de caractères personnalisés.
 
 Principales fonctionnalités du programme :
-- Prise en charge d'écrans plus grands que 40x25 caractères. Les écrans peuvent atteindre 8 Kio (8 192 octets) ; toutes les tailles tenant dans cette mémoire, avec une largeur minimale de 40 et une hauteur minimale de 27, sont prises en charge.
+- Prise en charge d'écrans plus grands que 40x25 caractères. Les écrans peuvent atteindre 10 Kio (10 240 octets) ; toutes les tailles tenant dans cette mémoire, avec une largeur minimale de 40 et une hauteur minimale de 27, sont prises en charge.
 - Prend en charge le redimensionnement de la zone de dessin, son effacement ou son remplissage
 - Prise en charge du chargement de jeux de caractères personnalisés (doivent être des jeux de caractères standards de 96 caractères de 6 bits de large et 8 bits de haut, des jeux alternatifs de 80 caractères, ou des jeux combinés de 176 caractères).
 - Inclut un éditeur de caractères simple pour modifier les caractères à la volée et voir directement le résultat dans l'écran en cours de création.
@@ -259,7 +259,7 @@ La navigation dans ce menu se fait avec les touches suivantes :
 
 *Width : redimensionner la largeur*
 
-Redimensionnez la largeur de la zone de dessin en saisissant la nouvelle largeur. Vous pouvez aussi bien réduire qu'agrandir la largeur. La largeur minimale est 40, la largeur maximale dépend de la hauteur de la zone de dessin et du fait que le résultat tienne dans l'allocation mémoire maximale de 8 Kio.
+Redimensionnez la largeur de la zone de dessin en saisissant la nouvelle largeur. Vous pouvez aussi bien réduire qu'agrandir la largeur. La largeur minimale est 40, la largeur maximale dépend de la hauteur de la zone de dessin et du fait que le résultat tienne dans l'allocation mémoire maximale de 10 Kio.
 
 Notez qu'en réduisant la largeur vous risquez de perdre des données, car tous les caractères à droite de la nouvelle largeur seront perdus. C'est pourquoi, lors d'une réduction, un menu déroulant apparaît pour vous demander confirmation. Sélectionnez la réponse souhaitée (position en surbrillance jaune si vous utilisez un fond noir).
 
@@ -267,7 +267,7 @@ Notez qu'en réduisant la largeur vous risquez de perdre des données, car tous 
 
 *Height : redimensionner la hauteur*
 
-Comme pour le redimensionnement de la largeur, cette option permet de redimensionner la hauteur de la même façon. La hauteur minimale est 27, le maximum dépend à nouveau de la largeur, compte tenu de l'allocation mémoire maximale de 8 Kio.
+Comme pour le redimensionnement de la largeur, cette option permet de redimensionner la hauteur de la même façon. La hauteur minimale est 27, le maximum dépend à nouveau de la largeur, compte tenu de l'allocation mémoire maximale de 10 Kio.
 
 Là aussi : en réduisant, vous risquez de perdre des données, qui seront effectivement perdues si vous confirmez.
 

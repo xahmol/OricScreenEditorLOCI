@@ -31,6 +31,7 @@
 #include "menu.h"
 #include "strings.h"
 #include "input.h"
+#include "loci.h"
 #include "info.h"
 
 // "I Dream in 8 Bits" logo, 40x13 Oric screen-RAM dump (rows 0-12 of the
@@ -137,12 +138,16 @@ void info_version_show(void)
  * the hardware RESET button, since the cold-start handler itself ($F88F)
  * must not be called directly from application code. No confirmation is
  * asked (matches README's documented Exit behaviour); unsaved work is
- * lost, as the RAM contents are gone after the reset.
+ * lost, as the RAM contents are gone after the reset. disable_overlay_ram()
+ * first: overlay RAM is enabled for the whole session (src/main.c), and
+ * $FFFC/$FFFD must read the real ROM-resident RESET vector, not whatever
+ * canvas/undo data happens to sit there in overlay RAM.
  *
  * @return (none) -- never returns.
  */
 void info_exit(void)
 {
+    disable_overlay_ram();
     __asm {
         jmp ($fffc)
     }

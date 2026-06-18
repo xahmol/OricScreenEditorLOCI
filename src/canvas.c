@@ -3,7 +3,9 @@
 #include "appstate.h"
 #include "canvas.h"
 
-uint8_t screenmap[CANVAS_MAX_SIZE];
+// screenmap[] itself is now a pointer macro into overlay RAM -- see
+// canvas.h. No array definition needed here any more (that's the main-RAM
+// space this change frees up).
 
 // Scratch row buffer for canvas_resize()'s width reflow, also reused by
 // src/select.c's cut/copy (CANVAS_MAX_ROW declared in canvas.h) for the

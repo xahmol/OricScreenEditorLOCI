@@ -58,7 +58,7 @@ check_not_found() {
 run_capture() {
     local cycles="$1" typekeys="$2" dump="$3"
     "$PHOS" -r "$ATMOSROM" \
-        -t "$SANDBOX/$TAPFILE" -f \
+        -t "$SANDBOX/$TAPFILE" -f --loci \
         --headless -c "$cycles" \
         --type-keys "8000000: $typekeys" \
         --dump-ram-at "$cycles:$dump" >/dev/null 2>&1
