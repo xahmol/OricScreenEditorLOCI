@@ -260,6 +260,25 @@ void editor_run(void)
             app.plotscreencode ^= 0x80;
             break;
 
+        // Try mode: preview plotscreencode at the cursor without
+        // committing it. Writes directly to screen RAM ($BB80), not
+        // screenmap[] -- so on cancel, canvas_blit() restoring the real
+        // canvas content is all that's needed, no remembered byte to
+        // put back. Ported from V1's plot_try() (local reference,
+        // /home/xahmol/git/OricScreenEditor/src/main.c).
+        case 't':
+        {
+            uint8_t *cell = (uint8_t *)TEXTVRAM + app.cursor_y * SCREEN_COLS + app.cursor_x;
+            *cell = app.plotscreencode;
+            if (key_read() == KEY_SPACE)
+            {
+                undo_snapshot(app.cursor_x + app.xoffset, app.cursor_y + app.yoffset, 1, 1);
+                canvas_put(app.cursor_x + app.xoffset, app.cursor_y + app.yoffset, app.plotscreencode);
+            }
+            canvas_blit();
+            break;
+        }
+
         // Undo/redo the most recent canvas edit (no V1 precedent --
         // genuinely new functionality, see CLAUDE.md "Canvas undo/redo").
         case 'z':
