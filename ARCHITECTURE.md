@@ -234,14 +234,16 @@ src/
                   character editor, 'p'/'c' open the palette/colour picker,
                   'l'/'s'/'m'/'w' open Line-Box/Select/Move/Write mode
                   (§6.9-§6.13), z/y undo/redo (§6.16), FUNCT+8 shows help
-                  (§6.18)
+                  (§6.18), t Try mode (§6.21), j/h Goto/Home (§6.22),
+                  f Find/Replace (§6.24)
   modes.h/c       EditorMode -> MSG_MODE_* display-name lookup
                   (mode_name()), shared by statusbar.c and any mode file
   select.c/h      Shared rectangle-grower (rect_select()) + Line/Box mode
-                  ('l') + Select mode ('s', incl. x/c cut/copy)
-                  (§6.9/§6.10/§6.11/§6.17)
+                  ('l', incl. 'o' hollow-box toggle) + Select mode ('s',
+                  incl. x/c cut/copy) (§6.9/§6.10/§6.11/§6.17)
   move.c/h        Move mode ('m'): nudges visible canvas content (§6.12)
-  write.c/h       Write mode ('w'): free-typing screencodes (§6.13)
+  write.c/h       Write mode ('w'): free-typing screencodes, incl.
+                  FUNCT+5 hex-direct attribute entry (§6.13)
   fileio.c/h      LOCI file I/O backing the File/Charset menus (§6.14)
   filepicker.c/h  XRAM-backed LOCI directory browser for every Load
                   action (§6.15)
@@ -252,9 +254,14 @@ src/
   help.c/h        FUNCT+8 help screens, #embed'd + LZO-compressed (§6.18)
   info.c/h        Information menu actions: Version (3-page popup) and
                   Exit (RESET vector) (§6.19)
+  findreplace.c/h Unified Find/Replace popup ('f'): screencode/ink/paper
+                  target, find-only jump or whole-canvas replace-all
+                  (§6.24)
   menu.c/h        Menu bar/pulldown/popup engine + main-RAM window-save stack
   menudata.c/h    OSE menu tables (Screen/File/Charset/Information) + Screen/
-                  File/Charset/Information pulldown dispatch
+                  File/Charset/Information pulldown dispatch, incl.
+                  Charset > Reset Std->ROM (§6.23) and goto_dialog()
+                  (§6.22)
   charsetedit.c/h Character editor popup: edits the 6x8 glyph for
                   app.plotscreencode/app.plotaltchar directly in live charset RAM
   charsetswap.c/h Charset-swap mechanism: backs up/restores CHARSET_STD around
@@ -549,7 +556,9 @@ main.c
  │   │               overlay RAM, not LOCI-device XRAM, see §2.4)
  │   ├─ input.h         (key_read(), §6.17)
  │   │    └─ ijk.h (ijk_detect/ijk_read -- VIA Port A joystick)
- │   └─ help.h          (FUNCT+8 in Main mode, §6.18)
+ │   ├─ help.h          (FUNCT+8 in Main mode, §6.18)
+ │   └─ findreplace.h   (Find/Replace popup, §6.24)
+ │        └─ menu.h, undo.h, input.h, strings.h
  └─ strings.h    (EN/FR localisation gateway -> strings_en.h/strings_fr.h, §3)
 
 select.c, move.c, write.c, menudata.c
@@ -865,6 +874,14 @@ Calls `rect_select(1)` (`app.mode = MODE_LINEBOX`); if accepted, fills the
 rectangle with `app.plotscreencode` via a `canvas_put()` loop, then
 `canvas_blit()`s. ESC at the rect stage leaves the canvas unchanged.
 
+**Hollow box (new, no V1 precedent)**: pressing `o` while growing the
+rectangle toggles a file-scope `select_hollow` flag (`rect_select()`,
+`src/select.c`). If set on accept, `linebox_run()` plots only the
+rectangle's border via the new `rect_perimeter_plot()` (same
+border-walk math as the existing `rect_perimeter_toggle()` cursor
+highlight, but `canvas_put()` instead of `canvas_cell_invert()`)
+instead of filling the interior. Default (no `o` press) is unchanged.
+
 ### 6.11 Select mode (`select_run()`, `src/select.c`, entered via `s`)
 
 Calls `rect_select(0)` (`app.mode = MODE_SELECT`); if cancelled, returns
@@ -905,6 +922,14 @@ section); `DEL` clears the cell; `CTRL+R` toggles a local reverse-video
 flag; any other printable key plots its screencode (`+0x80` if
 reverse-video) and advances right. `FUNCT+6` toggles the statusbar. ESC
 exits to Main.
+
+**Hex-direct attribute entry (new, no V1 precedent)**: `FUNCT+5`
+(`KEY_F5`, not `FUNCT+4` — see §7's `decode_funct[]` testability note)
+opens `write_hex_attr()`: choose `1`/`2`/`3` for ink/paper/modifier,
+type a single hex digit 0-7, and the resulting attribute byte is
+plotted at the cursor exactly like `FUNCT+1/2/3` do (advance right
+after). An alternative input method alongside the existing
+`CTRL+Z/X`/`CTRL+C/V` cycling, not a replacement for it.
 
 ### 6.14 LOCI file I/O (`src/fileio.c`, File/Charset menus, Phase 6)
 
@@ -1131,6 +1156,56 @@ OS-level loader; OSE's runtime has no such loader to return to). Both
 wired into `menudata.c`'s Information pulldown (choices 41/42), the last
 two menu items that had been permanent stubs since Phase 2.
 
+### 6.21 Try mode (`'t'` in Main mode, `src/editor.c`)
+
+Direct port of V1's `plot_try()`. Writes `app.plotscreencode` straight
+to screen RAM (`$BB80`) at the cursor, bypassing `screenmap[]` entirely
+— a pure preview. `key_read()` waits for the next key: `SPACE` commits
+it (`undo_snapshot()` + `canvas_put()`, same convention as every other
+destructive Main-mode action), anything else cancels with no canvas
+change (`canvas_blit()` redraws the untouched real content, since the
+preview never touched `screenmap[]`).
+
+### 6.22 Goto coordinates and Home (`'j'`/`'h'` in Main mode)
+
+`canvas_goto(x, y)` (`src/canvas.h/c`, new): clamps the target to the
+canvas extent, centers the viewport on it (clamped at the canvas
+edges), sets `cursor_x/y` + `xoffset/yoffset`, `canvas_blit()`s. Shared
+by `goto_dialog()` (`src/menudata.c`, `'j'`: two `cwin_textinput`
+fields pre-filled with the cursor's current absolute position, same
+pattern as `resize_dialog()`; ESC at either field cancels) and `'h'`
+(`src/editor.c`: the same primitive with fixed coordinates `(0,0)`, no
+popup).
+
+### 6.23 Charset > Reset Std->ROM (`menudata.c`, Charset pulldown choice 37)
+
+`charset_reset_std()`: after `menu_areyousure()` confirms, calls
+`charset_load(CHARSET_STD, (const uint8_t *)CHARSETROM)` (`include/
+charset.h` — the same primitive `charsetswap.c` already uses) and sets
+`app.stdchanged = 1`. Std-only, like every other ROM-restore path in
+this codebase. `PULLDOWN_MAXOPTIONS` grew from 6 to 7 (§4.4) to fit
+this 7th Charset-menu item.
+
+### 6.24 Unified Find/Replace (`'f'` in Main mode, `src/findreplace.c`, new file)
+
+`findreplace_run()`: a 3-step popup. Step 1 reads a single key
+(`1`/`2`/`3` for screencode/ink/paper target, ESC cancels). Step 2
+(`cwin_textinput`, pre-filled `"00"`/`"0"`) reads the value to find.
+Step 3 (same field shape) reads a replacement value: **ENTER**
+triggers replace-all (`undo_snapshot(0, 0, canvas_width, canvas_height)`
+— same whole-canvas scale and graceful-skip-if-oversized behaviour as
+Screen > Clear/Fill, §6.6 — then a linear scan over `screenmap[]`
+rewriting every match), **ESC** instead triggers find-only (scan
+forward from the cursor, wrapping, jump via `canvas_goto()` to the
+first match, no canvas change). For ink/paper targets, a candidate byte
+must first pass the serial-attribute test `(b & 0x60) == 0` before its
+sub-range (`0x00-0x07`/`0x10-0x17`) is checked.
+
+(Write mode's hex-direct attribute entry, `FUNCT+5`, is documented
+inline in §6.13 above alongside the rest of Write mode's key table,
+not as a separate section here, since it's a single new case with no
+standalone state of its own.)
+
 ---
 
 ## 7. Testing Infrastructure
@@ -1144,7 +1219,7 @@ boot at all, see §2.1's note) **except `test-boot-no-loci`**, which
 deliberately omits it to test the absent-path gate.
 
 ```
-make test                  # full suite (all 16 targets below)
+make test                  # full suite (all 22 targets below)
 make test-boot              # headless boot smoke test: splash + canvas/statusbar render
 make test-menus              # menu bar/pulldown/Screen-menu regression + Information > Version
 make test-screenresize        # Screen > Width/Height resize + shrink-confirm
@@ -1162,6 +1237,11 @@ make test-select-cutcopy                   # Select x/c: copy/cut/no-fit/ESC (Ph
 make test-undo-overflow                     # Clear/Fill on an oversized canvas: no crash, graceful skip
 make test-help-funct8                       # FUNCT+8 round-trips cleanly, Main + Character editor (Phase 9b)
 make test-fileio-traffic                     # actual LOCI file bytes: Save Screen/Combined/Project, Load Screen, Charset Save Std (--loci-flash)
+make test-findreplace                       # Find/Replace ('f'): cancel, find-only jump, replace-all, undo, ink recolor
+make test-write-hexattr                     # Write mode FUNCT+5 hex-direct attribute entry: cancel + ink/paper/modifier
+make test-trymode                           # Try mode ('t'): commit/cancel/undo
+make test-goto                              # Goto ('j') + Home ('h'): cancel, jump, jump-back
+make test-hollowbox                         # Line/Box 'o' toggle: hollow border vs filled, toggle-back
 make test-capture CYCLES=N TYPEKEYS='...'  # calibration helper for new scripts (also passes --loci)
 ```
 
@@ -1171,13 +1251,14 @@ make test-capture CYCLES=N TYPEKEYS='...'  # calibration helper for new scripts 
 - `tests/scripts/oric_screen.py` decodes the 40x28 `$BB80` text screen from a
   `--dump-ram-at` dump, providing `--find`/`--row`/`--bytes` assertions used
   by the shell scripts in `tests/scripts/test_*.sh`.
-- Current totals: 4+18+8+2+12+14+14+2+6+10+4+6+5+5+8+7+16 = **141/141**
+- Current totals: 4+18+8+2+12+14+14+2+6+10+4+6+5+5+8+7+16+5+6+4+3+5 = **164/164**
   (`test-boot` + `test-menus` + `test-screenresize` +
   `test-charsetram-spike` + `test-charsetedit` + `test-palette` +
   `test-colourpicker` + `test-cursor-autoscroll` + `test-linebox` +
   `test-select` + `test-move` + `test-writemode` + `test-boot-no-loci` +
   `test-select-cutcopy` + `test-undo-overflow` + `test-help-funct8` +
-  `test-fileio-traffic`).
+  `test-fileio-traffic` + `test-findreplace` + `test-write-hexattr` +
+  `test-trymode` + `test-goto` + `test-hollowbox`).
 - Write mode's `CTRL+letter` toggles and `DEL` have no automated coverage:
   Phosphoric's `--type-keys` has no CTRL-modifier escape and `DEL` (0x7F) is
   unmapped in its `char_map` — covered by manual walkthrough + code review
@@ -1205,6 +1286,25 @@ make test-capture CYCLES=N TYPEKEYS='...'  # calibration helper for new scripts 
   way if needed. Real hardware remains the authoritative check given
   Phosphoric's LOCI emulation is alpha-quality, same caveat as the
   colour picker's hardware-rendering issue.
+- **`KEY_F4` is bound to physical FUNCT+R, not FUNCT+digit-4** —
+  `include/keyboard.c`'s `decode_funct[]` (V1's own physical FUNCT-row
+  mapping) maps `KEY_F1/F2/F3/F6/F8/F9` to genuine FUNCT+digit combos,
+  but `KEY_F4` specifically to FUNCT+R. Phosphoric's `--type-keys`
+  `\fN` escape only supports FUNCT+digit, so any new FUNCT-combo
+  feature that needs headless coverage should use an unused
+  digit-bound slot (`KEY_F5/F7/F9/F10`) rather than `KEY_F4`. This bit
+  the Write mode hex-attribute-entry feature (§6.13) during
+  development — it was moved from the originally-planned FUNCT+4 to
+  FUNCT+5 specifically so `test-write-hexattr` could drive it.
+- **`cwin_textinput()`'s `VINPUT_ALPHA` flag does not include digits**,
+  despite its `include/charwin.h` comment ("Alpha + digits") — the
+  validation in `include/charwin.c` checks `validation & VINPUT_NUMS`
+  and `validation & VINPUT_ALPHA` as independent bits, so a hex-input
+  field needs `VINPUT_NUMS | VINPUT_ALPHA` explicitly. Found while
+  building Find/Replace (§6.21) and also fixed in the pre-existing (and
+  previously untested) character editor `'h'` hex-row-input
+  (`src/charsetedit.c`), which had the same latent bug with no
+  automated coverage to catch it.
 - IJK joystick input (§6.18) cannot be exercised by Phosphoric/Oricutron's
   `--type-keys` (no joystick simulation) — verified manually in Oricutron
   with a configured joystick instead. The help screens' and Version

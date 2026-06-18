@@ -82,6 +82,13 @@ Main features of the program:
   interface) as an alternative to the keyboard everywhere cursor keys and
   ENTER are used -- no separate mode or setting needed, it is detected
   automatically at startup and simply works alongside the keyboard.
+- **OSE-LOCI additions**: Try mode to preview a character before
+  plotting it; Jump (**J**) and Home (**H**) to move the cursor and
+  viewport straight to a typed or fixed coordinate; a unified Find/
+  Replace (**F**) for screencodes and ink/paper colors across the whole
+  canvas; a hollow-box option in Line and box mode; a Charset menu
+  option to reset the standard character set from ROM in one step; and
+  a hex-direct attribute entry shortcut in Write mode.
 
 ## Known issues
 - Filepicker routine only is properly working with SEDORIC3 disks created by the TAP2DSK tool from OSDK. If you want to import screens or charsets from other disks, please copy them to a TAP2DSK created image first.
@@ -149,6 +156,9 @@ Press these keys in main mode for editing:
 |**C**|Go to '**C**olour picker'
 |**T**|**T**ry mode
 |**R**|Toggle '**R**everse': toggle increase/decrease screencode by 128
+|**J**|**OSE-LOCI new:** **J**ump (go to) a typed canvas X/Y coordinate
+|**H**|**OSE-LOCI new:** **H**ome -- jump cursor and viewport to the canvas origin (0,0)
+|**F**|**OSE-LOCI new:** **F**ind/Replace a screencode or ink/paper color across the whole canvas
 |**Z**|**OSE-LOCI only:** Undo the most recent canvas edit
 |**Y**|**OSE-LOCI only:** Redo the most recently undone edit
 |**FUNCT+1**|Go to main menu
@@ -201,6 +211,27 @@ This will enter [character edit mode](#character-editor) and start with editing 
 
 Press **S** ([Select mode](#select-mode)) , **M** ([Move mode](#move-mode)), **L** ([Line and box mode](#line-and-box-mode)) or **W** ([Write mode](#write-mode)) for entering the corresponding edit modes.
 Reference is made to the specific sections in this readme for these modes (click the links). From all modes, return to main mode by pressing **ESC**.
+
+*Jump to coordinates and Home (OSE-LOCI new)*
+
+Press **J** to open a popup asking for an X then a Y canvas coordinate
+(both pre-filled with the cursor's current position). Confirming both
+jumps the cursor and viewport there in one step, scrolling as needed --
+much quicker than scrolling cell by cell on a canvas bigger than the
+40x27 screen. ESC at either field cancels with no change. Press **H** to
+jump straight back to the canvas origin (0,0) without any popup.
+
+*Find/Replace (OSE-LOCI new)*
+
+Press **F** to open the Find/Replace popup. First choose what to search
+for: **1** for screencode, **2** for ink color, or **3** for paper color.
+Next, enter the value to find (a hexadecimal screencode, or a color
+number 0-7). Finally, either press **ENTER** with a replacement value to
+replace every matching occurrence across the whole canvas (this can be
+undone afterwards with **Z**), or press **ESC** at that step to instead
+jump the cursor straight to the next occurrence of the value you searched
+for, without changing the canvas. ESC at the first two steps cancels the
+whole operation.
 
 *Undo and redo (OSE-LOCI only)*
 
@@ -334,6 +365,16 @@ V1, which used a ROM call to regenerate the alternate set from the
 standard one on load -- that ROM call doesn't work in this rewrite, so
 copying the same data into both banks is the closest available
 equivalent.)
+
+*Reset Std->ROM (OSE-LOCI new)*
+
+Restores the standard character set from the Oric's ROM font in one
+step, discarding any edits made to it via the character editor this
+session. Asks for confirmation first, since this cannot be undone (use
+this if you want to start a fresh standard character set without
+re-entering the editor and pressing **S** glyph by glyph). Only the
+standard set can be reset this way -- the Oric's ROM has no alternate
+character set table to restore from.
 
 **_Information: Version information, exit program_**
 
@@ -616,6 +657,11 @@ Pressing **L** in the main mode starts the Line and box mode. In this mode lines
 
 Ensure that the cursor is located at a corner of the selection to be made before entering Select mode. On entering select mode, grow the selection by pressing the **Cursor keys** to increase or decrease width and height in the desired direction from the origin. Leaving with or height at one character draws a line, otherwise a box is drawn.
 
+**OSE-LOCI new:** while growing the box, press **O** to toggle between a
+filled box (default, matching V1) and a hollow box that only plots the
+four border lines, leaving the interior untouched. The toggle can be
+flipped back and forth as many times as you like before accepting.
+
 Accept with **RETURN**, cancel with **ESC**. Both will leave this mode and return to main mode.
 
 **FUNCT+8** will show a help screen with all screen commands for this mode.
@@ -623,6 +669,7 @@ Accept with **RETURN**, cancel with **ESC**. Both will leave this mode and retur
 |Key|Description
 |---|---|
 |**Cursor keys**|Expand/shrink in the selected direction
+|**O**|**OSE-LOCI new:** Toggle filled/hollow box
 |**RETURN**|Accept line or box
 |**ESC**|Cancel and go back to main mode
 |**FUNCT+6**|Toggle statusbar visibility
@@ -641,6 +688,11 @@ Colors and attribute can be plotted while in write mode by first modifying the a
 - Pressing **FUNCT+1** plots ink
 - Pressing **FUNCT+2** plots paper
 - Pressing **FUNCT+3** plots character modifier.
+- **OSE-LOCI new:** Pressing **FUNCT+5** opens a popup to enter an
+  attribute directly as a hex digit: choose **1** for ink, **2** for
+  paper or **3** for character modifier, then type a value 0-7. This is
+  an alternative to cycling with CTRL+Z/X/C/V when you already know the
+  exact value you want.
 
 Leave Write mode by pressing **ESC**. **FUNCT+8** will show a help screen with the key commands for this mode.
 
@@ -659,6 +711,7 @@ Leave Write mode by pressing **ESC**. **FUNCT+8** will show a help screen with t
 |**FUNCT+1**|Plots ink
 |**FUNCT+2**|Plots paper
 |**FUNCT+3**|Plots character modifier
+|**FUNCT+5**|**OSE-LOCI new:** Enter ink/paper/modifier as a hex digit
 |**ESC** |Go back to main mode
 |**FUNCT+6**|Toggle statusbar visibility
 |**FUNCT+8**|Help screen

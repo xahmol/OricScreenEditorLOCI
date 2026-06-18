@@ -189,7 +189,7 @@ CYCLES   ?= 8000000
 # all: must appear first so it is the default goal
 # =========================================================================
 
-.PHONY: all all-langs clean run docs check-phosphoric sandbox-reset test-capture test-boot test-menus test-screenresize test-charsetram-spike test-charsetedit test-palette test-colourpicker test-cursor-autoscroll test-linebox test-select test-move test-writemode test-boot-no-loci test-select-cutcopy test-undo-overflow test-help-funct8 test-fileio-traffic test-findreplace test-write-hexattr test
+.PHONY: all all-langs clean run docs check-phosphoric sandbox-reset test-capture test-boot test-menus test-screenresize test-charsetram-spike test-charsetedit test-palette test-colourpicker test-cursor-autoscroll test-linebox test-select test-move test-writemode test-boot-no-loci test-select-cutcopy test-undo-overflow test-help-funct8 test-fileio-traffic test-findreplace test-write-hexattr test-trymode test-goto test-hollowbox test
 
 all: build/$(MAIN)$(LANGSUFFIX).tap
 
@@ -375,6 +375,24 @@ test-write-hexattr: check-phosphoric sandbox-reset
 	    TAPFILE=$(MAIN)$(LANGSUFFIX).tap \
 	    bash tests/scripts/test_write_hexattr.sh
 
+test-trymode: check-phosphoric sandbox-reset
+	$(MKDIR) tests/out 2>$(NULLDEV) ; true
+	PHOS=$(PHOS) ATMOSROM=$(ATMOSROM) SANDBOX=tests/sandbox OUT=tests/out \
+	    TAPFILE=$(MAIN)$(LANGSUFFIX).tap \
+	    bash tests/scripts/test_trymode.sh
+
+test-goto: check-phosphoric sandbox-reset
+	$(MKDIR) tests/out 2>$(NULLDEV) ; true
+	PHOS=$(PHOS) ATMOSROM=$(ATMOSROM) SANDBOX=tests/sandbox OUT=tests/out \
+	    TAPFILE=$(MAIN)$(LANGSUFFIX).tap \
+	    bash tests/scripts/test_goto.sh
+
+test-hollowbox: check-phosphoric sandbox-reset
+	$(MKDIR) tests/out 2>$(NULLDEV) ; true
+	PHOS=$(PHOS) ATMOSROM=$(ATMOSROM) SANDBOX=tests/sandbox OUT=tests/out \
+	    TAPFILE=$(MAIN)$(LANGSUFFIX).tap \
+	    bash tests/scripts/test_hollowbox.sh
+
 test:
 	@status=0; \
 	$(MAKE) test-boot || status=1; \
@@ -396,6 +414,9 @@ test:
 	$(MAKE) test-fileio-traffic || status=1; \
 	$(MAKE) test-findreplace || status=1; \
 	$(MAKE) test-write-hexattr || status=1; \
+	$(MAKE) test-trymode || status=1; \
+	$(MAKE) test-goto || status=1; \
+	$(MAKE) test-hollowbox || status=1; \
 	exit $$status
 
 # -------------------------------------------------------------------------

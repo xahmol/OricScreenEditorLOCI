@@ -78,6 +78,15 @@ Principales fonctionnalités du programme :
   touches curseur et ENTER sont utilisées -- aucun mode ou réglage séparé
   n'est nécessaire, il est détecté automatiquement au démarrage et
   fonctionne simplement en parallèle du clavier.
+- **Ajouts OSE-LOCI** : un mode d'essai pour prévisualiser un caractère
+  avant de le tracer ; Aller à (**J**) et Origine (**H**) pour déplacer
+  le curseur et la vue directement vers une coordonnée saisie ou fixe ;
+  un Rechercher/Remplacer unifié (**F**) pour les codes écran et les
+  couleurs d'encre/papier dans toute la zone de dessin ; une option de
+  boîte creuse en mode Ligne et boîte ; une option du menu Charset pour
+  réinitialiser le jeu de caractères standard depuis la ROM en une seule
+  étape ; et un raccourci de saisie hexadécimale directe d'attribut en
+  mode Écriture.
 
 ## Problèmes connus
 - La routine de sélection de fichiers ne fonctionne correctement qu'avec les disques SEDORIC3 créés par l'outil TAP2DSK de l'OSDK. Si vous souhaitez importer des écrans ou des jeux de caractères depuis d'autres disques, copiez-les d'abord sur une image créée avec TAP2DSK.
@@ -145,6 +154,9 @@ Appuyez sur ces touches en mode principal pour l'édition :
 |**C**|Aller au sélecteur de couleurs ('**C**olour picker')
 |**T**|Mode d'essai (**T**ry)
 |**R**|Basculer '**R**everse' (vidéo inversée) : bascule l'augmentation/diminution du code écran de 128
+|**J**|**Nouveau OSE-LOCI :** Aller (**J**ump) à une coordonnée X/Y saisie
+|**H**|**Nouveau OSE-LOCI :** Origine (**H**ome) -- ramener le curseur et la vue à la coordonnée (0,0)
+|**F**|**Nouveau OSE-LOCI :** Rechercher/Remplacer (**F**ind) un code écran ou une couleur d'encre/papier dans toute la zone de dessin
 |**Z**|**OSE-LOCI uniquement :** Annuler la dernière modification de la zone de dessin
 |**Y**|**OSE-LOCI uniquement :** Rétablir la dernière modification annulée
 |**FUNCT+1**|Aller au menu principal
@@ -197,6 +209,30 @@ Ceci ouvre le [mode édition de caractère](#éditeur-de-caractères) et commenc
 
 Appuyez sur **S** ([Mode sélection](#mode-sélection)), **M** ([Mode déplacement](#mode-déplacement)), **L** ([Mode ligne et boîte](#mode-ligne-et-boîte)) ou **W** ([Mode écriture](#mode-écriture)) pour entrer dans le mode d'édition correspondant.
 Référez-vous aux sections spécifiques de ce readme pour ces modes (cliquez sur les liens). Depuis tous les modes, revenez au mode principal en appuyant sur **ESC**.
+
+*Aller à des coordonnées et Origine (Nouveau OSE-LOCI)*
+
+Appuyez sur **J** pour ouvrir une fenêtre demandant une coordonnée X puis
+Y de la zone de dessin (toutes deux pré-remplies avec la position
+actuelle du curseur). Valider les deux déplace le curseur et la vue en
+une seule étape, en défilant si nécessaire -- bien plus rapide que de
+défiler case par case sur une zone de dessin plus grande que l'écran de
+40x27. ESC à l'une ou l'autre des saisies annule sans rien changer.
+Appuyez sur **H** pour revenir directement à l'origine (0,0) de la zone
+de dessin, sans fenêtre.
+
+*Rechercher/Remplacer (Nouveau OSE-LOCI)*
+
+Appuyez sur **F** pour ouvrir la fenêtre Rechercher/Remplacer. Choisissez
+d'abord ce qu'il faut rechercher : **1** pour un code écran, **2** pour
+une couleur d'encre, ou **3** pour une couleur de papier. Saisissez
+ensuite la valeur à rechercher (un code écran hexadécimal, ou un numéro
+de couleur 0-7). Enfin, appuyez sur **ENTRÉE** avec une valeur de
+remplacement pour remplacer toutes les occurrences correspondantes dans
+toute la zone de dessin (annulable ensuite avec **Z**), ou appuyez sur
+**ESC** à cette étape pour plutôt déplacer le curseur directement à la
+prochaine occurrence de la valeur recherchée, sans modifier la zone de
+dessin. ESC aux deux premières étapes annule toute l'opération.
 
 *Annuler et rétablir (OSE-LOCI uniquement)*
 
@@ -337,6 +373,17 @@ identiques. (Ceci diffère de V1, qui utilisait un appel ROM pour régénérer
 le jeu alternatif à partir du standard au chargement -- cet appel ROM ne
 fonctionne pas dans cette réécriture, donc copier les mêmes données dans
 les deux jeux est l'équivalent le plus proche disponible.)
+
+*Réinitialiser standard->ROM (Nouveau OSE-LOCI)*
+
+Restaure le jeu de caractères standard depuis la police ROM de l'Oric en
+une seule étape, en perdant toute modification apportée via l'éditeur de
+caractères durant cette session. Demande confirmation au préalable, car
+ceci ne peut pas être annulé (utilisez cette option pour repartir d'un
+jeu standard vierge sans devoir revenir dans l'éditeur et appuyer sur
+**S** caractère par caractère). Seul le jeu standard peut être
+réinitialisé ainsi -- la ROM de l'Oric ne contient pas de table pour le
+jeu alternatif.
 
 **_Information : informations de version, quitter le programme_**
 
@@ -621,6 +668,12 @@ Appuyer sur **L** en mode principal démarre le mode Ligne et boîte. Dans ce mo
 
 Assurez-vous que le curseur est positionné sur un coin de la sélection à créer avant d'entrer en mode Sélection. À l'entrée du mode sélection, agrandissez la sélection en appuyant sur les **touches curseur** pour augmenter ou diminuer la largeur et la hauteur dans la direction souhaitée depuis l'origine. Si la largeur ou la hauteur reste à un caractère, une ligne est dessinée, sinon une boîte est dessinée.
 
+**Nouveau OSE-LOCI :** pendant l'agrandissement de la boîte, appuyez sur
+**O** pour basculer entre une boîte pleine (par défaut, comme V1) et une
+boîte creuse qui ne trace que les quatre lignes de bordure, laissant
+l'intérieur intact. Le basculement peut être répété autant de fois que
+souhaité avant de valider.
+
 Acceptez avec **RETURN**, annulez avec **ESC**. Les deux quittent ce mode et reviennent au mode principal.
 
 **FUNCT+8** affiche un écran d'aide avec toutes les commandes pour ce mode.
@@ -628,6 +681,7 @@ Acceptez avec **RETURN**, annulez avec **ESC**. Les deux quittent ce mode et rev
 |Touche|Description
 |---|---|
 |**Touches curseur**|Agrandir/réduire dans la direction sélectionnée
+|**O**|**Nouveau OSE-LOCI :** Basculer boîte pleine/creuse
 |**RETURN**|Accepter la ligne ou la boîte
 |**ESC**|Annuler et revenir au mode principal
 |**FUNCT+6**|Basculer la visibilité de la barre d'état
@@ -646,6 +700,12 @@ Les couleurs et attributs peuvent être tracés en mode écriture en modifiant d
 - Appuyer sur **FUNCT+1** trace l'encre
 - Appuyer sur **FUNCT+2** trace le papier
 - Appuyer sur **FUNCT+3** trace le modificateur de caractère.
+- **Nouveau OSE-LOCI :** Appuyer sur **FUNCT+5** ouvre une fenêtre pour
+  saisir un attribut directement en hexadécimal : choisissez **1** pour
+  l'encre, **2** pour le papier ou **3** pour le modificateur de
+  caractère, puis saisissez une valeur 0-7. C'est une alternative au
+  basculement avec CTRL+Z/X/C/V quand vous connaissez déjà la valeur
+  exacte souhaitée.
 
 Quittez le mode Écriture en appuyant sur **ESC**. **FUNCT+8** affiche un écran d'aide avec les commandes clavier de ce mode.
 
@@ -664,6 +724,7 @@ Quittez le mode Écriture en appuyant sur **ESC**. **FUNCT+8** affiche un écran
 |**FUNCT+1**|Trace l'encre
 |**FUNCT+2**|Trace le papier
 |**FUNCT+3**|Trace le modificateur de caractère
+|**FUNCT+5**|**Nouveau OSE-LOCI :** Saisir encre/papier/modificateur en hexadécimal
 |**ESC** |Revenir au mode principal
 |**FUNCT+6**|Basculer la visibilité de la barre d'état
 |**FUNCT+8**|Écran d'aide
