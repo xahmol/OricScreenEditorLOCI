@@ -89,6 +89,11 @@
 #define MSG_RESIZE_PROMPT_HEIGHT  "Enter new height:"
 #define MSG_RESIZE_INVALID        "New size unsupported."
 
+// ── Goto dialog (src/menudata.c, goto_dialog(), 'j' in Main mode) ────────────
+#define MSG_GOTO_TITLE       "Goto coordinates"
+#define MSG_GOTO_PROMPT_X    "Enter column (X):"
+#define MSG_GOTO_PROMPT_Y    "Enter row (Y):"
+
 // ── Character editor (src/charsetedit.c) ──────────────────────────────────────
 #define MSG_CE_CODE_FMT   "Code:$%02x"
 #define MSG_CE_SET_STD    "Set:Std"

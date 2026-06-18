@@ -93,6 +93,11 @@
 #define MSG_RESIZE_PROMPT_HEIGHT  "Entrer nouvelle hauteur:"
 #define MSG_RESIZE_INVALID        "Nouvelle taille invalide."
 
+// ── Goto dialog (src/menudata.c, goto_dialog(), 'j' en mode principal) ───────
+#define MSG_GOTO_TITLE       "Aller aux coordonnees"
+#define MSG_GOTO_PROMPT_X    "Entrez colonne (X) :"
+#define MSG_GOTO_PROMPT_Y    "Entrez ligne (Y) :"
+
 // ── Character editor (src/charsetedit.c) ──────────────────────────────────────
 // "Jeu" (set) keeps Std/Alt identical to the English build -- only the
 // "Code"/"Hex" labels below are already unaccented French/English cognates.

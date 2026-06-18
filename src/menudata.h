@@ -16,6 +16,10 @@ void menudata_init(void);
 // (e.g. src/fileio.c's Project/Screen/Combined load).
 void update_size_titles(void);
 
+// Goto coordinates popup ('j' in Main mode): prompts for X then Y,
+// jumps the cursor + viewport there via canvas_goto() on confirm.
+void goto_dialog(void);
+
 // Open the menu bar (row 0) and run it until ESC is pressed at the bar
 // level. Dispatches Screen menu items (Width/Height/Clear/Fill); File/
 // Charset/Information items show a "not yet implemented" popup. Restores

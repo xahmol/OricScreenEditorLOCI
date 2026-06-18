@@ -36,6 +36,13 @@ void canvas_cell_invert(uint16_t x, uint16_t y);
 uint8_t canvas_resize(uint16_t neww, uint16_t newh);
 void cursor_move_scroll(int8_t dx, int8_t dy);
 
+// Jump the cursor + viewport directly to canvas-absolute (x, y): clamps
+// to the canvas extent, centers the viewport on the target where the
+// canvas is bigger than the viewport (clamped at the canvas edges),
+// re-blits. Shared by src/menudata.c's goto_dialog() and src/editor.c's
+// 'h' (jump to origin) case.
+void canvas_goto(uint16_t x, uint16_t y);
+
 #pragma compile("canvas.c")
 
 #endif // CANVAS_H

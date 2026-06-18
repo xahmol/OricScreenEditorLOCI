@@ -144,6 +144,42 @@ static void resize_dialog(uint8_t is_height)
     menu_winrestore();
 }
 
+/**
+ * Goto coordinates popup ('j' in Main mode): prompts for an X then a Y
+ * canvas coordinate (each pre-filled with the cursor's current absolute
+ * position), and on confirming both, jumps the cursor + viewport there
+ * via canvas_goto() (src/canvas.h). ESC at either field cancels with no
+ * change, matching every other popup's ESC convention in this codebase.
+ *
+ * @return (none)
+ */
+void goto_dialog(void)
+{
+    OricCharWin win;
+    char        bufx[6], bufy[6];
+
+    menu_winsave(5, 12, 1);
+    cwin_init(&win, 5, 5, 35, 12, A_FWBLACK, A_BGWHITE);
+    cwin_clear(&win);
+
+    cwin_putat_string(&win, 2, 1, MSG_GOTO_TITLE);
+    cwin_putat_string(&win, 2, 3, MSG_GOTO_PROMPT_X);
+    sprintf(bufx, "%u", (uint16_t)(app.cursor_x + app.xoffset));
+
+    if (cwin_textinput(&win, 2, 4, 8, bufx, 5, VINPUT_NUMS) >= 0)
+    {
+        cwin_putat_string(&win, 2, 6, MSG_GOTO_PROMPT_Y);
+        sprintf(bufy, "%u", (uint16_t)(app.cursor_y + app.yoffset));
+
+        if (cwin_textinput(&win, 2, 7, 8, bufy, 5, VINPUT_NUMS) >= 0)
+        {
+            canvas_goto(parse_uint(bufx), parse_uint(bufy));
+        }
+    }
+
+    menu_winrestore();
+}
+
 // -------------------------------------------------------------------------
 // Init and dispatch
 // -------------------------------------------------------------------------

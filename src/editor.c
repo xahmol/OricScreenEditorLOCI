@@ -279,6 +279,21 @@ void editor_run(void)
             break;
         }
 
+        // Goto coordinates: prompts for X/Y, jumps cursor + viewport
+        // there (src/menudata.c's goto_dialog() + src/canvas.h's
+        // canvas_goto()). New functionality, no V1 precedent.
+        case 'j':
+            goto_dialog();
+            break;
+
+        // Jump to the canvas origin (0,0) -- the same canvas_goto()
+        // primitive 'j' uses, with fixed coordinates. New functionality,
+        // no V1 precedent (VDCScreenEditor2 has a single HOME-key
+        // equivalent; this only covers the top-left corner, not all 4).
+        case 'h':
+            canvas_goto(0, 0);
+            break;
+
         // Undo/redo the most recent canvas edit (no V1 precedent --
         // genuinely new functionality, see CLAUDE.md "Canvas undo/redo").
         case 'z':

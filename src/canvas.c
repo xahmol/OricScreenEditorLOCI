@@ -151,6 +151,39 @@ void cursor_move_scroll(int8_t dx, int8_t dy)
 }
 
 /**
+ * Jump the cursor + viewport directly to canvas-absolute (x, y). Clamps
+ * x/y to the canvas extent, then centers the viewport on the target
+ * (clamped at the canvas edges so the viewport never reads outside the
+ * canvas), and sets app.cursor_x/y to the target's position within the
+ * resulting viewport. Always re-blits, even when the offset doesn't
+ * change, since the cursor position itself may have moved.
+ *
+ * @param x Canvas-absolute target column.
+ * @param y Canvas-absolute target row.
+ * @return (none)
+ */
+void canvas_goto(uint16_t x, uint16_t y)
+{
+    uint16_t maxxoff, maxyoff;
+
+    if (x >= app.canvas_width)  x = (uint16_t)(app.canvas_width - 1);
+    if (y >= app.canvas_height) y = (uint16_t)(app.canvas_height - 1);
+
+    maxxoff = (app.canvas_width  > VIEWPORT_WIDTH)  ? (uint16_t)(app.canvas_width  - VIEWPORT_WIDTH)  : 0;
+    maxyoff = (app.canvas_height > VIEWPORT_HEIGHT) ? (uint16_t)(app.canvas_height - VIEWPORT_HEIGHT) : 0;
+
+    app.xoffset = (x > VIEWPORT_WIDTH / 2)  ? (uint16_t)(x - VIEWPORT_WIDTH / 2)  : 0;
+    app.yoffset = (y > VIEWPORT_HEIGHT / 2) ? (uint16_t)(y - VIEWPORT_HEIGHT / 2) : 0;
+    if (app.xoffset > maxxoff) app.xoffset = maxxoff;
+    if (app.yoffset > maxyoff) app.yoffset = maxyoff;
+
+    app.cursor_x = (uint16_t)(x - app.xoffset);
+    app.cursor_y = (uint16_t)(y - app.yoffset);
+
+    canvas_blit();
+}
+
+/**
  * Resize the canvas to neww x newh cells, reflowing existing rows in place
  * via canvas_rowbuf[] when the width changes. Growing height just blanks the
  * new rows (row stride doesn't change); shrinking height needs no data
