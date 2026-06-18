@@ -15,6 +15,7 @@
 #include "undo.h"
 #include "input.h"
 #include "help.h"
+#include "findreplace.h"
 #include "editor.h"
 
 #define PLOT_MIN 0x20
@@ -292,6 +293,12 @@ void editor_run(void)
         // equivalent; this only covers the top-left corner, not all 4).
         case 'h':
             canvas_goto(0, 0);
+            break;
+
+        // Unified Find/Replace -- new functionality, no V1 precedent
+        // (see CLAUDE.md / src/findreplace.h).
+        case 'f':
+            findreplace_run();
             break;
 
         // Undo/redo the most recent canvas edit (no V1 precedent --

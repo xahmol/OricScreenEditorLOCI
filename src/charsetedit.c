@@ -419,7 +419,15 @@ void charsetedit_run(void)
             char hexbuf[3];
             hexbuf[0] = '\0';
             cwin_putat_string(&ce_win, CE_HEX_LABEL_X, CE_HEX_Y, MSG_CE_HEX_LABEL);
-            if (cwin_textinput(&ce_win, CE_HEX_INPUT_X, CE_HEX_Y, 2, hexbuf, 2, VINPUT_ALPHA) >= 0)
+            // VINPUT_ALPHA alone does NOT include digits despite its
+            // header comment ("Alpha + digits") -- charwin.c's validation
+            // checks (validation & VINPUT_NUMS)/(validation & VINPUT_ALPHA)
+            // as independent bits, so a hex field needs both ORed
+            // together. Found and fixed while building src/findreplace.c's
+            // own hex input -- this call had the same latent bug
+            // (untested: no automated coverage of this 'h' hex-row-input
+            // path existed before this fix).
+            if (cwin_textinput(&ce_win, CE_HEX_INPUT_X, CE_HEX_Y, 2, hexbuf, 2, VINPUT_NUMS | VINPUT_ALPHA) >= 0)
             {
                 g = ce_glyph();
                 ce_snapshot();

@@ -100,6 +100,13 @@
 #define MSG_GOTO_PROMPT_X    "Entrez colonne (X) :"
 #define MSG_GOTO_PROMPT_Y    "Entrez ligne (Y) :"
 
+// ── Rechercher/Remplacer (src/findreplace.c, 'f' en mode principal) ──────────
+#define MSG_FR_TITLE           "Rechercher / Remplacer"
+#define MSG_FR_TARGET_PROMPT   "1=Code 2=Encre 3=Papier"
+#define MSG_FR_FIND_CODE       "Code a trouver (hex) :"
+#define MSG_FR_FIND_COLOR      "Couleur a trouver (0-7) :"
+#define MSG_FR_REPLACE_PROMPT  "Remplacer, ESC=trouver :"
+
 // ── Character editor (src/charsetedit.c) ──────────────────────────────────────
 // "Jeu" (set) keeps Std/Alt identical to the English build -- only the
 // "Code"/"Hex" labels below are already unaccented French/English cognates.

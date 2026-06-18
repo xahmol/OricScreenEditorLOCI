@@ -96,6 +96,13 @@
 #define MSG_GOTO_PROMPT_X    "Enter column (X):"
 #define MSG_GOTO_PROMPT_Y    "Enter row (Y):"
 
+// ── Find/Replace (src/findreplace.c, 'f' in Main mode) ───────────────────────
+#define MSG_FR_TITLE           "Find / Replace"
+#define MSG_FR_TARGET_PROMPT   "1=Code 2=Ink 3=Paper"
+#define MSG_FR_FIND_CODE       "Find code (hex):"
+#define MSG_FR_FIND_COLOR      "Find color (0-7):"
+#define MSG_FR_REPLACE_PROMPT  "Replace, ESC=find only:"
+
 // ── Character editor (src/charsetedit.c) ──────────────────────────────────────
 #define MSG_CE_CODE_FMT   "Code:$%02x"
 #define MSG_CE_SET_STD    "Set:Std"
