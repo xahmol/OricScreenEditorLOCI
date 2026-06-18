@@ -5,7 +5,9 @@
 #
 # Fast-loads the freshly built oseloci.tap under Atmos BASIC 1.1 in
 # Phosphoric and decodes the $BB80 screen-text dump to assert:
-#   - the splash screen renders (title + version) before any key is pressed
+#   - the splash screen renders (V1's title image, assets/
+#     OSEforLOCI-Title.bin, with "Press any key to start" overlaid at row
+#     26) before any key is pressed
 #   - after a key is pressed, the splash is dismissed and the blank canvas
 #     + statusbar render correctly
 #
@@ -80,13 +82,12 @@ if [ ! -f "$SPLASH_DUMP" ] || [ ! -f "$MAIN_DUMP" ]; then
 else
     echo ""
     echo "Splash screen"
-    check_found "title renders"   "OricScreenEditor for LOCI" "$SPLASH_DUMP"
-    check_found "version renders" "Oscar64 build v0.1.0"      "$SPLASH_DUMP"
-    check_found "prompt renders"  "Press any key to start"    "$SPLASH_DUMP"
+    check_found "title image renders" "IDreamtIn8Bits.comWritten in 2022 by" "$SPLASH_DUMP"
+    check_found "prompt renders"      "Press any key to start"               "$SPLASH_DUMP"
 
     echo ""
     echo "Main mode (after dismiss)"
-    check_not_found "splash dismissed"     "OricScreenEditor for LOCI" "$MAIN_DUMP"
+    check_not_found "splash dismissed"     "IDreamtIn8Bits.comWritten in 2022 by" "$MAIN_DUMP"
     check_found     "statusbar renders"    "Main      XY 0, 0C41A S20I7P0S" "$MAIN_DUMP"
 fi
 

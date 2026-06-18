@@ -338,11 +338,12 @@ equivalent.)
 
 *Information*
 
-**OSE-LOCI note**: this option shows a 3-page popup instead of V1's single
-text screen: a full-screen title/logo image, a page with version and
-credits text, and a page with a QR code linking to this project's GitHub
-page. Press any key to advance through the pages and to return to the
-main menu afterwards.
+**OSE-LOCI note**: this option shows a 2-page popup instead of V1's single
+text screen, identical to the locifilemanager-v2 LOCI file manager's own
+version screen: a page with the IDreamtIn8Bits.com logo plus version and
+credits text, followed by a page with a QR code linking to this project's
+GitHub page. Press any key to advance through the pages and to return to
+the main menu afterwards.
 
 *Exit program*
 

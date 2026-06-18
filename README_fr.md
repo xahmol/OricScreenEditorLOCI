@@ -346,10 +346,11 @@ les deux jeux est l'équivalent le plus proche disponible.)
 
 *Information*
 
-**Note OSE-LOCI** : cette option affiche une fenêtre en 3 pages au lieu de
-l'écran texte unique de V1 : une image de titre/logo plein écran, une page
-avec les informations de version et les crédits, et une page avec un code
-QR menant à la page GitHub de ce projet. Appuyez sur une touche pour
+**Note OSE-LOCI** : cette option affiche une fenêtre en 2 pages au lieu de
+l'écran texte unique de V1, identique à celle du gestionnaire de fichiers
+LOCI locifilemanager-v2 : une page avec le logo IDreamtIn8Bits.com ainsi
+que les informations de version et les crédits, suivie d'une page avec un
+code QR menant à la page GitHub de ce projet. Appuyez sur une touche pour
 avancer entre les pages, puis pour revenir au menu principal.
 
 *Exit program (quitter le programme)*

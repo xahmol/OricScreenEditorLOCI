@@ -16,8 +16,6 @@
 #define MSG_PRESS_KEY_EXIT  "Appuyer sur une touche pour quitter."
 
 // ── Splash screen (src/main.c) ────────────────────────────────────────────
-#define MSG_SPLASH_TITLE      "OricScreenEditor pour LOCI"
-#define MSG_SPLASH_BUILD_FMT  "Compilation Oscar64 v%d.%d.%d"
 #define MSG_SPLASH_PRESSKEY   "Appuyer sur une touche pour demarrer"
 
 // ── Menu bar titles (src/menudata.c, menubar.titles) ──────────────────────
@@ -66,6 +64,7 @@
 #define MSG_INFO_EXIT     "Fin du programme"
 
 // ── Information > Version popup (src/info.c) ────────────────────────────────
+#define MSG_INFO_VERSION_HEADER     "Informations de version et credits"
 #define MSG_INFO_VERSION_TITLE      "OricScreenEditorLOCI"
 #define MSG_INFO_VERSION_AUTHOR     "Ecrit en 2025-2026 par Xander Mol"
 #define MSG_INFO_VERSION_FMT        "Version : v%u.%u.%u"

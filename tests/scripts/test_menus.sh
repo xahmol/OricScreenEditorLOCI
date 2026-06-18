@@ -98,32 +98,36 @@ echo "ESC (pulldown) + ESC (bar) closes with no residue"
 check_not_found "bar gone"       "Screen" "$DUMP3"
 check_found     "statusbar intact" "Main      XY 0, 0C41A S20I7P0S" "$DUMP3"
 
-# --- Scenario 4: Information > Version, page 1 (title image) ---------------
+# --- Scenario 4: Information > Version, page 1 (logo + version/credits) ----
 # (File's items were wired to real LOCI dispatch as of Phase 6 -- src/fileio.c
-# -- and Information's Version/Exit were wired up in Phase 9c -- src/info.c
-# -- so this scenario, which used to land on a permanent stub, now exercises
-# the real 3-page Version popup.)
+# -- and Information's Version/Exit were wired up in Phase 9c -- src/info.c,
+# matching locifilemanager-v2's versioninfo() layout exactly: page 1 is the
+# idi8b logo plus version/credits text sharing one screen, page 2 is the QR
+# code -- so this scenario, which used to land on a permanent stub, now
+# exercises the real 2-page Version popup.)
 DUMP4="$OUT/capture_menu_version_p1.bin"
 run_capture 15500000 '\p1\f1\p1\r\p1\r\p1\r\p1\n\p1\n' "$DUMP4"
 echo ""
-echo "Information > Version shows page 1 (title image, replaces the bar)"
-check_not_found "bar gone (title image showing)" "Screen File  Charset  Information" "$DUMP4"
+echo "Information > Version shows page 1 (logo + version/credits text)"
+check_not_found "bar gone (popup showing)" "Screen File  Charset  Information" "$DUMP4"
+check_found     "title line shown"         "OricScreenEditorLOCI"                   "$DUMP4"
+check_found     "GitHub URL shown"         "github.com/xahmol/oricscreeneditorloci" "$DUMP4"
 
-# --- Scenario 5: page 2 (version/credits text) ------------------------------
+# --- Scenario 5: page 2 (QR code) --------------------------------------------
 DUMP5="$OUT/capture_menu_version_p2.bin"
 run_capture 16600000 '\p1\f1\p1\r\p1\r\p1\r\p1\n\p1\n\p1\n' "$DUMP5"
 echo ""
-echo "Page 2 shows version/credits text"
-check_found "title line shown"     "OricScreenEditorLOCI"                "$DUMP5"
-check_found "GitHub URL shown"     "github.com/xahmol/oricscreeneditorloci" "$DUMP5"
+echo "Page 2 shows the QR code"
+check_found     "QR title shown"   "Scan QR code for source:" "$DUMP5"
+check_not_found "page 1 text gone" "OricScreenEditorLOCI"     "$DUMP5"
 
-# --- Scenario 6: page 3 (QR code) + dismiss + clean close -------------------
+# --- Scenario 6: dismiss + clean close ---------------------------------------
 DUMP6="$OUT/capture_menu_version_dismiss.bin"
-run_capture 21000000 '\p1\f1\p1\r\p1\r\p1\r\p1\n\p1\n\p1\n\p1\n\p1\n\p1\e\p1\e' "$DUMP6"
+run_capture 19800000 '\p1\f1\p1\r\p1\r\p1\r\p1\n\p1\n\p1\n\p1\n\p1\e\p1\e' "$DUMP6"
 echo ""
-echo "Page 3 (QR) dismissed, ESC-ESC closes with no residue"
-check_not_found "version text gone" "OricScreenEditorLOCI" "$DUMP6"
-check_not_found "bar gone"          "Screen"               "$DUMP6"
+echo "Page 2 (QR) dismissed, ESC-ESC closes with no residue"
+check_not_found "QR title gone"     "Scan QR code for source:" "$DUMP6"
+check_not_found "bar gone"          "Screen"                   "$DUMP6"
 check_found     "statusbar intact"  "Main      XY 0, 0C41A S20I7P0S" "$DUMP6"
 
 # --- Scenario 7: Fill dispatch ----------------------------------------------

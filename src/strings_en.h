@@ -12,8 +12,10 @@
 #define MSG_PRESS_KEY_EXIT  "Press any key to exit."
 
 // ── Splash screen (src/main.c) ────────────────────────────────────────────
-#define MSG_SPLASH_TITLE      "OricScreenEditor for LOCI"
-#define MSG_SPLASH_BUILD_FMT  "Oscar64 build v%d.%d.%d"
+// MSG_SPLASH_PRESSKEY is overlaid on the title image (assets/
+// OSEforLOCI-Title.bin) at row 26 -- the title/version text V1 showed
+// alongside its own title screen now lives only in the Information menu's
+// Version popup (src/info.c).
 #define MSG_SPLASH_PRESSKEY   "Press any key to start"
 
 // ── Menu bar titles (src/menudata.c, menubar.titles) ──────────────────────
@@ -58,6 +60,7 @@
 #define MSG_INFO_EXIT     "Exit program"
 
 // ── Information > Version popup (src/info.c) ────────────────────────────────
+#define MSG_INFO_VERSION_HEADER     "Version information and credits"
 #define MSG_INFO_VERSION_TITLE      "OricScreenEditorLOCI"
 #define MSG_INFO_VERSION_AUTHOR     "Written 2025-2026 by Xander Mol"
 #define MSG_INFO_VERSION_FMT        "Version: v%u.%u.%u"

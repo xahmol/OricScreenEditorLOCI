@@ -1055,21 +1055,34 @@ before the rect starts growing, V1's exact guard), `move.c`
 (unconditional), `write.c`. Not wired into the palette or colour-picker
 popups (no V1 precedent).
 
+### 6.19a Boot splash (`src/main.c`, revised after Phase 9c)
+
+The splash is V1's actual title screen image (`assets/
+OSEforLOCI-Title.bin`, carried over from V1), `#embed lzo` + `oscar_
+expand_lzo()`'d straight into `$BB80` (same approach as §6.19's help
+screens) instead of V1's tape-loaded `OSETSC.BIN`. `MSG_SPLASH_PRESSKEY`
+is overlaid at row 26 (blank in the image), matching V1's own "Press
+key." overlay at the same row; the image's rows 24-25 already contain
+V1's baked-in "IDreamtIn8Bits.com / Written in 2022 by Xander Mol" credit
+text. The version/build-number text V1 never showed on its title screen
+(only in its own `versioninfo()`) was dropped from the splash here too —
+see §6.20.
+
 ### 6.20 Information menu (`src/info.c`, Phase 9c)
 
-`info_version_show()`: a 3-page popup (`menu_winsave(0, VIEWPORT_
-HEIGHT+1, 1)`/`menu_winrestore()` around all 3) — page 1 is
-`OSEforLOCI-Title.bin` full-screen (same `#embed lzo` +
-`oscar_expand_lzo()` approach as §6.19's help screens), page 2 is
-programmatic version/credits text, page 3 is a 25x25-module QR code
-(`tools/gen_qr.js`, adapted from `locifilemanager-v2`'s same-purpose
-script) linking to the project's GitHub page. `info_exit()` resets the
-machine via `__asm { jmp ($fffc) }` — an indirect jump through the RESET
-vector, the bare-metal equivalent of V1's Exit (which just returned to
-the CC65 program's OS-level loader; OSE's runtime has no such loader to
-return to). Both wired into `menudata.c`'s Information pulldown (choices
-41/42), the last two menu items that had been permanent stubs since
-Phase 2.
+`info_version_show()`: a 2-page popup (`menu_winsave(0, VIEWPORT_
+HEIGHT+1, 1)`/`menu_winrestore()` around both), an **identical layout**
+to `locifilemanager-v2`'s `versioninfo()` — page 1 is the `idi8b_logo[]`
+artwork (40x13, rows 0-12, copied verbatim from `locifilemanager-v2/src/
+splash_data.h`) with version/credits text below it (rows 13-27, black
+background), page 2 is a 25x25-module QR code (`tools/gen_qr.js`,
+adapted from `locifilemanager-v2`'s same-purpose script) linking to the
+project's GitHub page. `info_exit()` resets the machine via `__asm { jmp
+($fffc) }` — an indirect jump through the RESET vector, the bare-metal
+equivalent of V1's Exit (which just returned to the CC65 program's
+OS-level loader; OSE's runtime has no such loader to return to). Both
+wired into `menudata.c`'s Information pulldown (choices 41/42), the last
+two menu items that had been permanent stubs since Phase 2.
 
 ---
 
@@ -1107,7 +1120,7 @@ make test-capture CYCLES=N TYPEKEYS='...'  # calibration helper for new scripts
 - `tests/scripts/oric_screen.py` decodes the 40x28 `$BB80` text screen from a
   `--dump-ram-at` dump, providing `--find`/`--row`/`--bytes` assertions used
   by the shell scripts in `tests/scripts/test_*.sh`.
-- Current totals: 5+16+8+2+12+14+14+2+6+10+4+6+12+5+4+7 = **127/127**
+- Current totals: 4+18+8+2+12+14+14+2+6+10+4+6+12+5+4+7 = **128/128**
   (`test-boot` + `test-menus` + `test-screenresize` +
   `test-charsetram-spike` + `test-charsetedit` + `test-palette` +
   `test-colourpicker` + `test-cursor-autoscroll` + `test-linebox` +
