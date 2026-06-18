@@ -27,6 +27,7 @@
 #include "menu.h"
 #include "statusbar.h"
 #include "strings.h"
+#include "input.h"
 #include "colourpicker.h"
 
 // -------------------------------------------------------------------------
@@ -175,7 +176,7 @@ void colourpicker_run(void)
 
     for (;;)
     {
-        key = cwin_getch();
+        key = key_read();
 
         switch (key)
         {

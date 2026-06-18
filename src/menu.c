@@ -4,8 +4,8 @@
 // /home/xahmol/git/locifilemanager-v2/src/menu.c). Adapted: MENUBAR_MAXOPTIONS
 // reduced to 4, window save/restore copies to a main-RAM buffer
 // (menu_winbuf[]) instead of overlay RAM (no loci_present()/enable_overlay_ram
-// gating needed), menu_getkey() replaced by a direct cwin_getch() call (no
-// IJK polling), menu_placeheader/menu_placetop/menu_popup_open/
+// gating needed), menu_getkey() replaced by a direct key_read() call
+// (src/input.h, keyboard+IJK joystick), menu_placeheader/menu_placetop/menu_popup_open/
 // menu_popup_close/menu_fileerrormessage/menu_option_select/menu_confirm_file
 // dropped (not needed until later phases).
 
@@ -14,6 +14,7 @@
 #include <string.h>
 #include "charwin.h"
 #include "strings.h"
+#include "input.h"
 #include "menu.h"
 
 // -------------------------------------------------------------------------
@@ -341,7 +342,7 @@ uint8_t menu_pulldown(uint8_t xpos, uint8_t ypos,
         menu_draw_item(row_y, xpos, menunumber,
                        menuchoice - 1, 1, endcolor, width);
 
-        uint8_t key = cwin_getch();
+        uint8_t key = key_read();
 
         // Un-highlight before acting
         menu_draw_item(row_y, xpos, menunumber,
@@ -432,7 +433,7 @@ uint8_t menu_main(void)
             row[xi + 1 + len] = CH_SPACE;
             row[xi + 2 + len] = A_BGGREEN;
 
-            key = cwin_getch();
+            key = key_read();
 
             // Un-highlight
             row[xi] = A_BGGREEN;
@@ -518,6 +519,6 @@ void menu_messagepopup(const char *message)
     menu_wininit(8, 6);
     menu_screen_puts(7, 9,  message);
     menu_screen_puts(7, 11, MSG_MENU_PRESSAKEY);
-    cwin_getch();
+    key_read();
     menu_winrestore();
 }

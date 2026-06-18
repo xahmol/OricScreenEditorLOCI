@@ -23,6 +23,7 @@
 #include "statusbar.h"
 #include "strings.h"
 #include "loci.h"
+#include "input.h"
 #include "filepicker.h"
 
 #define PICKER_WIN_SX  2
@@ -325,7 +326,7 @@ uint8_t filepicker_run(const char *title, uint8_t filter)
 
     for (;;)
     {
-        key = cwin_getch();
+        key = key_read();
 
         if (key == KEY_ESC)
         {

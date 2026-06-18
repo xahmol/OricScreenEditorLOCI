@@ -132,6 +132,8 @@ MAIN_SRCS = \
   src/filepicker.h      \
   src/undo.c            \
   src/undo.h            \
+  src/input.c           \
+  src/input.h           \
   src/strings.h         \
   src/strings_en.h      \
   src/strings_fr.h      \

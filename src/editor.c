@@ -13,6 +13,7 @@
 #include "move.h"
 #include "write.h"
 #include "undo.h"
+#include "input.h"
 #include "editor.h"
 
 #define PLOT_MIN 0x20
@@ -66,7 +67,7 @@ void editor_run(void)
 
     while (1)
     {
-        uint8_t c = cwin_getch();
+        uint8_t c = key_read();
 
         canvas_cell_invert(app.cursor_x, app.cursor_y); // hide cursor
 

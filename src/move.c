@@ -29,6 +29,7 @@
 #include "canvas.h"
 #include "statusbar.h"
 #include "undo.h"
+#include "input.h"
 #include "move.h"
 
 /**
@@ -107,7 +108,7 @@ void move_run(void)
 
     for (;;)
     {
-        key = cwin_getch();
+        key = key_read();
 
         if (key == KEY_ENTER || key == KEY_ESC) break;
 

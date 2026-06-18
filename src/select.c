@@ -28,6 +28,7 @@
 #include "menu.h"
 #include "strings.h"
 #include "undo.h"
+#include "input.h"
 #include "select.h"
 
 // Selected/grown rectangle, in absolute canvas coordinates (inclusive
@@ -110,7 +111,7 @@ uint8_t rect_select(uint8_t draworselect)
 
     for (;;)
     {
-        key = cwin_getch();
+        key = key_read();
 
         if (key == KEY_ENTER || key == KEY_ESC) break;
 
@@ -263,7 +264,7 @@ void select_run(void)
 
     do
     {
-        key = cwin_getch();
+        key = key_read();
 
         if (key == KEY_F6) statusbar_show((uint8_t)!app.showstatusbar);
     } while (key != 'd' && key != 'i' && key != 'p' && key != 'm'
@@ -278,7 +279,7 @@ void select_run(void)
 
         do
         {
-            movekey = cwin_getch();
+            movekey = key_read();
 
             canvas_cell_invert(app.cursor_x, app.cursor_y); // hide
 

@@ -16,6 +16,7 @@
 #include "menu.h"
 #include "menudata.h"
 #include "fileio.h"
+#include "input.h"
 #include "undo.h"
 
 // -------------------------------------------------------------------------
@@ -122,7 +123,7 @@ static void resize_dialog(uint8_t is_height)
         {
             cwin_putat_string(&win, 2, 6, MSG_RESIZE_INVALID);
             cwin_putat_string(&win, 2, 7, MSG_MENU_PRESSAKEY);
-            cwin_getch();
+            key_read();
         }
         else
         {

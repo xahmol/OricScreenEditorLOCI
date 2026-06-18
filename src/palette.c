@@ -27,6 +27,7 @@
 #include "menu.h"
 #include "statusbar.h"
 #include "strings.h"
+#include "input.h"
 #include "palette.h"
 
 // -------------------------------------------------------------------------
@@ -226,7 +227,7 @@ void palette_run(void)
 
     for (;;)
     {
-        key = cwin_getch();
+        key = key_read();
 
         switch (key)
         {

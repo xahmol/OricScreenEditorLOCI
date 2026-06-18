@@ -26,6 +26,7 @@
 #include "charset.h"
 #include "charsetswap.h"
 #include "strings.h"
+#include "input.h"
 #include "charsetedit.h"
 
 // -------------------------------------------------------------------------
@@ -253,7 +254,7 @@ void charsetedit_run(void)
 
     for (;;)
     {
-        uint8_t c = cwin_getch();
+        uint8_t c = key_read();
         uint8_t changed = 0;
         uint8_t redraw  = 0;
         volatile uint8_t *g;
