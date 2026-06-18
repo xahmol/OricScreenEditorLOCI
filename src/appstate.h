@@ -21,8 +21,9 @@
 
 // LOCI file-I/O base filename, persisted across File/Charset menu actions
 // as the next prompt's default. LociDirent.d_name (include/loci.h) is 64
-// bytes; 24 leaves comfortable room for the longest suffix ("CA.BIN" = 6).
-#define FILENAME_MAXLEN 24
+// bytes; 48 leaves comfortable room for the longest suffix ("CA.BIN" = 6)
+// plus a subdirectory-prefixed name from src/filepicker.c's browser.
+#define FILENAME_MAXLEN 48
 
 typedef enum {
     MODE_MAIN = 0,

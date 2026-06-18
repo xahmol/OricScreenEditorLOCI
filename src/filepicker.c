@@ -218,24 +218,96 @@ static void picker_draw_list(OricCharWin *w)
     }
 }
 
+#define PICKER_PATH_MAXLEN 64
+
 /**
- * Browse the LOCI device's root directory for a file matching filter.
- * See filepicker.h for the full contract.
+ * Append "/name" to base (or just "name" if base already ends in '/',
+ * i.e. base is the root "/"), into dest. Refuses (returns 0) rather than
+ * truncate silently if the result wouldn't fit in PICKER_PATH_MAXLEN.
+ *
+ * @param dest Destination buffer, PICKER_PATH_MAXLEN bytes.
+ * @param base Current path.
+ * @param name Directory name to descend into.
+ * @return 1 if dest was set, 0 if it would have overflowed.
+ */
+static uint8_t picker_path_descend(char *dest, const char *base, const char *name)
+{
+    uint8_t baselen    = (uint8_t)strlen(base);
+    uint8_t needslash  = (baselen > 0 && base[baselen - 1] != '/') ? 1 : 0;
+    uint8_t total      = (uint8_t)(baselen + needslash + strlen(name));
+
+    if (total >= PICKER_PATH_MAXLEN) return 0;
+
+    strcpy(dest, base);
+    if (needslash) strcat(dest, "/");
+    strcat(dest, name);
+    return 1;
+}
+
+/**
+ * Truncate path to its parent directory in place (no-op if path is
+ * already the root "/").
+ *
+ * @param path Path to truncate, PICKER_PATH_MAXLEN bytes.
+ * @return (none)
+ */
+static void picker_path_ascend(char *path)
+{
+    char *lastslash = strrchr(path, '/');
+    if (!lastslash) return;
+    if (lastslash == path) { path[1] = '\0'; return; }
+    *lastslash = '\0';
+}
+
+/**
+ * Rebuild the listing for path and redraw the popup. On failure (no
+ * matching entries), the caller's previous picker_firstelement/etc. are
+ * already gone -- the caller must reload a known-good path afterwards if
+ * it wants to keep browsing rather than give up.
+ *
+ * @param w      Popup window.
+ * @param title  Title row text.
+ * @param path   Directory to list.
+ * @param filter PICKER_FILTER_PLAIN or PICKER_FILTER_PROJECT.
+ * @return 1 if path had matching entries (now displayed), 0 if empty.
+ */
+static uint8_t picker_reload(OricCharWin *w, const char *title, const char *path, uint8_t filter)
+{
+    picker_build_list(path, filter);
+    if (!picker_firstelement) return 0;
+
+    picker_firstprint = picker_present = picker_firstelement;
+    picker_cursorrow  = 0;
+
+    picker_draw_header(w, title, path);
+    picker_draw_list(w);
+    return 1;
+}
+
+/**
+ * Browse the LOCI device, starting at the root, for a file matching
+ * filter. UP/DOWN scroll, ENTER descends into a directory entry or
+ * selects a file, LEFT goes to the parent directory (no-op at the root),
+ * ESC cancels. See filepicker.h for the full contract.
  *
  * @param title  Title row text.
  * @param filter PICKER_FILTER_PLAIN or PICKER_FILTER_PROJECT.
- * @return 1 if a file was selected (app.filename set), 0 if cancelled or
- *         no matching files exist.
+ * @return 1 if a file was selected (app.filename set, subdirectory-
+ *         prefixed if applicable), 0 if cancelled or the root has no
+ *         matching entries.
  */
 uint8_t filepicker_run(const char *title, uint8_t filter)
 {
     OricCharWin win;
     PickerMeta  meta;
+    char        path[PICKER_PATH_MAXLEN];
     uint8_t     key;
+
+    strcpy(path, "/");
 
     menu_winsave(PICKER_WIN_SY, PICKER_WIN_WY, 1);
 
-    picker_build_list("/", filter);
+    picker_build_list(path, filter);
     if (!picker_firstelement)
     {
         menu_winrestore();
@@ -248,7 +320,7 @@ uint8_t filepicker_run(const char *title, uint8_t filter)
 
     cwin_init(&win, PICKER_WIN_SX, PICKER_WIN_SY, PICKER_WIN_WX, PICKER_WIN_WY, A_FWBLACK, A_BGWHITE);
     cwin_clear(&win);
-    picker_draw_header(&win, title, "/");
+    picker_draw_header(&win, title, path);
     picker_draw_list(&win);
 
     for (;;)
@@ -261,6 +333,24 @@ uint8_t filepicker_run(const char *title, uint8_t filter)
             return 0;
         }
 
+        if (key == KEY_LEFT)
+        {
+            if (strcmp(path, "/") != 0)
+            {
+                picker_path_ascend(path);
+                if (!picker_reload(&win, title, path, filter))
+                {
+                    // A directory we already successfully listed on the
+                    // way down can't suddenly have zero matches (it has
+                    // at least the subdirectory we just came from) -- but
+                    // guard anyway rather than leave a blank popup.
+                    menu_winrestore();
+                    return 0;
+                }
+            }
+            continue;
+        }
+
         if (key == KEY_ENTER)
         {
             char        name[64];
@@ -271,23 +361,61 @@ uint8_t filepicker_run(const char *title, uint8_t filter)
 
             if (meta.isdir)
             {
-                // Subdirectory descent is Phase 7c -- not yet implemented.
+                char newpath[PICKER_PATH_MAXLEN];
+
+                xram_memcpy_from(name, (uint16_t)(picker_present + sizeof(meta)), meta.length);
+                name[meta.length] = '\0';
+
+                if (!picker_path_descend(newpath, path, name))
+                {
+                    menu_messagepopup(MSG_FILE_PATH_TOO_LONG);
+                    picker_reload(&win, title, path, filter);
+                    continue;
+                }
+
+                if (picker_reload(&win, title, newpath, filter))
+                {
+                    strcpy(path, newpath);
+                }
+                else
+                {
+                    menu_messagepopup(MSG_FILE_NO_FILES);
+                    picker_reload(&win, title, path, filter);
+                }
                 continue;
             }
 
             xram_memcpy_from(name, (uint16_t)(picker_present + sizeof(meta)), meta.length);
             name[meta.length] = '\0';
 
-            // Strip the matched suffix so app.filename holds the base name
-            // fileio.c's sprintf(path, "%s<suffix>", app.filename)-style
-            // composition expects (Phase 6, unchanged).
+            // Strip the matched suffix so the base name fileio.c's
+            // sprintf(path, "%s<suffix>", app.filename)-style composition
+            // expects (Phase 6, unchanged) is what's left, then prepend
+            // the current subdirectory (if any -- "/" itself contributes
+            // nothing) so app.filename resolves back to this file
+            // regardless of where it was found.
             suffix  = (filter == PICKER_FILTER_PROJECT) ? "PJ.BIN" : ".BIN";
             suflen  = (uint8_t)strlen(suffix);
             baselen = (uint8_t)(meta.length - suflen);
-            if (baselen > FILENAME_MAXLEN) baselen = FILENAME_MAXLEN;
+            if (baselen > 63) baselen = 63;
+            name[baselen] = '\0';
 
-            strncpy(app.filename, name, baselen);
-            app.filename[baselen] = '\0';
+            if (strcmp(path, "/") == 0)
+            {
+                strncpy(app.filename, name, FILENAME_MAXLEN);
+                app.filename[FILENAME_MAXLEN] = '\0';
+            }
+            else
+            {
+                // path is "/DIR1/DIR2" -- drop the leading '/' so the
+                // result is "DIR1/DIR2/name", a relative path LOCI
+                // resolves the same way loci_open() resolves any other
+                // relative path used elsewhere in this codebase.
+                strncpy(app.filename, path + 1, FILENAME_MAXLEN);
+                app.filename[FILENAME_MAXLEN] = '\0';
+                strncat(app.filename, "/", FILENAME_MAXLEN - strlen(app.filename));
+                strncat(app.filename, name, FILENAME_MAXLEN - strlen(app.filename));
+            }
 
             menu_winrestore();
             return 1;

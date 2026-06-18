@@ -51,6 +51,7 @@
 #define MSG_FILE_INVALID_FORMAT   "Fichier invalide ou incompatible."
 #define MSG_FILE_NOT_FOUND        "Fichier non trouve."
 #define MSG_FILE_NO_FILES         "Aucun fichier correspondant trouve."
+#define MSG_FILE_PATH_TOO_LONG    "Chemin trop long."
 
 // ── Pulldown 2 -- Charset / Caracteres ───────────────────────────────────────
 #define MSG_CHARSET_LOAD_STD       "Charger standard"
