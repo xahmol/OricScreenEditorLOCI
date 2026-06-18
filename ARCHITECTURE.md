@@ -53,7 +53,11 @@ adapted from. **All 9 phases of the rewrite are complete.**
 - **Headless test emulator:** [Phosphoric](https://github.com/benedictemarty/Phosphoric)
   (`oric1-emu`) — fast-loads `oseloci.tap` under Atmos BASIC 1.1 and asserts
   on `$BB80` screen-RAM dumps via `--type-keys` + `--dump-ram-at`. This is
-  what `make test*` runs against (§7).
+  what `make test*` runs against (§7). Unlike Oricutron, **Phosphoric can
+  emulate a LOCI device** (alpha-quality) — so LOCI-dependent features
+  are not necessarily real-hardware-only for testing; real hardware
+  stays the authoritative check given Phosphoric's LOCI emulation's
+  alpha status.
 
 ### 1.3 Build artifacts
 
@@ -899,9 +903,10 @@ to call) and aborts with a graceful popup if absent, then
   range; Combined save = Save Std; Combined load writes into *both* banks
   (`charset_load()`, §4.5) since the ROM call V1 used to regenerate Alt
   from Std is a no-op on this runtime (§6.5).
-- Not testable headless beyond the LOCI-absent gate (`test_fileio_no_
-  loci.sh`, §7) — actual byte I/O needs real hardware, same constraint as
-  the colour picker.
+- Headless coverage today is the LOCI-absent gate only (`test_fileio_no_
+  loci.sh`, §7); actual byte I/O isn't tested yet, but Phosphoric's LOCI
+  emulation (alpha-quality) makes that addable headlessly rather than
+  needing real hardware for every check — see §7's note.
 
 ### 6.15 File picker (`src/filepicker.c`, every Load action, Phase 7)
 
@@ -950,10 +955,11 @@ subdirectory prepends that subdirectory to `app.filename` (relative to
 the LOCI root, e.g. `"DIR1/DIR2/name"`). `FILENAME_MAXLEN` grew from 24 to
 48 (`src/appstate.h`) to leave room for this.
 
-No new automated test coverage: `filepicker_run()` is only reachable from
-a Load action that already requires `loci_check_present()` to pass first,
-so `test_fileio_no_loci.sh`'s existing assertions already cover everything
-headless testing can reach here.
+No new automated test coverage yet: `filepicker_run()` is only reachable
+from a Load action that already requires `loci_check_present()` to pass
+first, so `test_fileio_no_loci.sh`'s existing assertions are what's
+automated today. The actual directory browsing isn't covered yet, but
+(see §7) Phosphoric's LOCI emulation should make that addable headlessly.
 
 ### 6.16 Canvas undo/redo (`src/undo.c`, `z`/`y` in Main mode, Phase 8)
 
@@ -992,7 +998,9 @@ is actually about to commit, never speculatively before a cancellable
 step.
 
 Not testable headless beyond the LOCI-absent path (`test_undo_no_loci.sh`)
-— the actual snapshot/restore mechanism needs a real-hardware walkthrough.
+today — see §7's note: Phosphoric's LOCI emulation might cover this too,
+but only if it also models `MICRODISCCFG`-driven overlay-RAM banking
+(unconfirmed), not just the file/XRAM protocol.
 
 ### 6.17 Select mode cut/copy (`src/select.c`, `x`/`c`, Phase 8)
 
@@ -1112,13 +1120,18 @@ make test-capture CYCLES=N TYPEKEYS='...'  # calibration helper for new scripts
 - LOCI's actual file I/O (the byte-level load/save traffic, not just the
   presence gate), the file picker's directory browsing (§6.15), and
   canvas undo/redo's actual snapshot/restore (§6.16) have no automated
-  coverage either, for the same reason: Phosphoric/Oricutron cannot
-  emulate a LOCI device or Oric-side overlay RAM. The `*-no-loci` targets
-  only confirm the graceful absent-path; real load/save/browsing/undo
-  needs a **real-hardware** walkthrough (see the Phase 6/7/8 plans), same
-  constraint as the colour picker's hardware-rendering issue. Select
-  mode's cut/copy (§6.17) is the exception — fully covered headless, since
-  it needs neither LOCI nor overlay RAM.
+  coverage *yet* — but, **correction**: this is not because emulation is
+  impossible. Phosphoric *can* emulate a LOCI device (alpha-quality);
+  only Oricutron cannot emulate one at all. The `*-no-loci` targets today
+  only confirm the graceful absent-path, but headless tests of the real
+  load/save/browsing traffic should be addable via Phosphoric — that work
+  just hasn't been done yet. Undo/redo is the partial exception: it needs
+  Phosphoric to also model `MICRODISCCFG`-driven overlay-RAM banking, not
+  just the MIA/TAP/XRAM protocol, which is unconfirmed. Real hardware
+  remains the authoritative check given Phosphoric's LOCI emulation is
+  alpha-quality (see the Phase 6/7/8 plans), same caveat as the colour
+  picker's hardware-rendering issue. Select mode's cut/copy (§6.17) needs
+  neither LOCI nor overlay RAM and is already fully covered headless.
 - IJK joystick input (§6.18) cannot be exercised by Phosphoric/Oricutron's
   `--type-keys` (no joystick simulation) — verified manually in Oricutron
   with a configured joystick instead. The help screens' and Version

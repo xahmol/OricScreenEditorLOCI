@@ -253,9 +253,12 @@ palette mode also showing inverse ink/paper colour combinations"). Popup
 
 **Known issue (parked 2026-06-17, not blocking)**: user-tested on real Oric
 Atmos hardware and reports the colour picker's grid colours do not render
-correctly (screenshot pending — real hardware only, no Oricutron/Phosphoric
-repro available since neither emulates LOCI and the build halts at the
-LOCI-presence check on startup without it). Suspected scope: this popup is
+correctly (screenshot pending — not yet reproduced in any emulator: this
+was tested before it was confirmed that Phosphoric's LOCI emulation
+(alpha-quality, see "Phosphoric Testing Notes") could be used here; worth
+retrying under Phosphoric before assuming a real-hardware-only ULA
+timing quirk. Oricutron still cannot emulate LOCI at all, so it remains
+unusable for this regardless). Suspected scope: this popup is
 the first place in the codebase that changes ink *and* paper 8 times each
 within a single 36-column row (16 attribute changes/row) — `cp_draw_grid()`'s
 per-cell `[ink-attr, paper-attr, swatch0, swatch1]` write in
@@ -470,12 +473,16 @@ reference: locifilemanager-v2's `loci_present()`/`file_save()`/
   pattern, persisting `app.filename` (new `AppState` field) across calls
   as the next prompt's default. Load actions use the real directory
   browser added in Phase 7 (`filepicker_run()`, below) instead.
-- **Not testable headless beyond the LOCI-absent path**: Phosphoric/
-  Oricutron can't emulate a LOCI device, so the actual load/save byte
-  traffic needs a **real-hardware** walkthrough (same constraint as the
-  colour-picker hardware-rendering issue) — only `tests/scripts/
-  test_fileio_no_loci.sh` (confirming all 12 File/Charset items correctly
-  show `MSG_LOCI_NOT_FOUND` and return cleanly) is automated.
+- **Headless coverage today is the LOCI-absent path only, but this can
+  grow**: `tests/scripts/test_fileio_no_loci.sh` (confirming all 12
+  File/Charset items correctly show `MSG_LOCI_NOT_FOUND` and return
+  cleanly) is automated. The actual load/save byte traffic isn't covered
+  yet, but — **correction from an earlier wrong assumption in this
+  file** — Phosphoric *can* emulate a LOCI device (alpha-quality, see
+  "Phosphoric Testing Notes"), so headless tests of real load/save
+  traffic are possible and should be added; real hardware stays the
+  authoritative check given the emulation's alpha status. Oricutron
+  cannot emulate LOCI at all, so it remains unusable for this regardless.
 
 ### File picker (Phase 7)
 
@@ -535,12 +542,13 @@ Save — browsing to pick a name to overwrite isn't the same UX problem).
   path relative to the LOCI root, e.g. `"DIR1/DIR2/name"`).
   `FILENAME_MAXLEN` grew from 24 to 48 (`src/appstate.h`) to leave room
   for this.
-- **No new automated test coverage**: `filepicker_run()` is only reachable
-  from a Load action that already requires `loci_check_present()` to pass
-  first, so `test_fileio_no_loci.sh`'s existing 12 assertions (every
-  Load/Save action's LOCI-absent path) already cover everything headless
-  testing can reach here — the actual browsing needs the same
-  real-hardware walkthrough as the rest of Phase 6's file I/O.
+- **No new automated test coverage yet**: `filepicker_run()` is only
+  reachable from a Load action that already requires
+  `loci_check_present()` to pass first, so `test_fileio_no_loci.sh`'s
+  existing 12 assertions (every Load/Save action's LOCI-absent path) are
+  all that's automated today — the actual browsing isn't covered yet, but
+  (per the Phase 6 correction above) Phosphoric's LOCI emulation makes
+  this addable headlessly; not just a real-hardware-only walkthrough.
 
 ### Canvas undo/redo (Phase 8)
 
@@ -604,12 +612,16 @@ of bank-switched VDC RAM.
   plotted at the wrong canvas cell once the viewport had auto-scrolled
   (Phase 5a). `undo_snapshot()` needed the corrected coordinates to
   snapshot the right cell, so both call sites were fixed together.
-- **Not testable headless beyond the LOCI-absent path** (same constraint
-  as Phases 6-7's LOCI-device features, though this is the Oric-side
-  overlay RAM, not LOCI-device XRAM) — `tests/scripts/
+- **Not testable headless beyond the LOCI-absent path today** (this is
+  the Oric-side overlay RAM, not LOCI-device XRAM, but the same
+  `loci_present()` gate gets in the way) — `tests/scripts/
   test_undo_no_loci.sh` confirms `z`/`y` are graceful no-ops with no LOCI
-  present. The actual snapshot/restore mechanism needs a real-hardware
-  walkthrough (see the Phase 8 plan).
+  present. Unlike Phases 6-7's plain file-I/O/directory traffic, this
+  specifically needs Phosphoric's LOCI emulation to *also* model
+  `MICRODISCCFG`-driven overlay-RAM banking, not just the MIA/TAP/XRAM
+  protocol — unconfirmed whether that's modelled; worth checking before
+  assuming a real-hardware walkthrough is the only option (see the
+  Phase 8 plan).
 
 ### Select mode cut/copy (Phase 8)
 
@@ -712,6 +724,19 @@ LZO compression (`#embed lzo "file.bin"`, `oscar.h`'s
 which sits outside the code/data/bss region entirely) — this both shrinks
 the embedded data and avoids needing any decompression scratch buffer in
 BSS.
+
+**Prime target if more memory is ever needed**: these 5 embedded screens
+(4 help screens + the title image, ~5.4KB raw, still a few KB even
+LZO-compressed) are the single largest static-data cost in the binary
+purely for the sake of LOCI-optionality (see "LOCI file I/O (Phase 6)"'s
+"LOCI stays optional" point). If a future feature needs the freed
+`$0580-$B200` headroom, converting these 5 assets to load from LOCI
+storage at runtime (`loci_open`/`loci_read`, same mechanism as
+`fileio.c`) instead of `#embed` is the first thing to consider — at the
+cost of losing help/the Version-page title image when no LOCI device is
+attached, and losing `test_help_funct8.sh`'s headless coverage unless
+ported to run against Phosphoric's LOCI emulation (which can run these
+tests too, just not yet wired up — see "Phosphoric Testing Notes").
 
 ### Information menu (Phase 9c)
 
@@ -872,6 +897,19 @@ Emulator: `$ORICUTRON_HOME/oricutron -ma --serial none --vsynchack off --turbota
 `.env` (gitignored, see `.env.example`). `tests/fixtures/` is checked in;
 `tests/sandbox/` and `tests/out/` are gitignored scratch dirs regenerated by
 `make sandbox-reset`/`make test*`.
+
+**Phosphoric *can* emulate a LOCI device** (alpha-quality) — a fact this
+file got wrong in several places until corrected by the user 2026-06-18;
+don't re-introduce the "Phosphoric/Oricutron can't emulate LOCI" claim
+elsewhere. **Oricutron cannot emulate LOCI at all.** This means LOCI-
+dependent features (file I/O, the file picker, undo/redo's overlay RAM)
+are not necessarily real-hardware-only for testing — Phosphoric should be
+used to add headless coverage of the actual byte-level behaviour, not
+just the LOCI-absent path, where practical. Real Oric Atmos hardware
+remains the *authoritative* check given Phosphoric's LOCI emulation is
+still alpha-quality — a Phosphoric pass doesn't retire the need for an
+eventual real-hardware confirmation, but it's a much faster and more
+repeatable first line of testing than jumping straight to hardware.
 
 ## Memory Layout (`include/oric_crt.c`)
 
