@@ -9,8 +9,8 @@
 #   - the menu bar opens and shows all 4 top-level items
 #   - the Screen pulldown shows Width/Height/Clear/Fill
 #   - ESC at pulldown level then bar level closes the menu with no residue
-#   - selecting a stub item (Information pulldown) shows a "Not yet
-#     implemented" popup, which can be dismissed cleanly
+#   - Information > Version shows its 3 pages (title image, version/credits
+#     text, QR code) and returns cleanly to the bar/Main mode
 #   - the Fill dispatch actually fills the canvas
 #
 # --type-keys notes (see CLAUDE.md "Phosphoric testing notes"):
@@ -98,27 +98,35 @@ echo "ESC (pulldown) + ESC (bar) closes with no residue"
 check_not_found "bar gone"       "Screen" "$DUMP3"
 check_found     "statusbar intact" "Main      XY 0, 0C41A S20I7P0S" "$DUMP3"
 
-# --- Scenario 4: Information pulldown stub -> "Not yet implemented" popup -
-# (File's items are now wired to real LOCI dispatch as of Phase 6 --
-# src/fileio.c -- so this scenario moved to Information, which stays a
-# stub indefinitely; out of Phase 6's scope.)
-DUMP4="$OUT/capture_menu_notimpl.bin"
+# --- Scenario 4: Information > Version, page 1 (title image) ---------------
+# (File's items were wired to real LOCI dispatch as of Phase 6 -- src/fileio.c
+# -- and Information's Version/Exit were wired up in Phase 9c -- src/info.c
+# -- so this scenario, which used to land on a permanent stub, now exercises
+# the real 3-page Version popup.)
+DUMP4="$OUT/capture_menu_version_p1.bin"
 run_capture 15500000 '\p1\f1\p1\r\p1\r\p1\r\p1\n\p1\n' "$DUMP4"
 echo ""
-echo "Information pulldown stub shows Not-yet-implemented popup"
-check_found "popup message shown" "Not yet implemented"      "$DUMP4"
-check_found "popup prompt shown"  "Press a key to continue"  "$DUMP4"
+echo "Information > Version shows page 1 (title image, replaces the bar)"
+check_not_found "bar gone (title image showing)" "Screen File  Charset  Information" "$DUMP4"
 
-# --- Scenario 5: popup dismiss + clean close --------------------------------
-DUMP5="$OUT/capture_menu_notimpl_dismiss.bin"
-run_capture 17500000 '\p1\f1\p1\r\p1\r\p1\r\p1\n\p1\n\p1 \p1\e' "$DUMP5"
+# --- Scenario 5: page 2 (version/credits text) ------------------------------
+DUMP5="$OUT/capture_menu_version_p2.bin"
+run_capture 16600000 '\p1\f1\p1\r\p1\r\p1\r\p1\n\p1\n\p1\n' "$DUMP5"
 echo ""
-echo "Dismiss popup (SPACE) then ESC closes with no residue"
-check_not_found "popup gone"       "Not yet implemented" "$DUMP5"
-check_not_found "bar gone"         "Screen"              "$DUMP5"
-check_found     "statusbar intact" "Main      XY 0, 0C41A S20I7P0S" "$DUMP5"
+echo "Page 2 shows version/credits text"
+check_found "title line shown"     "OricScreenEditorLOCI"                "$DUMP5"
+check_found "GitHub URL shown"     "github.com/xahmol/oricscreeneditorloci" "$DUMP5"
 
-# --- Scenario 6: Fill dispatch ----------------------------------------------
+# --- Scenario 6: page 3 (QR code) + dismiss + clean close -------------------
+DUMP6="$OUT/capture_menu_version_dismiss.bin"
+run_capture 21000000 '\p1\f1\p1\r\p1\r\p1\r\p1\n\p1\n\p1\n\p1\n\p1\n\p1\e\p1\e' "$DUMP6"
+echo ""
+echo "Page 3 (QR) dismissed, ESC-ESC closes with no residue"
+check_not_found "version text gone" "OricScreenEditorLOCI" "$DUMP6"
+check_not_found "bar gone"          "Screen"               "$DUMP6"
+check_found     "statusbar intact"  "Main      XY 0, 0C41A S20I7P0S" "$DUMP6"
+
+# --- Scenario 7: Fill dispatch ----------------------------------------------
 DUMP6="$OUT/capture_menu_fill.bin"
 run_capture 16500000 '\p1\f1\p1\n\p1\d\p1\d\p1\d\p1\n\p1\e' "$DUMP6"
 echo ""

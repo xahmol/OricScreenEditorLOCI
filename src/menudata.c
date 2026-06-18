@@ -18,6 +18,7 @@
 #include "fileio.h"
 #include "input.h"
 #include "undo.h"
+#include "info.h"
 
 // -------------------------------------------------------------------------
 // Menu bar and pulldown tables
@@ -160,10 +161,10 @@ void menudata_init(void)
 
 /**
  * Open the menu bar (row 0), dispatch Screen menu choices (Width/Height/
- * Clear/Fill) and all File/Charset menu items (src/fileio.c), show a "not
- * yet implemented" popup for Information items, and run until ESC is
- * pressed at the bar level (any menu_main() return value >= 99). Restores
- * row 0 and redraws the canvas + statusbar on exit.
+ * Clear/Fill), all File/Charset menu items (src/fileio.c) and the
+ * Information menu items (src/info.c), and run until ESC is pressed at
+ * the bar level (any menu_main() return value >= 99). Restores row 0 and
+ * redraws the canvas + statusbar on exit.
  *
  * @return (none)
  */
@@ -243,6 +244,14 @@ void menu_run(void)
 
         case 36:
             fileio_save_charset(2);
+            break;
+
+        case 41:
+            info_version_show();
+            break;
+
+        case 42:
+            info_exit();
             break;
 
         default:

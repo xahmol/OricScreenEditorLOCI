@@ -7,7 +7,11 @@
 // dump at runtime and must manually save/restore the underlying screen
 // RAM; OSE embeds the dumps at compile time (#embed, no LOCI dependency)
 // and restores the real canvas/statusbar from screenmap[]/AppState
-// instead of a manual save buffer.
+// instead of a manual save buffer. Embedded LZO-compressed (oscar.h's
+// oscar_expand_lzo(), decompressing straight into $BB80 screen RAM, which
+// sits outside this project's $0580-$B200 code/data/bss region) --
+// raw 1080-byte-per-screen embeds left too little budget once the
+// Information menu's title image + QR code (Phase 9c) were added too.
 
 #include "oric.h"
 #include "charsetswap.h"
@@ -15,20 +19,21 @@
 #include "statusbar.h"
 #include "input.h"
 #include "help.h"
+#include <oscar.h>
 
 // #embed must be the only thing on its line -- oscar64 mis-tokenizes the
 // embedded byte stream if `{ #embed ... }` shares a line with other code.
-static const uint8_t help_screen1[] = {
-    #embed "../assets/OSEforLOCI-Help1.bin"
+static const char help_screen1[] = {
+    #embed lzo "../assets/OSEforLOCI-Help1.bin"
 };
-static const uint8_t help_screen2[] = {
-    #embed "../assets/OSEforLOCI-Help2.bin"
+static const char help_screen2[] = {
+    #embed lzo "../assets/OSEforLOCI-Help2.bin"
 };
-static const uint8_t help_screen3[] = {
-    #embed "../assets/OSEforLOCI-Help3.bin"
+static const char help_screen3[] = {
+    #embed lzo "../assets/OSEforLOCI-Help3.bin"
 };
-static const uint8_t help_screen4[] = {
-    #embed "../assets/OSEforLOCI-Help4.bin"
+static const char help_screen4[] = {
+    #embed lzo "../assets/OSEforLOCI-Help4.bin"
 };
 
 /**
@@ -41,7 +46,7 @@ static const uint8_t help_screen4[] = {
  */
 void help_show(uint8_t screennumber)
 {
-    const uint8_t *src;
+    const char *src;
 
     switch (screennumber)
     {
@@ -54,9 +59,7 @@ void help_show(uint8_t screennumber)
 
     charsetswap_enter();
 
-    uint8_t *dst = (uint8_t *)TEXTVRAM;
-    for (uint16_t i = 0; i < 1080; i++)
-        dst[i] = src[i];
+    oscar_expand_lzo((char *)TEXTVRAM, src);
 
     key_read();
 

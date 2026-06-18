@@ -65,6 +65,15 @@
 #define MSG_INFO_VERSION  "Version/credits"
 #define MSG_INFO_EXIT     "Fin du programme"
 
+// ── Information > Version popup (src/info.c) ────────────────────────────────
+#define MSG_INFO_VERSION_TITLE      "OricScreenEditorLOCI"
+#define MSG_INFO_VERSION_AUTHOR     "Ecrit en 2025-2026 par Xander Mol"
+#define MSG_INFO_VERSION_FMT        "Version : v%u.%u.%u"
+#define MSG_INFO_VERSION_SOURCE     "Source, docs et credits sur :"
+#define MSG_INFO_VERSION_URL        "github.com/xahmol/oricscreeneditorloci"
+#define MSG_INFO_VERSION_COPYRIGHT  "(C) 2025-2026, Xander Mol"
+#define MSG_INFO_VERSION_QR_TITLE   "Scannez le QR code pour la source :"
+
 // ── Pulldown 4 -- Yes/No / Oui/Non ───────────────────────────────────────────
 #define MSG_MENU_YN_YES  "Oui"
 #define MSG_MENU_YN_NO   "Non"
