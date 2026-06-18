@@ -67,6 +67,9 @@
 #define MSG_MENU_NOTIMPL     "Not yet implemented"
 #define MSG_MENU_SHRINKWARN  "Shrinking might delete data."
 
+// ── Select mode cut/copy (src/select.c) ─────────────────────────────────────
+#define MSG_SELECT_NOFIT  "Selection does not fit."
+
 // ── Resize dialog (src/menudata.c, resize_dialog()) ──────────────────────────
 #define MSG_RESIZE_TITLE_WIDTH    "Resize canvas width"
 #define MSG_RESIZE_TITLE_HEIGHT   "Resize canvas height"

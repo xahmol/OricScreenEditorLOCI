@@ -75,6 +75,9 @@
 #define MSG_MENU_NOTIMPL     "Pas encore implemente"
 #define MSG_MENU_SHRINKWARN  "Reduire peut effacer donnees."
 
+// ── Select mode cut/copy (src/select.c) ─────────────────────────────────────
+#define MSG_SELECT_NOFIT  "Selection hors limites."
+
 // ── Resize dialog (src/menudata.c, resize_dialog()) ──────────────────────────
 #define MSG_RESIZE_TITLE_WIDTH    "Redimensionner largeur"
 #define MSG_RESIZE_TITLE_HEIGHT   "Redimensionner hauteur"

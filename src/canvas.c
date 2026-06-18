@@ -5,12 +5,13 @@
 
 uint8_t screenmap[CANVAS_MAX_SIZE];
 
-// Scratch row buffer for canvas_resize()'s width reflow. Sized to the widest
-// possible row (CANVAS_MAX_SIZE / VIEWPORT_HEIGHT ~= 303, rounded up).
-// File-scope static, not stack-local: the Oscar64 software stack
-// ($B200-$B3FF) is only 512 bytes.
-#define CANVAS_MAX_ROW 320
-static uint8_t canvas_rowbuf[CANVAS_MAX_ROW];
+// Scratch row buffer for canvas_resize()'s width reflow, also reused by
+// src/select.c's cut/copy (CANVAS_MAX_ROW declared in canvas.h) for the
+// same overlap-safety reason -- both uses are mutually exclusive in time,
+// so sharing the single buffer is safe and avoids doubling the allocation.
+// Not stack-local: the Oscar64 software stack ($B200-$B3FF) is only
+// 512 bytes.
+uint8_t canvas_rowbuf[CANVAS_MAX_ROW];
 
 /**
  * Fill the entire canvas buffer (app.canvas_width * app.canvas_height

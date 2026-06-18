@@ -18,12 +18,15 @@
 // clears all stale highlight bytes -- so only the new perimeter needs
 // drawing in that case, not an erase pass.
 
+#include <string.h>
 #include "oric.h"
 #include "keyboard.h"
 #include "charwin.h"
 #include "appstate.h"
 #include "canvas.h"
 #include "statusbar.h"
+#include "menu.h"
+#include "strings.h"
 #include "undo.h"
 #include "select.h"
 
@@ -190,15 +193,61 @@ void linebox_run(void)
 }
 
 /**
+ * Paste the accepted selection (select_startx/starty/width/height) at
+ * (destx, desty), direct port of V1's per-row selectmode() cut/copy loop:
+ * each row is copied through canvas_rowbuf[] (src/canvas.h, shared with
+ * canvas_resize()) one at a time, in top-to-bottom or bottom-to-top order
+ * depending on whether the destination is below or above the source --
+ * the same overlap-safety direction choice canvas_resize() uses for its
+ * row reflow. If cut, the source row is blanked to CH_SPACE immediately
+ * after being copied into canvas_rowbuf (before the destination write),
+ * so a source/destination overlap can't lose data.
+ *
+ * @param destx Canvas-absolute left column of the paste destination.
+ * @param desty Canvas-absolute top row of the paste destination.
+ * @param cut   1 to blank the source after copying (cut), 0 to leave it
+ *              unchanged (copy).
+ * @return (none)
+ */
+static void select_paste(uint16_t destx, uint16_t desty, uint8_t cut)
+{
+    uint16_t ycount, srcy, dsty;
+
+    for (ycount = 0; ycount < select_height; ycount++)
+    {
+        if (desty >= select_starty)
+        {
+            srcy = (uint16_t)(select_starty + select_height - ycount - 1);
+            dsty = (uint16_t)(desty + select_height - ycount - 1);
+        }
+        else
+        {
+            srcy = (uint16_t)(select_starty + ycount);
+            dsty = (uint16_t)(desty + ycount);
+        }
+
+        memcpy(canvas_rowbuf, &screenmap[srcy * app.canvas_width + select_startx], select_width);
+        if (cut) memset(&screenmap[srcy * app.canvas_width + select_startx], CH_SPACE, select_width);
+        memcpy(&screenmap[dsty * app.canvas_width + destx], canvas_rowbuf, select_width);
+    }
+
+    canvas_blit();
+}
+
+/**
  * Select mode, entered via 's' from Main mode. Grows a rectangle
  * (rect_select(0)); if accepted, prompts for an action: 'd' clears the
  * rect to CH_SPACE, 'i' fills it with app.plotink, 'p' fills it with
  * 16+app.plotpaper, 'm' fills it with the modifier-attribute byte for
  * app.plotaltchar/plotdouble/plotblink (the same bit-packing as oric.h's
  * A_STD(8)/A_ALT(9)/A_STD2H(10)/.../A_BLINK2HALT(15): base 8, bit0=altchar,
- * bit1=double, bit2=blink). ESC at either stage leaves the canvas
- * unchanged. V1's cut/copy ('x'/'c') are deferred to Phase 8 (overlay-RAM
- * clipboard) -- see CLAUDE.md/the Phase 5 plan.
+ * bit1=double, bit2=blink), or 'x'/'c' to cut/copy: a destination-picking
+ * sub-loop (cursor keys move via cursor_move_scroll(), ENTER confirms,
+ * ESC cancels) followed by select_paste() if the destination fits within
+ * the canvas (MSG_SELECT_NOFIT popup otherwise). ESC at any stage leaves
+ * the canvas unchanged. Cutting takes two undo_snapshot() calls (source
+ * and destination rects are usually disjoint) so reverting a cut needs
+ * two 'z' presses -- a minor known wrinkle, not fixed here.
  *
  * @return (none)
  */
@@ -217,7 +266,61 @@ void select_run(void)
         key = cwin_getch();
 
         if (key == KEY_F6) statusbar_show((uint8_t)!app.showstatusbar);
-    } while (key != 'd' && key != 'i' && key != 'p' && key != 'm' && key != KEY_ESC);
+    } while (key != 'd' && key != 'i' && key != 'p' && key != 'm'
+          && key != 'x' && key != 'c' && key != KEY_ESC);
+
+    if (key == 'x' || key == 'c')
+    {
+        uint8_t movekey;
+        uint16_t destx, desty;
+
+        canvas_cell_invert(app.cursor_x, app.cursor_y); // show dest cursor
+
+        do
+        {
+            movekey = cwin_getch();
+
+            canvas_cell_invert(app.cursor_x, app.cursor_y); // hide
+
+            switch (movekey)
+            {
+            case KEY_LEFT:  cursor_move_scroll(-1, 0); break;
+            case KEY_RIGHT: cursor_move_scroll(1, 0);  break;
+            case KEY_UP:    cursor_move_scroll(0, -1); break;
+            case KEY_DOWN:  cursor_move_scroll(0, 1);  break;
+            case KEY_F6:    statusbar_show((uint8_t)!app.showstatusbar); break;
+            default: break;
+            }
+
+            statusbar_draw();
+            canvas_cell_invert(app.cursor_x, app.cursor_y); // show at new pos
+        } while (movekey != KEY_ENTER && movekey != KEY_ESC);
+
+        canvas_cell_invert(app.cursor_x, app.cursor_y); // hide before popup/paste
+
+        app.mode = MODE_MAIN;
+
+        if (movekey == KEY_ENTER)
+        {
+            destx = (uint16_t)(app.cursor_x + app.xoffset);
+            desty = (uint16_t)(app.cursor_y + app.yoffset);
+
+            if (destx + select_width > app.canvas_width || desty + select_height > app.canvas_height)
+            {
+                menu_messagepopup(MSG_SELECT_NOFIT);
+            }
+            else
+            {
+                undo_snapshot(destx, desty, select_width, select_height);
+                if (key == 'x')
+                    undo_snapshot(select_startx, select_starty, select_width, select_height);
+                select_paste(destx, desty, (uint8_t)(key == 'x'));
+            }
+        }
+
+        statusbar_draw();
+        return;
+    }
 
     app.mode = MODE_MAIN;
 

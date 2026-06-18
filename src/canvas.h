@@ -6,6 +6,12 @@
 
 extern uint8_t screenmap[CANVAS_MAX_SIZE];
 
+// Widest possible canvas row (CANVAS_MAX_SIZE / VIEWPORT_HEIGHT ~= 303,
+// rounded up). canvas_resize() and select.c's cut/copy both reuse this
+// single scratch buffer (mutually exclusive in time).
+#define CANVAS_MAX_ROW 320
+extern uint8_t canvas_rowbuf[CANVAS_MAX_ROW];
+
 void canvas_init(void);
 void canvas_clear(void);
 void canvas_fill(uint8_t value);
