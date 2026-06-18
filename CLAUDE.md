@@ -214,12 +214,21 @@ gap).
   render via the `A_STD`/`A_ALT` attribute bytes, not direct charset-RAM
   access, so there's no live-edit-preview requirement (unlike charsetedit).
 
-**Noted follow-up (not blocking)**: V1 ships `assets/Petscii.css.bin` as the
-default Alt charset, which is what makes `visualmap`'s reordering visually
-meaningful. OSE doesn't load any default Alt-charset asset at startup (a
-Phase-1 gap, not Phase-4-specific) — `visualmap` still works correctly (a pure
-index permutation over whatever is in `CHARSET_ALT`), just less visually
-useful until a default-charset-loading mechanism exists.
+**Correction (was wrong in an earlier draft of this section)**:
+`visualchar[]`'s reordering is designed around the Oric's own
+native ROM-resident alternate (semigraphics) charset, **not** any
+PETSCII asset file — `assets/Petscii.css.bin` is unrelated to this
+feature. V1 normally populates `CHARSET_ALT` with that ROM-native
+bitmap via `jsr $F816` (`ROM_ALTCHARS`) — which, per "Charset-swap
+mechanism" below, is a no-op when called from Oscar64 in this runtime.
+So `CHARSET_ALT` starts uninitialised at boot, and `visualmap` (a pure
+index permutation over whatever bytes are in `CHARSET_ALT`) has nothing
+meaningful to reorder until the user loads *some* charset by hand. No
+embedded or otherwise available source for the Oric ROM's native
+alt-charset bitmap is confirmed to exist in this codebase — fixing this
+properly would need that data sourced first (e.g. extracted from a ROM
+dump), not just "load an existing asset," so it's left as an open gap
+rather than a quick fix.
 
 ### Colour picker (Phase 4c)
 
