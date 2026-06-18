@@ -38,6 +38,14 @@
 static uint16_t select_startx, select_starty, select_endx, select_endy;
 static uint16_t select_width, select_height;
 
+// Line/Box-only: toggled by 'o' during rect_select()'s grow loop (no-op
+// for Select mode, which never reads it), read by linebox_run() after
+// rect_select() returns to decide fill-vs-outline. A file-scope static
+// rather than a rect_select() parameter/return value, same convention as
+// select_startx/etc. above -- avoids changing rect_select()'s signature
+// for something only one of its two callers cares about.
+static uint8_t select_hollow;
+
 /**
  * XOR-toggle (canvas_cell_invert()) every cell of one canvas cell that is
  * currently within the viewport (app.xoffset/yoffset), converting from
@@ -84,13 +92,46 @@ static void rect_perimeter_toggle(uint16_t sx, uint16_t sy, uint16_t ex, uint16_
 }
 
 /**
+ * Plot value along just the perimeter (border, not the fill) of the
+ * rectangle [sx..ex] x [sy..ey] (inclusive, canvas-absolute coordinates)
+ * -- same walk as rect_perimeter_toggle(), but canvas_put() instead of
+ * canvas_cell_invert(), and unconditional rather than viewport-clipped
+ * (this writes to the canvas model itself, not a transient highlight).
+ * Used by linebox_run() for the hollow-box ('o' toggle) case.
+ *
+ * @param sx    Left column.
+ * @param sy    Top row.
+ * @param ex    Right column.
+ * @param ey    Bottom row.
+ * @param value Screencode/attribute byte to plot along the border.
+ * @return (none)
+ */
+static void rect_perimeter_plot(uint16_t sx, uint16_t sy, uint16_t ex, uint16_t ey, uint8_t value)
+{
+    uint16_t x, y;
+
+    for (x = sx; x <= ex; x++)
+    {
+        canvas_put(x, sy, value);
+        if (ey != sy) canvas_put(x, ey, value);
+    }
+    for (y = (uint16_t)(sy + 1); y < ey; y++)
+    {
+        canvas_put(sx, y, value);
+        if (ex != sx) canvas_put(ex, y, value);
+    }
+}
+
+/**
  * Grow a rectangle from the cursor's current position using cursor keys
  * (cursor_move_scroll() handles auto-scroll on oversized canvases, see
  * src/canvas.c), with a live perimeter highlight. ENTER accepts (populating
  * select_startx/starty/endx/endy/width/height) and returns 1; ESC cancels
  * and returns 0. FUNCT+6 toggles the statusbar without affecting the rect.
- * Sets app.mode to MODE_LINEBOX or MODE_SELECT for the duration (per
- * draworselect) and restores MODE_MAIN before returning.
+ * 'o' toggles select_hollow (Line/Box-only; linebox_run() reads it after
+ * this returns -- Select mode never does). Sets app.mode to MODE_LINEBOX
+ * or MODE_SELECT for the duration (per draworselect) and restores
+ * MODE_MAIN before returning.
  *
  * @param draworselect 1 for Line/Box mode, 0 for Select mode (only affects
  *                      app.mode/the statusbar's Mode field while running).
@@ -106,6 +147,7 @@ uint8_t rect_select(uint8_t draworselect)
     uint8_t key;
 
     app.mode = draworselect ? MODE_LINEBOX : MODE_SELECT;
+    select_hollow = 0;
 
     rect_perimeter_toggle(orgx, orgy, orgx, orgy);
     statusbar_draw();
@@ -134,6 +176,13 @@ uint8_t rect_select(uint8_t draworselect)
                 rect_perimeter_toggle(orgx, orgy, orgx, orgy);
                 statusbar_draw();
             }
+            continue;
+
+        // Hollow-box toggle: Line/Box-only (linebox_run() reads
+        // select_hollow after this returns; Select mode never does, so
+        // toggling it during select_run()'s rect-grow is harmless).
+        case 'o':
+            select_hollow = !select_hollow;
             continue;
 
         default:
@@ -183,8 +232,10 @@ uint8_t rect_select(uint8_t draworselect)
 
 /**
  * Line/Box mode, entered via 'l' from Main mode. Grows a rectangle
- * (rect_select(1)) and, if accepted, fills it with app.plotscreencode.
- * ESC leaves the canvas unchanged.
+ * (rect_select(1)) and, if accepted, fills it with app.plotscreencode --
+ * or, if 'o' was pressed during the grow to toggle hollow mode, plots
+ * just the rectangle's border (rect_perimeter_plot()) instead, leaving
+ * the interior untouched. ESC leaves the canvas unchanged.
  *
  * @return (none)
  */
@@ -196,9 +247,16 @@ void linebox_run(void)
 
     undo_snapshot(select_startx, select_starty, select_width, select_height);
 
-    for (y = select_starty; y < select_starty + select_height; y++)
-        for (x = select_startx; x < select_startx + select_width; x++)
-            canvas_put(x, y, app.plotscreencode);
+    if (select_hollow)
+    {
+        rect_perimeter_plot(select_startx, select_starty, select_endx, select_endy, app.plotscreencode);
+    }
+    else
+    {
+        for (y = select_starty; y < select_starty + select_height; y++)
+            for (x = select_startx; x < select_startx + select_width; x++)
+                canvas_put(x, y, app.plotscreencode);
+    }
 
     canvas_blit();
 }
