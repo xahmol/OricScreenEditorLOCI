@@ -17,10 +17,7 @@ local checkout at `/home/xahmol/git/OricScreenEditor`), restarted on the
 Oscar64 native/bare-metal build chain shared with
 [locifilemanager-v2](https://github.com/xahmol/locifilemanager-v2)
 (`/home/xahmol/git/locifilemanager-v2`), which this document's structure is
-adapted from. **OSE is mid-rewrite (Phase 8 of 9 complete)** — several
-sections below describe library code that is present (copied verbatim from
-locifilemanager-v2) but not yet wired into the application; these are marked
-explicitly.
+adapted from. **All 9 phases of the rewrite are complete.**
 
 ---
 
@@ -156,8 +153,10 @@ banking, so Phase 7 had no dependency on Phase 8 wiring up overlay RAM —
 an earlier draft of the Phase 7 plan conflated the two; corrected during
 implementation, and the same distinction came up again (and was corrected
 again) while planning Phase 8's undo eviction policy — see CLAUDE.md's
-"Canvas undo/redo (Phase 8)" section. `ijk.h/c` remains dormant, for a
-later IJK-input phase — not `#include`d from any `src/` file yet.
+"Canvas undo/redo (Phase 8)" section. `ijk.h/c` is now wired in too
+(Phase 9a, `src/input.c/h` — see §6.17): `ijk_detect()`/`ijk_read()` back
+`key_read()`, the universal keyboard+joystick blocking read that replaced
+`cwin_getch()` everywhere.
 
 ### 2.5 Interrupt policy
 
@@ -169,8 +168,8 @@ entered. **Convention:** any code that must transiently enable interrupts
 brackets it with `PHP`/`SEI` ... `PLP`, never `SEI`/`CLI` — an unconditional
 `CLI` would permanently re-enable IRQs (since no handler exists) and let the
 stock ROM IRQ handler corrupt zero page / screen RAM on every frame
-thereafter. (Not yet exercised by OSE — applies once §2.4's overlay-RAM/IJK
-code is wired in.)
+thereafter. Exercised by both `src/undo.c` (overlay-RAM access) and
+`include/ijk.c` (VIA Port A access via `key_read()`, Phase 9a).
 
 ### 2.6 Screen model
 
@@ -205,7 +204,9 @@ src/
                   cursor, i/o/u plot ink/paper/modifier, 0-9/SHIFT+0-9
                   favourites, FUNCT+1 opens the menu bar, 'e' opens the
                   character editor, 'p'/'c' open the palette/colour picker,
-                  'l'/'s'/'m'/'w' open Line-Box/Select/Move/Write mode (§6.9-§6.13)
+                  'l'/'s'/'m'/'w' open Line-Box/Select/Move/Write mode
+                  (§6.9-§6.13), z/y undo/redo (§6.16), FUNCT+8 shows help
+                  (§6.18)
   modes.h/c       EditorMode -> MSG_MODE_* display-name lookup
                   (mode_name()), shared by statusbar.c and any mode file
   select.c/h      Shared rectangle-grower (rect_select()) + Line/Box mode
@@ -218,9 +219,14 @@ src/
                   action (§6.15)
   undo.c/h        Canvas-edit undo/redo ('z'/'y'), overlay-RAM-backed
                   dirty-rect ring buffer (§6.16)
+  input.c/h       key_read(): universal keyboard+IJK-joystick blocking
+                  read, replaces cwin_getch() everywhere (§6.17)
+  help.c/h        FUNCT+8 help screens, #embed'd + LZO-compressed (§6.18)
+  info.c/h        Information menu actions: Version (3-page popup) and
+                  Exit (RESET vector) (§6.19)
   menu.c/h        Menu bar/pulldown/popup engine + main-RAM window-save stack
   menudata.c/h    OSE menu tables (Screen/File/Charset/Information) + Screen/
-                  File/Charset pulldown dispatch
+                  File/Charset/Information pulldown dispatch
   charsetedit.c/h Character editor popup: edits the 6x8 glyph for
                   app.plotscreencode/app.plotaltchar directly in live charset RAM
   charsetswap.c/h Charset-swap mechanism: backs up/restores CHARSET_STD around
@@ -245,7 +251,8 @@ include/
                   src/fileio.c (§6.14), LOCI-device XRAM via
                   src/filepicker.c (§6.15), Oric-side overlay RAM via
                   src/undo.c (§6.16) -- see §2.4
-  ijk.h/c         Raxiss IJK joystick driver -- present, not yet compiled in (§2.4)
+  ijk.h/c         Raxiss IJK joystick driver -- wired in via src/input.c
+                  (§2.4, §6.17)
 
 tools/
   mktap.py        Wraps Oscar64 .bin output in an Oric tape header
@@ -484,23 +491,34 @@ main.c
  │   └─ charsetswap.h (charsetswap_mark_changed/enter/exit)
  │       └─ charset.h (charset_address/save/load/rom_glyph, glyph-bitmap ops)
  ├─ menudata.h   (Screen/File/Charset/Information tables + Screen/File/
- │                Charset dispatch)
- │   └─ menu.h, canvas.h, statusbar.h, strings.h, fileio.h
+ │                Charset/Information dispatch)
+ │   └─ menu.h, canvas.h, statusbar.h, strings.h, fileio.h, info.h
  ├─ editor.h     (main-mode loop)
  │   ├─ charsetedit.h (character editor popup)
  │   │   └─ charset.h (glyph addressing + bitmap transforms)
+ │   │   └─ help.h (FUNCT+8, §6.18)
  │   ├─ palette.h     (palette popup: Fav/Std/Alt grid, visualchar[])
  │   ├─ colourpicker.h (colour picker popup: 8x8 ink x paper grid)
  │   ├─ select.h      (rect_select(), Line/Box + Select mode, cut/copy)
+ │   │   └─ help.h (FUNCT+8, guarded -- §6.18)
  │   ├─ move.h         (Move mode: content nudge)
+ │   │   └─ help.h (FUNCT+8, §6.18)
  │   ├─ write.h        (Write mode: free-typing screencodes)
- │   └─ undo.h          (undo/redo, §6.16)
- │        └─ loci.h (enable_overlay_ram/disable_overlay_ram -- Oric-side
- │                   overlay RAM, not LOCI-device XRAM, see §2.4)
+ │   │   └─ help.h (FUNCT+8, §6.18)
+ │   ├─ undo.h          (undo/redo, §6.16)
+ │   │    └─ loci.h (enable_overlay_ram/disable_overlay_ram -- Oric-side
+ │   │               overlay RAM, not LOCI-device XRAM, see §2.4)
+ │   ├─ input.h         (key_read(), §6.17)
+ │   │    └─ ijk.h (ijk_detect/ijk_read -- VIA Port A joystick)
+ │   └─ help.h          (FUNCT+8 in Main mode, §6.18)
  └─ strings.h    (EN/FR localisation gateway -> strings_en.h/strings_fr.h, §3)
 
 select.c, move.c, write.c, menudata.c
  └─ undo.h (undo_snapshot() retrofitted into every destructive edit, §6.16)
+
+main.c, editor.c, select.c, move.c, write.c, charsetedit.c, palette.c,
+colourpicker.c, filepicker.c, menu.c, menudata.c
+ └─ input.h (key_read() replaces cwin_getch() everywhere, §6.17)
 
 menudata.c
  └─ fileio.h  (LOCI file I/O: filename prompt (Save), presence gate,
@@ -511,20 +529,23 @@ menudata.c
            └─ loci.h (xram_peek/poke/memcpy_to/memcpy_from -- LOCI-device
                       XRAM, not Oric-side overlay RAM, see §2.4)
            └─ menu.h, statusbar.h
+ └─ info.h    (Information menu: Version 3-page popup, Exit via RESET
+               vector, §6.19)
+      └─ menu.h, appstate.h, input.h
 
 statusbar.c, select.c, move.c, write.c
  └─ modes.h  (mode_name(): EditorMode -> MSG_MODE_* lookup, standalone)
 
 main.c, canvas.c, statusbar.c, menu.c, menudata.c, editor.c, charsetedit.c,
-charsetswap.c, select.c, move.c, write.c, fileio.c, filepicker.c
+charsetswap.c, select.c, move.c, write.c, fileio.c, filepicker.c, help.c,
+info.c
  └─ charwin.h  (windows, cursor, text input)
       └─ keyboard.h (raw key scan/decode)
  └─ oric.h     (hardware register layout, screen/attr/charset-bank constants)
 
-(dormant, not yet #included from src/ -- see §2.4)
-ijk.h   -- VIA Port A joystick driver
-(loci.h's overlay-RAM portion -- enable_overlay_ram()/xram_* -- also still
-dormant; only the file-I/O portion is wired in, via fileio.h above)
+help.c, info.c
+ └─ oscar.h (Oscar64 stdlib: oscar_expand_lzo(), decompresses #embed lzo
+            data straight into $BB80 screen RAM)
 ```
 
 `charwin.h`, `keyboard.h`, `menu.h`, `menudata.h`, `canvas.h`, `statusbar.h`,
@@ -997,6 +1018,51 @@ minor known wrinkle.
 Fully testable headless (`test_select_cutcopy.sh`) — no LOCI/overlay RAM
 involved at all.
 
+### 6.18 IJK joystick input (`src/input.c`, Phase 9a)
+
+`key_read()` is the single blocking-read function every mode now calls
+instead of `cwin_getch()`. Each call: if `ijk_present` (set once by
+`ijk_detect()` from `main.c`), reads both sticks (`ijk_read()`) and maps
+`FIRE`/`RIGHT`/`LEFT`/`DOWN`/`UP` bits to `KEY_ENTER`/cursor keys
+(left stick first, then right, last-match-wins); a fired direction is
+drained to neutral before returning (no repeat from a single press).
+Falls back to `keyb_poll()` if the joystick gave nothing this spin, or
+none is present. Ported from `nonworkingcc65`'s `getkey(joyallowed=1,
+norepeat=1)` — V1 itself has no joystick code at all.
+
+### 6.19 Help screens (`src/help.c`, `FUNCT+8`, Phase 9b)
+
+`help_show(screennumber)` (1=Main, 2=Character editor, 3=Select/Move/
+Line-Box, 4=Write) blits one of 4 `#embed`'d, LZO-compressed 1080-byte
+screen dumps (`assets/OSEforLOCI-Help{1..4}.bin`) straight into `$BB80`
+via `oscar_expand_lzo()`, bracketed by `charsetswap_enter()`/`exit()` (so
+the dump's own text renders with ROM glyphs regardless of user charset
+edits) and a `key_read()` wait; `canvas_blit()` + `statusbar_draw()`
+restore the real canvas afterward. Ported from V1's
+`helpscreen_load(screennumber)`, but compile-time-embedded instead of
+tape-loaded — works with no LOCI device. Wired into `editor.c` (Main,
+unconditional), `charsetedit.c` (also redraws the popup's own chrome
+afterward), `select.c`'s shared `rect_select()` (guarded to only fire
+before the rect starts growing, V1's exact guard), `move.c`
+(unconditional), `write.c`. Not wired into the palette or colour-picker
+popups (no V1 precedent).
+
+### 6.20 Information menu (`src/info.c`, Phase 9c)
+
+`info_version_show()`: a 3-page popup (`menu_winsave(0, VIEWPORT_
+HEIGHT+1, 1)`/`menu_winrestore()` around all 3) — page 1 is
+`OSEforLOCI-Title.bin` full-screen (same `#embed lzo` +
+`oscar_expand_lzo()` approach as §6.19's help screens), page 2 is
+programmatic version/credits text, page 3 is a 25x25-module QR code
+(`tools/gen_qr.js`, adapted from `locifilemanager-v2`'s same-purpose
+script) linking to the project's GitHub page. `info_exit()` resets the
+machine via `__asm { jmp ($fffc) }` — an indirect jump through the RESET
+vector, the bare-metal equivalent of V1's Exit (which just returned to
+the CC65 program's OS-level loader; OSE's runtime has no such loader to
+return to). Both wired into `menudata.c`'s Information pulldown (choices
+41/42), the last two menu items that had been permanent stubs since
+Phase 2.
+
 ---
 
 ## 7. Testing Infrastructure
@@ -1007,9 +1073,9 @@ Automated headless testing runs `build/oseloci.tap` under **Phosphoric**
 screen-content assertions via `tests/scripts/oric_screen.py`).
 
 ```
-make test                  # full suite (all 13 targets below)
+make test                  # full suite (all 16 targets below)
 make test-boot              # headless boot smoke test: splash + canvas/statusbar render
-make test-menus              # menu bar/pulldown/Screen-menu regression
+make test-menus              # menu bar/pulldown/Screen-menu regression + Information > Version
 make test-screenresize        # Screen > Width/Height resize + shrink-confirm
 make test-charsetram-spike     # Strategy A charset-RAM edit regression (Phase 3a)
 make test-charsetedit            # character editor: grid, favourites, transforms, Std/Alt
@@ -1023,6 +1089,7 @@ make test-writemode                      # Write mode: typing+advance, FUNCT+1/2
 make test-fileio-no-loci                  # all 12 File/Charset items show the LOCI-absent popup (Phase 6)
 make test-select-cutcopy                   # Select x/c: copy/cut/no-fit/ESC (Phase 8c)
 make test-undo-no-loci                      # z/y are graceful no-ops with no LOCI (Phase 8)
+make test-help-funct8                       # FUNCT+8 round-trips cleanly, Main + Character editor (Phase 9b)
 make test-capture CYCLES=N TYPEKEYS='...'  # calibration helper for new scripts
 ```
 
@@ -1032,12 +1099,12 @@ make test-capture CYCLES=N TYPEKEYS='...'  # calibration helper for new scripts
 - `tests/scripts/oric_screen.py` decodes the 40x28 `$BB80` text screen from a
   `--dump-ram-at` dump, providing `--find`/`--row`/`--bytes` assertions used
   by the shell scripts in `tests/scripts/test_*.sh`.
-- Current totals: 5+15+8+2+12+14+14+2+6+10+4+6+12+5+4 = **119/119**
+- Current totals: 5+16+8+2+12+14+14+2+6+10+4+6+12+5+4+7 = **127/127**
   (`test-boot` + `test-menus` + `test-screenresize` +
   `test-charsetram-spike` + `test-charsetedit` + `test-palette` +
   `test-colourpicker` + `test-cursor-autoscroll` + `test-linebox` +
   `test-select` + `test-move` + `test-writemode` + `test-fileio-no-loci` +
-  `test-select-cutcopy` + `test-undo-no-loci`).
+  `test-select-cutcopy` + `test-undo-no-loci` + `test-help-funct8`).
 - Write mode's `CTRL+letter` toggles and `DEL` have no automated coverage:
   Phosphoric's `--type-keys` has no CTRL-modifier escape and `DEL` (0x7F) is
   unmapped in its `char_map` — covered by manual walkthrough + code review
@@ -1052,6 +1119,21 @@ make test-capture CYCLES=N TYPEKEYS='...'  # calibration helper for new scripts
   constraint as the colour picker's hardware-rendering issue. Select
   mode's cut/copy (§6.17) is the exception — fully covered headless, since
   it needs neither LOCI nor overlay RAM.
+- IJK joystick input (§6.18) cannot be exercised by Phosphoric/Oricutron's
+  `--type-keys` (no joystick simulation) — verified manually in Oricutron
+  with a configured joystick instead. The help screens' and Version
+  popup's exact *visual* content (§6.19/§6.20) likewise needs a manual
+  look; what `test-help-funct8` checks instead is that `FUNCT+8` is wired
+  correctly and round-trips cleanly (see that script's header comment for
+  why the "still showing" intermediate state can't be captured from a
+  type-keys script — Phosphoric's `\fN` escape delivers the 2-key FUNCT
+  combo as a single matrix event that the *second*, inner `key_read()`
+  call inside `help_show()` also consumes, so a lone `\f8` both opens and
+  immediately dismisses help within one action). `info_exit()`'s RESET
+  jump (§6.20) is not headlessly testable at all — a real reset is
+  indistinguishable from a crash to the test harness from outside; it was
+  confirmed manually instead (post-jump CPU state has the `I` flag clear
+  and the PC deep in ROM, see CLAUDE.md's "Information menu (Phase 9c)").
 
 ---
 
@@ -1075,6 +1157,13 @@ make test-capture CYCLES=N TYPEKEYS='...'  # calibration helper for new scripts
 - **IRQs stay disabled for the whole program** — never use unconditional
   `SEI`/`CLI`; use `PHP`/`SEI`/`PLP` for any future code that touches overlay
   RAM or VIA Port A (§2.5).
+- **`#embed` must be the only thing on its source line**, and large
+  `#embed`s eat into the `heap` section's already-tight remaining budget
+  before `code`/`data`/`bss` — prefer `#embed lzo`/`#embed rle` +
+  `oscar_expand_lzo()`/`oscar_expand_rle()` (decompressing straight into
+  hardware screen RAM, outside the `$0580-$B200` region) over raw embeds
+  for anything screen-sized (see `oscar64manual.md`'s "Embedded Data"
+  section and CLAUDE.md's "Help system (Phase 9b)").
 - **Canvas vs. charwin** (§4.1/§4.3) — never use `cwin_*`/`OricCharWin` for
   the canvas; it bypasses the column-0/1 attribute convention that all other
   `cwin_*` windows rely on.

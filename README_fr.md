@@ -73,6 +73,11 @@ Principales fonctionnalités du programme :
 - Mode déplacement pour faire défiler le contenu de l'écran (uniquement pour la fenêtre visible de 40x27, en raison de contraintes mémoire)
 - Mode palette, incluant un mode de plan de caractères visuel, pour sélectionner visuellement les caractères et les couleurs
 - Emplacements favoris pour sélectionner rapidement 10 caractères favoris
+- **Ajout OSE-LOCI** : prend en charge un joystick compatible IJK
+  (interface Raxiss IJK) comme alternative au clavier partout où les
+  touches curseur et ENTER sont utilisées -- aucun mode ou réglage séparé
+  n'est nécessaire, il est détecté automatiquement au démarrage et
+  fonctionne simplement en parallèle du clavier.
 
 ## Problèmes connus
 - La routine de sélection de fichiers ne fonctionne correctement qu'avec les disques SEDORIC3 créés par l'outil TAP2DSK de l'OSDK. Si vous souhaitez importer des écrans ou des jeux de caractères depuis d'autres disques, copiez-les d'abord sur une image créée avec TAP2DSK.
@@ -341,13 +346,19 @@ les deux jeux est l'équivalent le plus proche disponible.)
 
 *Information*
 
-Cette option affiche une fenêtre avec les informations de version.
-
-![Information](https://github.com/xahmol/OricScreenEditor/blob/main/screenshots/OSE%20Version%20info.png?raw=true)
+**Note OSE-LOCI** : cette option affiche une fenêtre en 3 pages au lieu de
+l'écran texte unique de V1 : une image de titre/logo plein écran, une page
+avec les informations de version et les crédits, et une page avec un code
+QR menant à la page GitHub de ce projet. Appuyez sur une touche pour
+avancer entre les pages, puis pour revenir au menu principal.
 
 *Exit program (quitter le programme)*
 
-Cette option permet de quitter le programme. NB : aucune confirmation ne sera demandée et le travail non sauvegardé sera perdu.
+**Note OSE-LOCI** : comme cette réécriture bare-metal n'a pas de
+chargeur cassette sous-jacent vers lequel revenir (contrairement à
+l'OricScreenEditor original en CC65), cette option réinitialise la
+machine à son état de démarrage à froid. NB : aucune confirmation ne sera
+demandée et le travail non sauvegardé sera perdu.
 
 ## Éditeur de caractères
 ([Retour au sommaire](#sommaire))
@@ -444,7 +455,6 @@ Commandes clavier dans ce mode :
 |**V**|Basculer entre le mode normal et le mode plan de caractères **v**isuel
 |**ESC** |Quitter le mode caractère et revenir au mode principal
 |**FUNCT+6**|Basculer la visibilité de la barre d'état
-|**FUNCT+8**|Écran d'aide
 
 *Déplacer le curseur*
 
@@ -470,7 +480,7 @@ Appuyer sur **V** bascule entre le mode normal et le mode visuel.
 
 *Quitter le mode et aide*
 
-Appuyer sur **ESC** quitte le mode palette et revient au mode principal. **FUNCT+8** affiche un écran d'aide avec toutes les commandes clavier du mode caractère.
+Appuyer sur **ESC** quitte le mode palette et revient au mode principal. Il n'y a pas d'écran d'aide séparé pour le mode palette.
 
 ## Sélecteur de couleurs
 ([Retour au sommaire](#sommaire))

@@ -73,6 +73,10 @@ Main features of the program:
 - Move mode to scroll the screen contents (due to memory constraints only for the 40x27 viewport)
 - Palette mode, including visual charmap mode, to visually select characters and colors
 - Favorite slots to quickly select 10 favorite characters
+- **OSE-LOCI addition**: supports an IJK-compatible joystick (Raxiss IJK
+  interface) as an alternative to the keyboard everywhere cursor keys and
+  ENTER are used -- no separate mode or setting needed, it is detected
+  automatically at startup and simply works alongside the keyboard.
 
 ## Known issues
 - Filepicker routine only is properly working with SEDORIC3 disks created by the TAP2DSK tool from OSDK. If you want to import screens or charsets from other disks, please copy them to a TAP2DSK created image first.
@@ -334,13 +338,19 @@ equivalent.)
 
 *Information*
 
-This option shows a popup with version information.
-
-![Information](https://github.com/xahmol/OricScreenEditor/blob/main/screenshots/OSE%20Version%20info.png?raw=true)
+**OSE-LOCI note**: this option shows a 3-page popup instead of V1's single
+text screen: a full-screen title/logo image, a page with version and
+credits text, and a page with a QR code linking to this project's GitHub
+page. Press any key to advance through the pages and to return to the
+main menu afterwards.
 
 *Exit program*
 
-With this option you can exit the program. NB: No confirmation will be asked and unsaved work will be lost.
+**OSE-LOCI note**: since this rewrite's bare-metal runtime has no
+underlying tape-loader process to return to (unlike the original
+CC65-based OricScreenEditor), this option resets the machine back to its
+cold-start state instead. NB: No confirmation will be asked and unsaved
+work will be lost.
 
 ## Character editor:
 ([Back to contents](#contents))
@@ -437,7 +447,6 @@ Keyboard commands in this mode:
 |**V**|Toggle between normal mode and visual charmap mode
 |**ESC** |Leave character mode and go back to main mode
 |**FUNCT+6**|Toggle statusbar visibility
-|**FUNCT+8**|Help screen
 
 *Moving cursor*
 
@@ -463,7 +472,7 @@ Pressing **V** toggles between normal and visual mode.
 
 *Leave mode and help*
 
-Pressing **ESC** leaves the palette mode and returns to main mode. **FUNCT+8** will show a help screen with all keyboard commands of the character mode.
+Pressing **ESC** leaves the palette mode and returns to main mode. There is no separate help screen for the palette mode.
 
 ## Colour picker
 ([Back to contents](#contents))

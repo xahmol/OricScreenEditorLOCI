@@ -18,26 +18,27 @@ storage device**.
 - Enhanced palette mode that also shows the inverse colour combinations for
   each ink/paper pair
 
-**Status: Phase 8 of 9 complete**, plus charset-swap infrastructure, a narrow
+**Status: all 9 phases complete.** Charset-swap infrastructure, a narrow
 charset-editor popup, palette mode, the colour picker, Select/Move/Line-Box/
 Write modes, the `G`/`I`/`O`/`U`/`R` main-mode keys, a cursor-auto-scroll fix
 for oversized canvases, LOCI file I/O (File and Charset menus) with a real
 XRAM-backed directory browser for every Load action, canvas-edit undo/redo
 (`z`/`y`) backed by Oric-side overlay RAM, Select mode cut/copy, the
-main-mode attribute-selection keys, a redesigned statusbar, and EN/FR
+main-mode attribute-selection keys, a redesigned statusbar, IJK joystick
+input (universal `key_read()`, every mode), FUNCT+8 help screens (Main/
+Character editor/Select-Move-Line-Box/Write), an Information menu (3-page
+Version/credits + QR popup, Exit via the RESET vector), and EN/FR
 localisation (canvas data model + minimal main mode + menu bar/Screen menu
 + character editor + charset-swap mechanism + palette/colour-picker popups
 + Select/Move/Line-Box/Write modes + LOCI file I/O + file picker + undo/
-redo + Select cut/copy + Phosphoric test harness; binary 26875 bytes EN /
-26960 bytes FR).
+redo + Select cut/copy + IJK/help/Information menu + Phosphoric test
+harness; binary 31139 bytes EN / 31230 bytes FR).
 A previous CC65-based attempt at this got stuck and is archived
 in the `nonworkingcc65` branch (full history + uncommitted state). `main` was
 restarted from scratch on the Oscar64 native/bare-metal build chain developed
 for [locifilemanager-v2](https://github.com/xahmol/locifilemanager-v2)
 (`/home/xahmol/git/locifilemanager-v2`), which the runtime and libraries below
-were copied from verbatim. The remaining phase (IJK/help/
-polish) is tracked in the active plan — see
-`~/.claude/plans/snappy-beaming-lynx.md` or ask Claude for status.
+were copied from verbatim.
 
 **Other docs**: `ARCHITECTURE.md` (memory map, module layout, dependency
 graph), `libmanual.md`/`libmanual_fr.md` (per-function API reference for
@@ -641,6 +642,119 @@ needs two `z` presses** — a minor known wrinkle, not fixed) before
 Fully testable headless (`tests/scripts/test_select_cutcopy.sh`) — unlike
 undo, this needs no LOCI/overlay RAM at all.
 
+### IJK joystick input (Phase 9a)
+
+`src/input.c/h` (new): `key_read()` is a faithful port of `nonworkingcc65`'s
+`getkey(joyallowed=1, norepeat=1)` (V1 itself has no IJK code at all — the
+IJK driver, `include/ijk.c/h`, is purely a LOCI-port addition, copied in at
+the very start of this project but never `#include`d from `src/` until
+this phase). Each call: if `ijk_present` (set once by `ijk_detect()`,
+called from `main.c` right after `charwin_init()`), reads both sticks
+(`ijk_read()`) and maps `FIRE`/`RIGHT`/`LEFT`/`DOWN`/`UP` bits (left stick
+checked first, then right, last-match-wins) to
+`KEY_ENTER`/`KEY_RIGHT`/`KEY_LEFT`/`KEY_DOWN`/`KEY_UP`; if a direction
+fired, drains the stick to neutral before returning (so a single press
+doesn't repeat). Falls back to `keyb_poll()` (`include/keyboard.h`) if the
+joystick gave nothing this spin, or no joystick is present. Every
+`cwin_getch()` call site across `src/*.c` (11 files: `main`, `editor`,
+`select`, `move`, `write`, `charsetedit`, `palette`, `colourpicker`,
+`filepicker`, `menu`, `menudata`) now goes through `key_read()` instead —
+joystick input works everywhere keyboard input does. `include/charwin.c`'s
+`cwin_getch()` itself is untouched (a generic library function with no
+peripheral-specific knowledge).
+
+### Help system (Phase 9b)
+
+`src/help.c/h` (new): `help_show(screennumber)` shows one of 4 help
+screens (1=Main, 2=Character editor, 3=Select/Move/Line-Box, 4=Write —
+ported from V1's `helpscreen_load(screennumber)`), each a raw 1080-byte
+(40x27) screencode dump **embedded at compile time**
+(`assets/OSEforLOCI-Help{1..4}.bin`, Oscar64's `#embed`) rather than
+tape-loaded at runtime like V1 — works even without a LOCI device.
+`charsetswap_enter()`/`exit()` bracket the raw `$BB80` blit (same
+direct-write approach `canvas_blit()` uses, for the same reason: a
+pre-rendered image can use arbitrary attribute bytes in columns 0-1 that
+`cwin_clear()`-based popups would clobber); `key_read()` waits for a key,
+then `canvas_blit()` + `statusbar_draw()` restore the real canvas (no
+manual screen-RAM save/restore needed, unlike V1, since OSE already has
+the real content in `screenmap[]`/`AppState`).
+
+Wired to `FUNCT+8` (`KEY_F8`): `editor.c` (Main, unconditional) →
+`help_show(1)`; `charsetedit.c` → `help_show(2)` (also redraws the popup's
+own chrome — `cwin_clear()` + `ce_draw_header/favourites/grid` — since
+`help_show()`'s `canvas_blit()` would otherwise leave the popup's screen
+area showing raw canvas content instead of the popup's white background);
+`select.c`'s shared `rect_select()` → `help_show(3)`, **guarded to only
+fire before the rect starts growing** (`curx==orgx && cury==orgy`, V1's
+exact guard — ported, not redesigned, per
+`feedback_dont_oversimplify_ported_designs`) since a live rect-highlight
+redraw underneath would be visually awkward; `move.c` → `help_show(3)`
+unconditionally (no rect-growing concern there); `write.c` →
+`help_show(4)`. **Not** wired into `palette.c`/`colourpicker.c` — no V1
+precedent (V1 has no help screen for Palette, and `README.md` previously
+had an incorrect claim that it did — corrected in Phase 9d).
+
+**Embedding gotcha** (see `oscar64manual.md`'s "Embedded Data" section for
+the full writeup): `#embed` must be the only thing on its source line —
+`byte data[] = { #embed "file.bin" };` all on one line mis-tokenizes the
+embedded bytes. A second, size-budget gotcha: embedding the 4 help
+screens raw (1080 bytes each) plus, in Phase 9c, the title image and QR
+code pushed the `$0580-$B200` code/data/bss region too close to its
+ceiling for `oscar64`'s heap section to be placed at all (`error 3034:
+Cannot place heap section`) even though the total binary size was well
+under the region's nominal size. Since `malloc`/`free` are fully stubbed
+in this bare-metal runtime (`crt_math.c`'s `crt_malloc` always returns
+NULL — no real heap is ever used), the fix was to drop `heap` from
+`oric_crt.c`'s main region section list, **and** to switch all 5 raw
+1080-byte screen dumps (4 help screens + the title image, Phase 9c) to
+LZO compression (`#embed lzo "file.bin"`, `oscar.h`'s
+`oscar_expand_lzo()` decompressing straight into `$BB80` screen RAM,
+which sits outside the code/data/bss region entirely) — this both shrinks
+the embedded data and avoids needing any decompression scratch buffer in
+BSS.
+
+### Information menu (Phase 9c)
+
+`src/info.c/h` (new), wired into `menudata.c`'s Information pulldown
+choices 41 (Version) / 42 (Exit) — the last two menu items that had been
+permanent stubs since Phase 2.
+
+- **`info_version_show()`**: a 3-page popup, adapted from
+  `locifilemanager-v2`'s `versioninfo()` (same version/credits + QR-code
+  concept, same vendored QR-generation library). Page 1 =
+  `OSEforLOCI-Title.bin` (a full 40x27 image, unlike `locifilemanager-v2`'s
+  smaller partial logo designed to share a screen with text) full-screen,
+  raw-blit + LZO (same approach as the help screens, see above). Page 2 =
+  programmatic version/credits text (`cwin_init`/`cwin_clear`, black
+  background) — title, author, `VERSION_MAJOR`/`MINOR`/`PATCH` (the same
+  macros the splash screen already uses), GitHub URL, copyright. Page 3 =
+  a 25x25-module QR code linking to
+  `https://github.com/xahmol/OricScreenEditorLOCI`
+  (`CH_INVSPACE`/`CH_SPACE` per module), generated by `tools/gen_qr.js`
+  (adapted from `locifilemanager-v2/tools/gen_qr.js` — same vendored
+  `kazuhikoarase/qrcode-generator` library at
+  `/usr/share/nodejs/qrcode-terminal/vendor/QRCode/`, just a different
+  `TEXT` constant) and pasted into `info.c` as a static array — a one-time
+  generation step, not a build dependency (no Node.js requirement added to
+  the Makefile). Any key advances each page; `menu_winsave(0,
+  VIEWPORT_HEIGHT+1, 1)`/`menu_winrestore()` (main-RAM, not
+  `locifilemanager-v2`'s overlay-RAM `menu_popup_open`/`close()`) save/
+  restore the whole screen around all 3 pages.
+- **`info_exit()`**: V1 (CC65) just returns control to the OS-level tape
+  loader; OSE's bare-metal Oscar64 runtime replaced that loader entirely at
+  boot (see "Memory Layout" below), so there's nothing to "return" to. The
+  safe, hardware-documented equivalent
+  (`~/.claude/oric_atmos_reference.md`'s vector table) is a software reset
+  through the RESET vector: `__asm { jmp ($fffc) }` — **not** a direct call
+  to the cold-start handler at `$F88F`, which the reference explicitly
+  warns must only be invoked via the CPU RESET pin. No confirmation is
+  asked (matches `README.md`'s already-documented Exit behaviour); manually
+  verified in Phosphoric (post-jump CPU state has interrupts re-enabled —
+  the `I` flag clear, unlike this app's permanent boot-time `SEI` — and the
+  PC deep in ROM, confirming the reset took effect). Not headlessly
+  testable (a real reset is indistinguishable from a crash to the test
+  harness from outside).
+
 ### Charset-swap mechanism
 
 `src/charsetswap.c/h` + `include/charset.c/h` ensure popup chrome (menu bar,
@@ -736,7 +850,8 @@ make test         # full automated Phosphoric test suite (test-boot, test-menus,
                   # test-palette, test-colourpicker, test-cursor-autoscroll,
                   # test-linebox, test-select, test-move, test-writemode,
                   # test-fileio-no-loci, test-select-cutcopy,
-                  # test-undo-no-loci) -- EN only, see "Localisation" below
+                  # test-undo-no-loci, test-help-funct8) -- EN only, see
+                  # "Localisation" below
 make test-boot    # headless boot smoke test (splash + canvas/statusbar render)
 make test-capture CYCLES=N TYPEKEYS='...'
                   # calibration helper: dumps tests/out/capture.bin + .png
@@ -830,6 +945,15 @@ src/
   undo.c/h        Canvas-edit undo/redo ('z'/'y'), overlay-RAM-backed
                   dirty-rect ring buffer (see "Canvas undo/redo
                   (Phase 8)")
+  input.c/h       key_read(): universal keyboard+IJK-joystick blocking
+                  read, replaces cwin_getch() everywhere (see "IJK
+                  joystick input (Phase 9a)")
+  help.c/h        FUNCT+8 help screens (Main/Character editor/Select-
+                  Move-Line-Box/Write), #embed'd + LZO-compressed (see
+                  "Help system (Phase 9b)")
+  info.c/h        Information menu actions: Version (3-page popup w/
+                  title image + credits + QR code) and Exit (RESET
+                  vector) (see "Information menu (Phase 9c)")
   charsetedit.c/h Character editor popup: edits the 6x8 glyph for
                   app.plotscreencode/app.plotaltchar directly in live charset
                   RAM (Strategy A -- see "Character editor (Phase 3)")
