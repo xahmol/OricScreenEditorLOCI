@@ -20,6 +20,7 @@
 #include "menudata.h"
 #include "strings.h"
 #include "loci.h"
+#include "filepicker.h"
 #include "fileio.h"
 
 // Magic number identifying an OSE screen/combined file (FileHeader.magic) --
@@ -150,7 +151,7 @@ void fileio_load_screen(void)
     int16_t    fd;
 
     if (!loci_check_present()) return;
-    if (!fileio_get_filename(MSG_FILE_LOAD_SCREEN)) return;
+    if (!filepicker_run(MSG_FILE_LOAD_SCREEN, PICKER_FILTER_PLAIN)) return;
 
     sprintf(path, "%s.BIN", app.filename);
 

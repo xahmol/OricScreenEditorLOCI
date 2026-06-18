@@ -42,6 +42,7 @@
 #define MSG_FILE_PROMPT_FILENAME  "Enter filename:"
 #define MSG_FILE_INVALID_FORMAT   "Invalid or incompatible file."
 #define MSG_FILE_NOT_FOUND        "File not found."
+#define MSG_FILE_NO_FILES         "No matching files found."
 
 // ── Pulldown 2 -- Charset ───────────────────────────────────────────────────
 #define MSG_CHARSET_LOAD_STD       "Load standard"

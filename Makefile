@@ -128,6 +128,8 @@ MAIN_SRCS = \
   src/write.h           \
   src/fileio.c          \
   src/fileio.h          \
+  src/filepicker.c      \
+  src/filepicker.h      \
   src/strings.h         \
   src/strings_en.h      \
   src/strings_fr.h      \
