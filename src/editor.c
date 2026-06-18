@@ -12,6 +12,7 @@
 #include "select.h"
 #include "move.h"
 #include "write.h"
+#include "undo.h"
 #include "editor.h"
 
 #define PLOT_MIN 0x20
@@ -30,8 +31,9 @@
  * open the palette/colour picker popups, 'l'/'s'/'m'/'w' open Line-Box/
  * Select/Move/Write mode, 'g' grabs the screencode/attribute under the
  * cursor into the matching plot* field, 'i'/'o'/'u' plot ink/paper/the
- * modifier attribute at the cursor and move down, and 'r' toggles
- * reverse-video on plotscreencode. Never returns.
+ * modifier attribute at the cursor and move down, 'r' toggles
+ * reverse-video on plotscreencode, and 'z'/'y' undo/redo the most recent
+ * canvas edit. Never returns.
  *
  * @return (none)
  */
@@ -56,6 +58,7 @@ void editor_run(void)
     app.stdchanged = 0;
     app.altchanged = 0;
     app.filename[0] = '\0';
+    undo_init();
 
     canvas_blit();
     statusbar_draw();
@@ -86,12 +89,17 @@ void editor_run(void)
             break;
 
         case KEY_SPACE:
-            canvas_put(app.cursor_x, app.cursor_y, app.plotscreencode);
+            // +xoffset/+yoffset matches the i/o/u/g cases below -- a
+            // pre-existing gap fixed here since undo_snapshot() must
+            // snapshot the exact same cell canvas_put() writes to.
+            undo_snapshot(app.cursor_x + app.xoffset, app.cursor_y + app.yoffset, 1, 1);
+            canvas_put(app.cursor_x + app.xoffset, app.cursor_y + app.yoffset, app.plotscreencode);
             canvas_blit();
             break;
 
         case KEY_DEL:
-            canvas_put(app.cursor_x, app.cursor_y, CH_SPACE);
+            undo_snapshot(app.cursor_x + app.xoffset, app.cursor_y + app.yoffset, 1, 1);
+            canvas_put(app.cursor_x + app.xoffset, app.cursor_y + app.yoffset, CH_SPACE);
             canvas_blit();
             break;
 
@@ -218,18 +226,21 @@ void editor_run(void)
         // Plot present ink/paper/modifier attribute at the cursor and move
         // down one row.
         case 'i':
+            undo_snapshot(app.cursor_x + app.xoffset, app.cursor_y + app.yoffset, 1, 1);
             canvas_put(app.cursor_x + app.xoffset, app.cursor_y + app.yoffset, app.plotink);
             cursor_move_scroll(0, 1);
             canvas_blit();
             break;
 
         case 'o':
+            undo_snapshot(app.cursor_x + app.xoffset, app.cursor_y + app.yoffset, 1, 1);
             canvas_put(app.cursor_x + app.xoffset, app.cursor_y + app.yoffset, (uint8_t)(16 + app.plotpaper));
             cursor_move_scroll(0, 1);
             canvas_blit();
             break;
 
         case 'u':
+            undo_snapshot(app.cursor_x + app.xoffset, app.cursor_y + app.yoffset, 1, 1);
             canvas_put(app.cursor_x + app.xoffset, app.cursor_y + app.yoffset,
                        (uint8_t)(8 | (app.plotaltchar ? 1 : 0)
                                    | (app.plotdouble  ? 2 : 0)
@@ -241,6 +252,16 @@ void editor_run(void)
         // Toggle reverse-video on the current plot screencode.
         case 'r':
             app.plotscreencode ^= 0x80;
+            break;
+
+        // Undo/redo the most recent canvas edit (no V1 precedent --
+        // genuinely new functionality, see CLAUDE.md "Canvas undo/redo").
+        case 'z':
+            undo_perform();
+            break;
+
+        case 'y':
+            redo_perform();
             break;
 
         default:

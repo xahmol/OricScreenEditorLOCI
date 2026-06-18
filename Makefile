@@ -130,6 +130,8 @@ MAIN_SRCS = \
   src/fileio.h          \
   src/filepicker.c      \
   src/filepicker.h      \
+  src/undo.c            \
+  src/undo.h            \
   src/strings.h         \
   src/strings_en.h      \
   src/strings_fr.h      \
