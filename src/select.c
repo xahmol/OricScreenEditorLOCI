@@ -29,6 +29,7 @@
 #include "strings.h"
 #include "undo.h"
 #include "input.h"
+#include "help.h"
 #include "select.h"
 
 // Selected/grown rectangle, in absolute canvas coordinates (inclusive
@@ -124,6 +125,15 @@ uint8_t rect_select(uint8_t draworselect)
 
         case KEY_F6:
             statusbar_show((uint8_t)!app.showstatusbar);
+            continue;
+
+        case KEY_F8:
+            if (curx == orgx && cury == orgy)
+            {
+                help_show(3);
+                rect_perimeter_toggle(orgx, orgy, orgx, orgy);
+                statusbar_draw();
+            }
             continue;
 
         default:

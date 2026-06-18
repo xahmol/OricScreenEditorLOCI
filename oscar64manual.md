@@ -236,6 +236,28 @@ const char sprites[] = { #embed spd_sprites lzo "sprites.spd" };
 const char tiles[]   = { #embed spd_tiles "sprites.spd" };
 ```
 
+**Gotcha**: `#embed` is a preprocessor directive and must be the *only*
+thing on its source line. `byte data[] = { #embed "file.bin" };` all on
+one line mis-tokenizes the embedded byte stream (the compiler tries to
+parse the binary's raw bytes as C source, producing a cascade of
+"invalid token"/"Declaration starts with invalid token" errors whose
+location is reported inside the .bin file). Always write:
+```c
+byte data[] = {
+    #embed "file.bin"
+};
+```
+
+**Gotcha**: if `malloc`/`free` are fully stubbed (e.g. a bare-metal
+runtime where `crt_malloc` always returns NULL, no real heap ever used),
+and `#embed`-ing enough data fills most of the `main` region, oscar64 can
+fail with `error 3034: Cannot place heap section` even though the total
+binary size is well under the region's nominal size — the heap section
+still needs *some* room and a full code+data+bss leaves none. Fix: drop
+`heap` from the region's section list (`#pragma region(main, ..., {code,
+data, bss})` instead of `{code, data, bss, heap}`) once you've confirmed
+nothing in the program actually allocates from it.
+
 ---
 
 ## Preprocessor Extensions

@@ -17,6 +17,7 @@
 #include "statusbar.h"
 #include "undo.h"
 #include "input.h"
+#include "help.h"
 #include "write.h"
 
 /**
@@ -111,6 +112,10 @@ void write_run(void)
 
         case KEY_F6:
             statusbar_show((uint8_t)!app.showstatusbar);
+            break;
+
+        case KEY_F8:
+            help_show(4);
             break;
 
         default:

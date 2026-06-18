@@ -27,6 +27,7 @@
 #include "charsetswap.h"
 #include "strings.h"
 #include "input.h"
+#include "help.h"
 #include "charsetedit.h"
 
 // -------------------------------------------------------------------------
@@ -425,6 +426,14 @@ void charsetedit_run(void)
 
         case KEY_F6:
             statusbar_show((uint8_t)!app.showstatusbar);
+            break;
+
+        case KEY_F8:
+            help_show(2);
+            cwin_clear(&ce_win);
+            ce_draw_header();
+            ce_draw_favourites();
+            ce_draw_grid();
             break;
 
         case KEY_ESC:

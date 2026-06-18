@@ -134,6 +134,8 @@ MAIN_SRCS = \
   src/undo.h            \
   src/input.c           \
   src/input.h           \
+  src/help.c            \
+  src/help.h            \
   src/strings.h         \
   src/strings_en.h      \
   src/strings_fr.h      \
@@ -149,7 +151,11 @@ MAIN_SRCS = \
   include/ijk.c          \
   include/ijk.h          \
   include/loci.c         \
-  include/loci.h
+  include/loci.h         \
+  assets/OSEforLOCI-Help1.bin \
+  assets/OSEforLOCI-Help2.bin \
+  assets/OSEforLOCI-Help3.bin \
+  assets/OSEforLOCI-Help4.bin
 
 # -------------------------------------------------------------------------
 # Emulator flags

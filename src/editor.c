@@ -14,6 +14,7 @@
 #include "write.h"
 #include "undo.h"
 #include "input.h"
+#include "help.h"
 #include "editor.h"
 
 #define PLOT_MIN 0x20
@@ -158,6 +159,10 @@ void editor_run(void)
 
         case KEY_F6:
             statusbar_show(!app.showstatusbar);
+            break;
+
+        case KEY_F8:
+            help_show(1);
             break;
 
         case KEY_F1:

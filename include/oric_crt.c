@@ -67,7 +67,13 @@ void StackStart, StackEnd, BSSStart, BSSEnd, CodeStart, CodeEnd, ZeroStart, Zero
 #pragma region(startup, 0x0500, 0x0580, , , {})
 
 // Main program region: starts at $0580 (after startup region)
-#pragma region(main, 0x0580, 0xB200, , , {code, data, bss, heap})
+// Deviation from locifilemanager-v2's copy of this runtime: 'heap' is
+// dropped from the section list (crt_math.c's crt_malloc always returns
+// NULL, so no real heap is ever used) -- with code+data+bss now large
+// enough (Phase 9's #embed'd help/title screens) to fill nearly all of
+// this region, oscar64 errors "Cannot place heap section" if a non-empty
+// heap section is still requested but has no room left to place.
+#pragma region(main, 0x0580, 0xB200, , , {code, data, bss})
 
 // -------------------------------------------------------------------------
 // Startup
