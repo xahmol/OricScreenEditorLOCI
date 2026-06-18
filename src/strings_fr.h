@@ -58,6 +58,7 @@
 #define MSG_CHARSET_SAVE_ALT       "Sauver alterne"
 #define MSG_CHARSET_LOAD_COMBINED  "Charger combine"
 #define MSG_CHARSET_SAVE_COMBINED  "Sauver combine"
+#define MSG_CHARSET_RESET_STD      "Reinit std->ROM"
 
 // ── Pulldown 3 -- Information ───────────────────────────────────────────────
 #define MSG_INFO_VERSION  "Version/credits"
@@ -82,6 +83,7 @@
 #define MSG_MENU_PRESSAKEY   "Appuyer touche pour continuer"
 #define MSG_MENU_NOTIMPL     "Pas encore implemente"
 #define MSG_MENU_SHRINKWARN  "Reduire peut effacer donnees."
+#define MSG_CHARSET_RESETWARN "Ceci efface vos modifications."
 
 // ── Select mode cut/copy (src/select.c) ─────────────────────────────────────
 #define MSG_SELECT_NOFIT  "Selection hors limites."

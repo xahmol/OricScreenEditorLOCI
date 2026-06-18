@@ -32,7 +32,7 @@ MenuBar menubar = {
 
 // pulldown_titles[0][0]/[0][1] (Width:/Height:) are rewritten by
 // update_size_titles() whenever the canvas size changes.
-char pulldown_options[PULLDOWN_NUMBER] = { 4, 6, 6, 2, 2 };
+char pulldown_options[PULLDOWN_NUMBER] = { 4, 6, 7, 2, 2 };
 
 char pulldown_titles[PULLDOWN_NUMBER][PULLDOWN_MAXOPTIONS][PULLDOWN_MAXLENGTH] = {
     // 0 -- Screen
@@ -42,7 +42,7 @@ char pulldown_titles[PULLDOWN_NUMBER][PULLDOWN_MAXOPTIONS][PULLDOWN_MAXLENGTH] =
       MSG_FILE_SAVE_COMBINED, MSG_FILE_LOAD_COMBINED },
     // 2 -- Charset
     { MSG_CHARSET_LOAD_STD, MSG_CHARSET_LOAD_ALT, MSG_CHARSET_SAVE_STD, MSG_CHARSET_SAVE_ALT,
-      MSG_CHARSET_LOAD_COMBINED, MSG_CHARSET_SAVE_COMBINED },
+      MSG_CHARSET_LOAD_COMBINED, MSG_CHARSET_SAVE_COMBINED, MSG_CHARSET_RESET_STD },
     // 3 -- Information
     { MSG_INFO_VERSION, MSG_INFO_EXIT },
     // 4 -- Yes/No
@@ -180,6 +180,26 @@ void goto_dialog(void)
     menu_winrestore();
 }
 
+/**
+ * Charset > Reset Std->ROM: after a menu_areyousure() confirmation,
+ * restores all 768 displayable bytes of CHARSET_STD from CHARSETROM in
+ * one step (charset_load(), include/charset.h -- the same primitive
+ * charsetswap.c already uses for popup chrome), instead of the
+ * character editor's glyph-by-glyph 's' key. Sets app.stdchanged so
+ * File > Save Project knows the standard charset changed this session.
+ * Std-only, same as every other ROM-restore path in this codebase (the
+ * Oric ROM has no alternate-charset table to restore from).
+ *
+ * @return (none)
+ */
+static void charset_reset_std(void)
+{
+    if (menu_areyousure(MSG_CHARSET_RESETWARN) != 1) return;
+
+    charset_load(CHARSET_STD, (const uint8_t *)CHARSETROM);
+    app.stdchanged = 1;
+}
+
 // -------------------------------------------------------------------------
 // Init and dispatch
 // -------------------------------------------------------------------------
@@ -280,6 +300,10 @@ void menu_run(void)
 
         case 36:
             fileio_save_charset(2);
+            break;
+
+        case 37:
+            charset_reset_std();
             break;
 
         case 41:

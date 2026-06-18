@@ -54,6 +54,7 @@
 #define MSG_CHARSET_SAVE_ALT       "Save alternate"
 #define MSG_CHARSET_LOAD_COMBINED  "Load combined"
 #define MSG_CHARSET_SAVE_COMBINED  "Save combined"
+#define MSG_CHARSET_RESET_STD      "Reset Std->ROM"
 
 // ── Pulldown 3 -- Information ───────────────────────────────────────────────
 #define MSG_INFO_VERSION  "Version/credits"
@@ -78,6 +79,7 @@
 #define MSG_MENU_PRESSAKEY   "Press a key to continue"
 #define MSG_MENU_NOTIMPL     "Not yet implemented"
 #define MSG_MENU_SHRINKWARN  "Shrinking might delete data."
+#define MSG_CHARSET_RESETWARN "This discards your edits."
 
 // ── Select mode cut/copy (src/select.c) ─────────────────────────────────────
 #define MSG_SELECT_NOFIT  "Selection does not fit."
