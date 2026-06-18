@@ -481,16 +481,20 @@ reference: locifilemanager-v2's `loci_present()`/`file_save()`/
   pattern, persisting `app.filename` (new `AppState` field) across calls
   as the next prompt's default. Load actions use the real directory
   browser added in Phase 7 (`filepicker_run()`, below) instead.
-- **Headless coverage today is the LOCI-absent path only, but this can
-  grow**: `tests/scripts/test_fileio_no_loci.sh` (confirming all 12
-  File/Charset items correctly show `MSG_LOCI_NOT_FOUND` and return
-  cleanly) is automated. The actual load/save byte traffic isn't covered
-  yet, but — **correction from an earlier wrong assumption in this
-  file** — Phosphoric *can* emulate a LOCI device (alpha-quality, see
-  "Phosphoric Testing Notes"), so headless tests of real load/save
-  traffic are possible and should be added; real hardware stays the
-  authoritative check given the emulation's alpha status. Oricutron
-  cannot emulate LOCI at all, so it remains unusable for this regardless.
+- **Headless coverage now includes the actual load/save byte traffic**,
+  not just the absent path: `tests/scripts/test_fileio_traffic.sh`
+  (`make test-fileio-traffic`) uses Phosphoric's `--loci-flash DIR`
+  (a real host filesystem directory LOCI file ops read/write through —
+  alpha-quality, but confirmed working via a direct spike, see "Canvas
+  storage is overlay RAM, LOCI is required") to assert on the actual
+  bytes written for Save Screen/Combined/Project and Charset Save
+  Standard, plus a Load Screen round-trip. (The old `test_fileio_no_
+  loci.sh`, which only checked the LOCI-absent popup, was retired when
+  LOCI became mandatory to boot at all — that scenario is no longer
+  reachable.) Load Combined/Project and Charset Load aren't covered yet
+  — same Save UI pattern already proven, addable the same way if
+  needed. Real hardware stays the authoritative check given the
+  emulation's alpha status.
 
 ### File picker (Phase 7)
 
@@ -926,11 +930,14 @@ make test         # full automated Phosphoric test suite (test-boot, test-menus,
                   # test-palette, test-colourpicker, test-cursor-autoscroll,
                   # test-linebox, test-select, test-move, test-writemode,
                   # test-boot-no-loci, test-select-cutcopy,
-                  # test-undo-overflow, test-help-funct8) -- EN only, see
-                  # "Localisation" below. All targets pass --loci to
-                  # Phosphoric (LOCI is required, see "Canvas storage is
-                  # overlay RAM, LOCI is required") except test-boot-
-                  # no-loci, which deliberately tests the absent path.
+                  # test-undo-overflow, test-help-funct8,
+                  # test-fileio-traffic) -- EN only, see "Localisation"
+                  # below. All targets pass --loci to Phosphoric (LOCI is
+                  # required, see "Canvas storage is overlay RAM, LOCI is
+                  # required") except test-boot-no-loci (deliberately
+                  # tests the absent path) and test-fileio-traffic (uses
+                  # --loci-flash DIR instead, a real host filesystem
+                  # directory for byte-level LOCI file I/O assertions).
 make test-boot    # headless boot smoke test (splash + canvas/statusbar render)
 make test-capture CYCLES=N TYPEKEYS='...'
                   # calibration helper: dumps tests/out/capture.bin + .png
@@ -964,6 +971,13 @@ remains the *authoritative* check given Phosphoric's LOCI emulation is
 still alpha-quality — a Phosphoric pass doesn't retire the need for an
 eventual real-hardware confirmation, but it's a much faster and more
 repeatable first line of testing than jumping straight to hardware.
+
+`--loci-flash DIR` (used by `test-fileio-traffic`, see "LOCI file I/O")
+points LOCI's file ops at a real host filesystem directory, instead of
+just enabling presence detection like plain `--loci` does — this is
+what lets a test script assert on the *actual bytes* a Save action
+writes (`FileHeader`/`ProjectHeader` field values, section offsets) via
+a normal Python file read, not just on-screen behaviour after the fact.
 
 ## Memory Layout (`include/oric_crt.c`)
 

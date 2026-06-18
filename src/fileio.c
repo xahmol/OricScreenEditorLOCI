@@ -4,10 +4,17 @@
 // previously #included from any src/ file) into OSE's File/Charset menus.
 // Calling-convention reference: locifilemanager-v2's loci_present()
 // startup gate and file_save()/file_load() single-blob convention
-// (src/dir.c config_save()/config_load() there) -- adapted here to a
-// per-action presence check (see loci_check_present()) rather than a
-// startup-blocking one, since OSE must keep working with no LOCI device
-// attached (editing, and Phosphoric/Oricutron testing of everything else).
+// (src/dir.c config_save()/config_load() there) -- adapted here, at the
+// time this file was written, to a per-action presence check
+// (loci_check_present()) rather than a startup-blocking one, since LOCI
+// was still optional then. LOCI is now required to boot at all (the
+// canvas itself lives in overlay RAM -- see src/main.c, CLAUDE.md
+// "Canvas storage is overlay RAM, LOCI is required"), so this gate can
+// never actually fail in practice any more; left in place as harmless
+// defensiveness rather than removed, since it costs nothing. Byte-level
+// I/O correctness is exercised by tests/scripts/test_fileio_traffic.sh
+// (Phosphoric's --loci-flash gives direct host-filesystem access to
+// what gets written).
 
 #include <stdio.h>
 #include "oric.h"

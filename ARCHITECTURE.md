@@ -1161,6 +1161,7 @@ make test-boot-no-loci                    # no --loci: gate message shown, Main 
 make test-select-cutcopy                   # Select x/c: copy/cut/no-fit/ESC (Phase 8c)
 make test-undo-overflow                     # Clear/Fill on an oversized canvas: no crash, graceful skip
 make test-help-funct8                       # FUNCT+8 round-trips cleanly, Main + Character editor (Phase 9b)
+make test-fileio-traffic                     # actual LOCI file bytes: Save Screen/Combined/Project, Load Screen, Charset Save Std (--loci-flash)
 make test-capture CYCLES=N TYPEKEYS='...'  # calibration helper for new scripts (also passes --loci)
 ```
 
@@ -1170,12 +1171,13 @@ make test-capture CYCLES=N TYPEKEYS='...'  # calibration helper for new scripts 
 - `tests/scripts/oric_screen.py` decodes the 40x28 `$BB80` text screen from a
   `--dump-ram-at` dump, providing `--find`/`--row`/`--bytes` assertions used
   by the shell scripts in `tests/scripts/test_*.sh`.
-- Current totals: 4+18+8+2+12+14+14+2+6+10+4+6+5+5+8+7 = **125/125**
+- Current totals: 4+18+8+2+12+14+14+2+6+10+4+6+5+5+8+7+16 = **141/141**
   (`test-boot` + `test-menus` + `test-screenresize` +
   `test-charsetram-spike` + `test-charsetedit` + `test-palette` +
   `test-colourpicker` + `test-cursor-autoscroll` + `test-linebox` +
   `test-select` + `test-move` + `test-writemode` + `test-boot-no-loci` +
-  `test-select-cutcopy` + `test-undo-overflow` + `test-help-funct8`).
+  `test-select-cutcopy` + `test-undo-overflow` + `test-help-funct8` +
+  `test-fileio-traffic`).
 - Write mode's `CTRL+letter` toggles and `DEL` have no automated coverage:
   Phosphoric's `--type-keys` has no CTRL-modifier escape and `DEL` (0x7F) is
   unmapped in its `char_map` — covered by manual walkthrough + code review
@@ -1191,9 +1193,16 @@ make test-capture CYCLES=N TYPEKEYS='...'  # calibration helper for new scripts 
   above already exercises undo's actual snapshot/restore mechanism
   (`test-select-cutcopy`, `test-undo-overflow`) as a side effect of the
   canvas itself now requiring overlay RAM to exist at all. LOCI's actual
-  file *I/O byte traffic* (Save/Load Screen/Project/Combined) still has
-  no dedicated automated coverage yet — that's addable the same way, just
-  not yet done. Real hardware remains the authoritative check given
+  file *I/O byte traffic* (Save Screen/Combined/Project, Charset Save
+  Standard) now has dedicated automated coverage too:
+  `test-fileio-traffic` (§7 list) uses Phosphoric's `--loci-flash DIR`
+  instead of plain `--loci` — a real host filesystem directory LOCI
+  file ops read/write through — to assert on the *actual bytes written*
+  (`FileHeader`/`ProjectHeader` field values, charset/screen section
+  offsets), not just on-screen behaviour, plus a Load Screen round-trip.
+  Load Combined/Project and Charset Load aren't covered yet (same Save
+  UI pattern already proven, lower marginal value) — addable the same
+  way if needed. Real hardware remains the authoritative check given
   Phosphoric's LOCI emulation is alpha-quality, same caveat as the
   colour picker's hardware-rendering issue.
 - IJK joystick input (§6.18) cannot be exercised by Phosphoric/Oricutron's
