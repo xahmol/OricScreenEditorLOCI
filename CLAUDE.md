@@ -1176,6 +1176,10 @@ make              # build build/oseloci.tap (English, LANG=EN default)
 make LANG=FR      # build build/oseloci_fr.tap (French)
 make all-langs    # build both build/oseloci.tap and build/oseloci_fr.tap
 make run          # build + launch in Oricutron (LANG=FR for the French build)
+make usb          # build both languages and copy oseloci.tap/oseloci_fr.tap
+                  # to USBPATH (set in .env, gitignored -- see .env.example),
+                  # auto-mounting/-unmounting the WSL2 drvfs USB drive if
+                  # detected (same convention as locifilemanager-v2)
 make clean        # remove build artifacts (both languages)
 make docs         # regenerate README.pdf from README.md (requires pandoc)
 make test         # full automated Phosphoric test suite (test-boot, test-menus,

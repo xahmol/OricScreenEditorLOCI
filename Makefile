@@ -163,6 +163,26 @@ MAIN_SRCS = \
   assets/OSEforLOCI-Title.bin
 
 # -------------------------------------------------------------------------
+# USB stick transfer -- variable declarations
+# -------------------------------------------------------------------------
+# Set USBPATH in .env (gitignored) -- path to the directory on the USB stick.
+# Native Linux: /media/yourname/USBSTICK/oric
+# WSL2: Windows drives auto-mount at /mnt/<letter>; USB stick on E: -> /mnt/e/oric
+# See .env.example for a template.
+
+-include .env
+USBPATH  ?= NOT_SET
+
+# Derived from USBPATH -- used for WSL2 auto-mount.
+# Assumes USBPATH starts with /mnt/<letter>/... (standard WSL2 drvfs layout).
+# Example: USBPATH=/mnt/e/oric -> USBMOUNT=/mnt/e, USBDRIVE=E:
+USBMOUNT := $(shell echo "$(USBPATH)" | cut -d/ -f1-3)
+USBDRIVE := $(shell echo "$(USBPATH)" | cut -d/ -f3 | tr a-z A-Z):
+
+# Detect WSL2 at parse time so check-usb can branch without a shell function.
+IS_WSL2  := $(shell grep -qi microsoft /proc/version 2>/dev/null && echo 1 || echo 0)
+
+# -------------------------------------------------------------------------
 # Emulator flags
 # -------------------------------------------------------------------------
 
@@ -176,8 +196,6 @@ EMUFLAG = -ma --serial none --vsynchack off --turbotape on
 # roms/basic11b.rom. Phosphoric lets oseloci.tap be fast-loaded (-t ... -f)
 # under Atmos BASIC 1.1 and tested headless via RAM dumps.
 
--include .env
-
 PHOSDIR  ?= NOT_SET
 PHOS      = $(PHOSDIR)/oric1-emu
 ATMOSROM  = $(PHOSDIR)/roms/basic11b.rom
@@ -189,7 +207,7 @@ CYCLES   ?= 8000000
 # all: must appear first so it is the default goal
 # =========================================================================
 
-.PHONY: all all-langs clean run docs check-phosphoric sandbox-reset test-capture test-boot test-menus test-screenresize test-charsetram-spike test-charsetedit test-palette test-colourpicker test-cursor-autoscroll test-linebox test-select test-move test-writemode test-boot-no-loci test-select-cutcopy test-undo-overflow test-help-funct8 test-fileio-traffic test-findreplace test-write-hexattr test-trymode test-goto test-hollowbox test-ellipse test
+.PHONY: all all-langs clean run docs check-usb usb check-phosphoric sandbox-reset test-capture test-boot test-menus test-screenresize test-charsetram-spike test-charsetedit test-palette test-colourpicker test-cursor-autoscroll test-linebox test-select test-move test-writemode test-boot-no-loci test-select-cutcopy test-undo-overflow test-help-funct8 test-fileio-traffic test-findreplace test-write-hexattr test-trymode test-goto test-hollowbox test-ellipse test
 
 all: build/$(MAIN)$(LANGSUFFIX).tap
 
@@ -221,6 +239,31 @@ run: build/$(MAIN)$(LANGSUFFIX).tap
 all-langs:
 	$(MAKE) LANG=EN
 	$(MAKE) LANG=FR
+
+# -------------------------------------------------------------------------
+# USB stick transfer
+# -------------------------------------------------------------------------
+
+check-usb:
+	@test "$(USBPATH)" != "NOT_SET" || \
+	    (echo "ERROR: USBPATH not set -- copy .env.example to .env and set USBPATH" && false)
+	@if ! test -d "$(USBPATH)"; then \
+	    if [ "$(IS_WSL2)" = "1" ]; then \
+	        echo "WSL2: mounting $(USBDRIVE) at $(USBMOUNT) via drvfs..."; \
+	        sudo mount -t drvfs $(USBDRIVE) $(USBMOUNT); \
+	    fi; \
+	fi
+	@test -d "$(USBPATH)" || \
+	    (echo "ERROR: USB path '$(USBPATH)' not found -- plug in USB stick and retry" && false)
+
+usb: check-usb all-langs
+	cp build/$(MAIN).tap      "$(USBPATH)/"
+	cp build/$(MAIN)_fr.tap   "$(USBPATH)/"
+	@if [ "$(IS_WSL2)" = "1" ]; then \
+	    echo "WSL2: unmounting $(USBMOUNT)..."; \
+	    sudo umount $(USBMOUNT); \
+	    echo "Done -- USB stick can now be ejected in Windows."; \
+	fi
 
 # -------------------------------------------------------------------------
 # Phosphoric automated testing
