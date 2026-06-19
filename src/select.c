@@ -46,6 +46,13 @@ static uint16_t select_width, select_height;
 // for something only one of its two callers cares about.
 static uint8_t select_hollow;
 
+// Line/Box-only, same convention as select_hollow above: toggled by 'c'
+// during rect_select()'s grow loop, read by linebox_run() after it
+// returns to decide rectangle-vs-ellipse. Independent of select_hollow --
+// the two combine for a 4-way dispatch (filled/hollow box, filled/hollow
+// ellipse).
+static uint8_t select_ellipse;
+
 /**
  * XOR-toggle (canvas_cell_invert()) every cell of one canvas cell that is
  * currently within the viewport (app.xoffset/yoffset), converting from
@@ -123,15 +130,123 @@ static void rect_perimeter_plot(uint16_t sx, uint16_t sy, uint16_t ex, uint16_t 
 }
 
 /**
+ * Test whether canvas cell (x, y) lies within the ellipse inscribed in
+ * the bounding box [sx..ex] x [sy..ey] (inclusive). Uses doubled
+ * coordinates (dx2 = 2*x - (sx+ex)) so the center is always exact for
+ * both even and odd bounding-box dimensions, with no fractional or
+ * floating-point math (this project builds with -dNOFLOAT). A
+ * degenerate 1-cell-wide or -tall bounding box collapses correctly to
+ * a straight line via this same test, with no special-casing needed.
+ *
+ * @param x  Canvas-absolute column to test.
+ * @param y  Canvas-absolute row to test.
+ * @param sx Left column of the bounding box.
+ * @param sy Top row of the bounding box.
+ * @param ex Right column of the bounding box.
+ * @param ey Bottom row of the bounding box.
+ * @return 1 if (x, y) is inside or on the ellipse, 0 otherwise.
+ */
+static uint8_t ellipse_inside(uint16_t x, uint16_t y, uint16_t sx, uint16_t sy, uint16_t ex, uint16_t ey)
+{
+    int32_t dx2 = (int32_t)(2 * (int32_t)x - ((int32_t)sx + (int32_t)ex));
+    int32_t dy2 = (int32_t)(2 * (int32_t)y - ((int32_t)sy + (int32_t)ey));
+    int32_t rx2 = (int32_t)ex - (int32_t)sx;
+    int32_t ry2 = (int32_t)ey - (int32_t)sy;
+    int32_t dx2sq = dx2 * dx2;
+    int32_t dy2sq = dy2 * dy2;
+    int32_t rx2sq = rx2 * rx2;
+    int32_t ry2sq = ry2 * ry2;
+    return (uint8_t)(dx2sq * ry2sq + dy2sq * rx2sq <= rx2sq * ry2sq);
+}
+
+/**
+ * Plot value into every cell of the ellipse inscribed in [sx..ex] x
+ * [sy..ey] (inclusive, canvas-absolute). One-shot operation (called
+ * once on ENTER, not live), so the straightforward O(width*height)
+ * per-cell test is cheap enough on 6502 -- no need for an incremental
+ * rasterization algorithm.
+ *
+ * @param sx    Left column of the bounding box.
+ * @param sy    Top row of the bounding box.
+ * @param ex    Right column of the bounding box.
+ * @param ey    Bottom row of the bounding box.
+ * @param value Screencode/attribute byte to plot.
+ * @return (none)
+ */
+static void ellipse_fill(uint16_t sx, uint16_t sy, uint16_t ex, uint16_t ey, uint8_t value)
+{
+    uint16_t x, y;
+
+    for (y = sy; y <= ey; y++)
+        for (x = sx; x <= ex; x++)
+            if (ellipse_inside(x, y, sx, sy, ex, ey))
+                canvas_put(x, y, value);
+}
+
+/**
+ * Plot value along just the outline of the ellipse inscribed in
+ * [sx..ex] x [sy..ey]: for each row, the leftmost and rightmost inside
+ * cell; for each column, the topmost and bottommost inside cell (the
+ * ellipse's convexity makes each row/column's inside cells a single
+ * contiguous span, so tracking just the extremes during one forward
+ * scan is sufficient -- no reverse-scan/underflow-prone loop needed).
+ *
+ * @param sx    Left column of the bounding box.
+ * @param sy    Top row of the bounding box.
+ * @param ex    Right column of the bounding box.
+ * @param ey    Bottom row of the bounding box.
+ * @param value Screencode/attribute byte to plot.
+ * @return (none)
+ */
+static void ellipse_outline(uint16_t sx, uint16_t sy, uint16_t ex, uint16_t ey, uint8_t value)
+{
+    uint16_t x, y, leftx = sx, rightx = sx, topy = sy, boty = sy;
+    uint8_t found;
+
+    for (y = sy; y <= ey; y++)
+    {
+        found = 0;
+        for (x = sx; x <= ex; x++)
+            if (ellipse_inside(x, y, sx, sy, ex, ey))
+            {
+                if (!found) { leftx = x; found = 1; }
+                rightx = x;
+            }
+        if (found)
+        {
+            canvas_put(leftx, y, value);
+            if (rightx != leftx) canvas_put(rightx, y, value);
+        }
+    }
+
+    for (x = sx; x <= ex; x++)
+    {
+        found = 0;
+        for (y = sy; y <= ey; y++)
+            if (ellipse_inside(x, y, sx, sy, ex, ey))
+            {
+                if (!found) { topy = y; found = 1; }
+                boty = y;
+            }
+        if (found)
+        {
+            canvas_put(x, topy, value);
+            if (boty != topy) canvas_put(x, boty, value);
+        }
+    }
+}
+
+/**
  * Grow a rectangle from the cursor's current position using cursor keys
  * (cursor_move_scroll() handles auto-scroll on oversized canvases, see
  * src/canvas.c), with a live perimeter highlight. ENTER accepts (populating
  * select_startx/starty/endx/endy/width/height) and returns 1; ESC cancels
  * and returns 0. FUNCT+6 toggles the statusbar without affecting the rect.
- * 'o' toggles select_hollow (Line/Box-only; linebox_run() reads it after
- * this returns -- Select mode never does). Sets app.mode to MODE_LINEBOX
- * or MODE_SELECT for the duration (per draworselect) and restores
- * MODE_MAIN before returning.
+ * 'o' toggles select_hollow and 'c' toggles select_ellipse (both
+ * Line/Box-only; linebox_run() reads them after this returns -- Select
+ * mode never does). Sets app.mode to MODE_LINEBOX or MODE_SELECT for
+ * the duration (per draworselect) and restores MODE_MAIN before
+ * returning.
  *
  * @param draworselect 1 for Line/Box mode, 0 for Select mode (only affects
  *                      app.mode/the statusbar's Mode field while running).
@@ -148,6 +263,7 @@ uint8_t rect_select(uint8_t draworselect)
 
     app.mode = draworselect ? MODE_LINEBOX : MODE_SELECT;
     select_hollow = 0;
+    select_ellipse = 0;
 
     rect_perimeter_toggle(orgx, orgy, orgx, orgy);
     statusbar_draw();
@@ -183,6 +299,14 @@ uint8_t rect_select(uint8_t draworselect)
         // toggling it during select_run()'s rect-grow is harmless).
         case 'o':
             select_hollow = !select_hollow;
+            continue;
+
+        // Ellipse/circle toggle: same Line/Box-only convention as 'o'
+        // above, independent of select_hollow -- the two combine for a
+        // 4-way dispatch in linebox_run() (filled/hollow box, filled/
+        // hollow ellipse).
+        case 'c':
+            select_ellipse = !select_ellipse;
             continue;
 
         default:
@@ -232,10 +356,12 @@ uint8_t rect_select(uint8_t draworselect)
 
 /**
  * Line/Box mode, entered via 'l' from Main mode. Grows a rectangle
- * (rect_select(1)) and, if accepted, fills it with app.plotscreencode --
- * or, if 'o' was pressed during the grow to toggle hollow mode, plots
- * just the rectangle's border (rect_perimeter_plot()) instead, leaving
- * the interior untouched. ESC leaves the canvas unchanged.
+ * (rect_select(1)) and, if accepted, plots app.plotscreencode according
+ * to the 'o' (hollow) and 'c' (ellipse) toggles pressed during the grow
+ * (rect_select()): filled box (default, neither toggle), hollow box
+ * ('o' only, rect_perimeter_plot()), filled ellipse ('c' only,
+ * ellipse_fill()), or hollow ellipse (both, ellipse_outline()). ESC
+ * leaves the canvas unchanged.
  *
  * @return (none)
  */
@@ -247,7 +373,14 @@ void linebox_run(void)
 
     undo_snapshot(select_startx, select_starty, select_width, select_height);
 
-    if (select_hollow)
+    if (select_ellipse)
+    {
+        if (select_hollow)
+            ellipse_outline(select_startx, select_starty, select_endx, select_endy, app.plotscreencode);
+        else
+            ellipse_fill(select_startx, select_starty, select_endx, select_endy, app.plotscreencode);
+    }
+    else if (select_hollow)
     {
         rect_perimeter_plot(select_startx, select_starty, select_endx, select_endy, app.plotscreencode);
     }

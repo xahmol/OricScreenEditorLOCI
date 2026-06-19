@@ -83,10 +83,10 @@ Principales fonctionnalités du programme :
   le curseur et la vue directement vers une coordonnée saisie ou fixe ;
   un Rechercher/Remplacer unifié (**F**) pour les codes écran et les
   couleurs d'encre/papier dans toute la zone de dessin ; une option de
-  boîte creuse en mode Ligne et boîte ; une option du menu Charset pour
-  réinitialiser le jeu de caractères standard depuis la ROM en une seule
-  étape ; et un raccourci de saisie hexadécimale directe d'attribut en
-  mode Écriture.
+  boîte creuse et ellipse/cercle en mode Ligne et boîte ; une option du
+  menu Charset pour réinitialiser le jeu de caractères standard depuis
+  la ROM en une seule étape ; et un raccourci de saisie hexadécimale
+  directe d'attribut en mode Écriture.
 
 ## Problèmes connus
 - La routine de sélection de fichiers ne fonctionne correctement qu'avec les disques SEDORIC3 créés par l'outil TAP2DSK de l'OSDK. Si vous souhaitez importer des écrans ou des jeux de caractères depuis d'autres disques, copiez-les d'abord sur une image créée avec TAP2DSK.
@@ -674,6 +674,15 @@ boîte creuse qui ne trace que les quatre lignes de bordure, laissant
 l'intérieur intact. Le basculement peut être répété autant de fois que
 souhaité avant de valider.
 
+**Nouveau OSE-LOCI :** toujours pendant l'agrandissement, appuyez sur
+**C** pour basculer entre une boîte rectangulaire (par défaut) et une
+ellipse/cercle inscrite dans le même rectangle englobant. Combinez avec
+**O** pour un contour d'ellipse creux, ou laissez **O** désactivé pour
+une ellipse pleine. Notez que les cellules de caractères faisant 6x8
+pixels (non carrées), un rectangle carré s'affichera comme une ellipse
+aplatie, pas un cercle parfait -- élargissez le rectangle si vous
+souhaitez un résultat plus rond.
+
 Acceptez avec **RETURN**, annulez avec **ESC**. Les deux quittent ce mode et reviennent au mode principal.
 
 **FUNCT+8** affiche un écran d'aide avec toutes les commandes pour ce mode.
@@ -681,8 +690,9 @@ Acceptez avec **RETURN**, annulez avec **ESC**. Les deux quittent ce mode et rev
 |Touche|Description
 |---|---|
 |**Touches curseur**|Agrandir/réduire dans la direction sélectionnée
-|**O**|**Nouveau OSE-LOCI :** Basculer boîte pleine/creuse
-|**RETURN**|Accepter la ligne ou la boîte
+|**O**|**Nouveau OSE-LOCI :** Basculer boîte/ellipse pleine ou creuse
+|**C**|**Nouveau OSE-LOCI :** Basculer forme rectangle/ellipse
+|**RETURN**|Accepter la ligne, la boîte ou l'ellipse
 |**ESC**|Annuler et revenir au mode principal
 |**FUNCT+6**|Basculer la visibilité de la barre d'état
 |**FUNCT+8**|Écran d'aide

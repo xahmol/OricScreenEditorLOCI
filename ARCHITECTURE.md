@@ -239,8 +239,9 @@ src/
   modes.h/c       EditorMode -> MSG_MODE_* display-name lookup
                   (mode_name()), shared by statusbar.c and any mode file
   select.c/h      Shared rectangle-grower (rect_select()) + Line/Box mode
-                  ('l', incl. 'o' hollow-box toggle) + Select mode ('s',
-                  incl. x/c cut/copy) (§6.9/§6.10/§6.11/§6.17)
+                  ('l', incl. 'o' hollow-box and 'c' ellipse/circle
+                  toggles) + Select mode ('s', incl. x/c cut/copy)
+                  (§6.9/§6.10/§6.11/§6.17)
   move.c/h        Move mode ('m'): nudges visible canvas content (§6.12)
   write.c/h       Write mode ('w'): free-typing screencodes, incl.
                   FUNCT+5 hex-direct attribute entry (§6.13)
@@ -882,6 +883,22 @@ border-walk math as the existing `rect_perimeter_toggle()` cursor
 highlight, but `canvas_put()` instead of `canvas_cell_invert()`)
 instead of filling the interior. Default (no `o` press) is unchanged.
 
+**Ellipse/circle (new, no V1/VDCSE2 precedent)**: pressing `c` toggles a
+second, independent file-scope flag, `select_ellipse`. `linebox_run()`
+4-way dispatches on `(select_ellipse, select_hollow)`. `ellipse_inside(x,
+y, sx, sy, ex, ey)` tests cell membership via a doubled-coordinate
+integer inequality (`dx2 = 2*x-(sx+ex)`, etc. — no floats, required by
+`-dNOFLOAT`); `ellipse_fill()` is a direct `O(width*height)` per-cell
+scan (cheap, one-shot on `ENTER`, not live); `ellipse_outline()` tracks
+each row's/column's leftmost-rightmost/topmost-bottommost inside cell
+during one forward scan (exploits ellipse convexity, avoids any
+underflow-prone reverse loop). No live-preview change — the grow loop's
+highlight stays the plain rectangle perimeter regardless of either
+flag, same as the hollow-box toggle. Character cells are 6x8 pixels, so
+a square bounding box renders as a flattened ellipse, not a circle —
+deliberately not corrected for, same treatment as Box mode's bounding
+box.
+
 ### 6.11 Select mode (`select_run()`, `src/select.c`, entered via `s`)
 
 Calls `rect_select(0)` (`app.mode = MODE_SELECT`); if cancelled, returns
@@ -1219,7 +1236,7 @@ boot at all, see §2.1's note) **except `test-boot-no-loci`**, which
 deliberately omits it to test the absent-path gate.
 
 ```
-make test                  # full suite (all 22 targets below)
+make test                  # full suite (all 23 targets below)
 make test-boot              # headless boot smoke test: splash + canvas/statusbar render
 make test-menus              # menu bar/pulldown/Screen-menu regression + Information > Version
 make test-screenresize        # Screen > Width/Height resize + shrink-confirm
@@ -1242,6 +1259,7 @@ make test-write-hexattr                     # Write mode FUNCT+5 hex-direct attr
 make test-trymode                           # Try mode ('t'): commit/cancel/undo
 make test-goto                              # Goto ('j') + Home ('h'): cancel, jump, jump-back
 make test-hollowbox                         # Line/Box 'o' toggle: hollow border vs filled, toggle-back
+make test-ellipse                           # Line/Box 'c' toggle: filled/hollow ellipse, toggle-back
 make test-capture CYCLES=N TYPEKEYS='...'  # calibration helper for new scripts (also passes --loci)
 ```
 
@@ -1251,14 +1269,14 @@ make test-capture CYCLES=N TYPEKEYS='...'  # calibration helper for new scripts 
 - `tests/scripts/oric_screen.py` decodes the 40x28 `$BB80` text screen from a
   `--dump-ram-at` dump, providing `--find`/`--row`/`--bytes` assertions used
   by the shell scripts in `tests/scripts/test_*.sh`.
-- Current totals: 4+18+8+2+12+14+14+2+6+10+4+6+5+5+8+7+16+5+6+4+3+5 = **164/164**
+- Current totals: 4+18+8+2+12+14+14+2+6+10+4+6+5+5+8+7+16+5+6+4+3+5+12 = **176/176**
   (`test-boot` + `test-menus` + `test-screenresize` +
   `test-charsetram-spike` + `test-charsetedit` + `test-palette` +
   `test-colourpicker` + `test-cursor-autoscroll` + `test-linebox` +
   `test-select` + `test-move` + `test-writemode` + `test-boot-no-loci` +
   `test-select-cutcopy` + `test-undo-overflow` + `test-help-funct8` +
   `test-fileio-traffic` + `test-findreplace` + `test-write-hexattr` +
-  `test-trymode` + `test-goto` + `test-hollowbox`).
+  `test-trymode` + `test-goto` + `test-hollowbox` + `test-ellipse`).
 - Write mode's `CTRL+letter` toggles and `DEL` have no automated coverage:
   Phosphoric's `--type-keys` has no CTRL-modifier escape and `DEL` (0x7F) is
   unmapped in its `char_map` — covered by manual walkthrough + code review

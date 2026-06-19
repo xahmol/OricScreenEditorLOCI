@@ -966,6 +966,64 @@ the pre-existing `test_linebox.sh` unchanged after this feature
 shipped. Fills a real gap: drawing a frame/border previously needed
 four separate lines drawn by hand with the corners lined up manually.
 
+#### Ellipse/circle drawing in Line/Box mode (`c` toggle)
+
+A later addition (investigated and approved in its own planning
+session, after the 7-part batch above), following the exact same
+pattern as the hollow-box toggle: `src/select.c` gained a second
+file-scope flag, `select_ellipse`, toggled by `case 'c':` in
+`rect_select()`'s grow-loop switch (independent of `select_hollow`,
+both reset at the start of every call). `linebox_run()` now 4-way
+dispatches on `(select_ellipse, select_hollow)`: filled box (default,
+unchanged), hollow box (already shipped), filled ellipse, or hollow
+ellipse. No precedent in V1 or VDCScreenEditor2 -- genuinely new
+functionality. No live-preview change was needed: the grow loop's
+highlight was already always just the rectangle perimeter regardless
+of `select_hollow`'s state, so the same is true for `select_ellipse` --
+shape choice is only applied once, on `ENTER`.
+
+**Membership test, not a ported Bresenham/midpoint algorithm**: rather
+than the classic conics-by-octant ellipse rasterization (more code,
+more edge cases for 4-way mirroring and even/odd dimensions), a new
+`ellipse_inside(x, y, sx, sy, ex, ey)` tests each cell directly against
+the doubled-coordinate integer inequality `dx2²·ry2² + dy2²·rx2² ≤
+rx2²·ry2²` (`dx2 = 2*x - (sx+ex)`, `rx2 = ex-sx`, etc. -- the doubling
+keeps the center exact for both even and odd bounding-box dimensions
+without any fractional math, required since this project builds with
+`-dNOFLOAT`). A degenerate 1-cell-wide or -tall box collapses correctly
+to a straight line via this same test, with no special-casing.
+`int32_t` (already used elsewhere, e.g. `canvas.c`/`menudata.c`/
+`menu.c`) is sufficient: since `width*height ≤ CANVAS_MAX_SIZE`
+(10240), every squared cross-term is bounded by `(rx2·ry2)² ≤
+10240² ≈ 1.05×10⁸`, verified by hand to have no overflow risk at any
+intermediate step (each sub-term squared before combining, not
+interleaved). `ellipse_fill()` does a straightforward `O(width·height)`
+per-cell test (cheap enough on 6502 since it's a one-shot operation on
+`ENTER`, not live per-keypress); `ellipse_outline()` exploits the
+ellipse's convexity (each row/column's inside cells form a single
+contiguous span) to track just the leftmost/rightmost per row and
+topmost/bottommost per column during one forward scan each --
+avoiding any reverse-scan loop, which would otherwise need explicit
+underflow guarding for a `uint16_t` counter reaching `sx==0`.
+
+**Non-square cells, deliberately not corrected for**: character cells
+are 6x8 pixels (`include/charset.h`'s `CHARSET_GLYPH_WIDTH`/
+`GLYPH_BYTES`), so a square bounding box renders as a visibly flattened
+ellipse on real hardware. Treated the same way Box mode already treats
+its bounding box as the rectangle's exact bounds -- consistent,
+predictable, and the user can already compensate by drawing a wider
+box, matching how every other character-cell-grid art tool handles
+this (documented in README.md/README_fr.md rather than "fixed").
+
+**Test coverage**: `tests/scripts/test_ellipse.sh` (3 scenarios, 12
+assertions) uses a hand-verified 5x5 bounding box (grown via `l`,
+`DOWN`x4, `RIGHT`x4 from the origin) whose filled set is a 13-cell
+diamond and whose hollow outline is exactly 8 cells -- both computed by
+hand against the membership inequality above and confirmed to match
+Phosphoric's actual output exactly on first try, plus a toggle-back
+scenario confirming `c` pressed twice returns to the unchanged default
+filled rectangle. Full suite: 164/164 -> 176/176.
+
 #### Charset > Reset Std->ROM (`menudata.c`, Charset pulldown)
 
 `PULLDOWN_MAXOPTIONS` grew from 6 to 7 (`src/menu.h`) -- cheap now that
@@ -1128,14 +1186,15 @@ make test         # full automated Phosphoric test suite (test-boot, test-menus,
                   # test-undo-overflow, test-help-funct8,
                   # test-fileio-traffic, test-findreplace,
                   # test-write-hexattr, test-trymode, test-goto,
-                  # test-hollowbox) -- EN only, see "Localisation"
-                  # below. All targets pass --loci to Phosphoric (LOCI is
-                  # required, see "Canvas storage is overlay RAM, LOCI is
-                  # required") except test-boot-no-loci (deliberately
-                  # tests the absent path) and test-fileio-traffic (uses
-                  # --loci-flash DIR instead, a real host filesystem
-                  # directory for byte-level LOCI file I/O assertions).
-                  # Current total: 164/164.
+                  # test-hollowbox, test-ellipse) -- EN only, see
+                  # "Localisation" below. All targets pass --loci to
+                  # Phosphoric (LOCI is required, see "Canvas storage is
+                  # overlay RAM, LOCI is required") except
+                  # test-boot-no-loci (deliberately tests the absent
+                  # path) and test-fileio-traffic (uses --loci-flash DIR
+                  # instead, a real host filesystem directory for
+                  # byte-level LOCI file I/O assertions).
+                  # Current total: 176/176.
 make test-boot    # headless boot smoke test (splash + canvas/statusbar render)
 make test-capture CYCLES=N TYPEKEYS='...'
                   # calibration helper: dumps tests/out/capture.bin + .png
@@ -1325,10 +1384,11 @@ src/
                   standalone, no dependency in either direction with
                   editor.c/select.c/move.c/write.c
   select.c/h      Shared rectangle-grower (rect_select()) + Line/Box mode
-                  ('l', linebox_run(), incl. 'o' hollow-box toggle) +
-                  Select mode ('s', select_run(), incl. x/c cut/copy)
-                  -- see "Shared rectangle-grower"/"Line/Box mode"/
-                  "Select mode" (Phase 5)/"Select mode cut/copy (Phase 8)"/
+                  ('l', linebox_run(), incl. 'o' hollow-box toggle and
+                  'c' ellipse/circle toggle) + Select mode ('s',
+                  select_run(), incl. x/c cut/copy) -- see "Shared
+                  rectangle-grower"/"Line/Box mode"/"Select mode"
+                  (Phase 5)/"Select mode cut/copy (Phase 8)"/
                   "Post-Phase-9 feature additions"
   move.c/h        Move mode ('m'): nudges the visible canvas content by one
                   row/col (see "Move mode (Phase 5d)")

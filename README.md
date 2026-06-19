@@ -86,9 +86,9 @@ Main features of the program:
   plotting it; Jump (**J**) and Home (**H**) to move the cursor and
   viewport straight to a typed or fixed coordinate; a unified Find/
   Replace (**F**) for screencodes and ink/paper colors across the whole
-  canvas; a hollow-box option in Line and box mode; a Charset menu
-  option to reset the standard character set from ROM in one step; and
-  a hex-direct attribute entry shortcut in Write mode.
+  canvas; a hollow-box and ellipse/circle option in Line and box mode;
+  a Charset menu option to reset the standard character set from ROM in
+  one step; and a hex-direct attribute entry shortcut in Write mode.
 
 ## Known issues
 - Filepicker routine only is properly working with SEDORIC3 disks created by the TAP2DSK tool from OSDK. If you want to import screens or charsets from other disks, please copy them to a TAP2DSK created image first.
@@ -662,6 +662,14 @@ filled box (default, matching V1) and a hollow box that only plots the
 four border lines, leaving the interior untouched. The toggle can be
 flipped back and forth as many times as you like before accepting.
 
+**OSE-LOCI new:** also while growing the box, press **C** to toggle
+between a rectangular box (default) and an ellipse/circle inscribed in
+the same bounding box. Combine with **O** for a hollow ellipse outline,
+or leave **O** off for a filled ellipse. Note that since character cells
+are 6x8 pixels (not square), a square bounding box renders as a
+flattened ellipse, not a perfect circle -- widen the box if you want a
+rounder result.
+
 Accept with **RETURN**, cancel with **ESC**. Both will leave this mode and return to main mode.
 
 **FUNCT+8** will show a help screen with all screen commands for this mode.
@@ -669,8 +677,9 @@ Accept with **RETURN**, cancel with **ESC**. Both will leave this mode and retur
 |Key|Description
 |---|---|
 |**Cursor keys**|Expand/shrink in the selected direction
-|**O**|**OSE-LOCI new:** Toggle filled/hollow box
-|**RETURN**|Accept line or box
+|**O**|**OSE-LOCI new:** Toggle filled/hollow box or ellipse
+|**C**|**OSE-LOCI new:** Toggle rectangle/ellipse shape
+|**RETURN**|Accept line, box or ellipse
 |**ESC**|Cancel and go back to main mode
 |**FUNCT+6**|Toggle statusbar visibility
 |**FUNCT+8**|Help screen
