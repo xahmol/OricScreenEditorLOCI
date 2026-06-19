@@ -22,6 +22,18 @@
 #define CHARSET_GLYPH_AREA_OFFSET 0x100
 #define CHARSET_GLYPH_AREA_SIZE   768
 
+// CHARSET_ALT only has 896 bytes of real RAM ($B800-$BB7F) before screen
+// RAM begins at $BB80 -- unlike CHARSET_STD ($B400-$B7FF), a full
+// non-overlapping 1024-byte bank. So CHARSET_ALT's displayable range
+// (base+CHARSET_GLYPH_AREA_OFFSET) can only safely span 640 bytes (codes
+// 0x20-0x6F, 80 glyphs), not the full 768 -- codes 0x70-0x7F have no
+// independent storage there at all; reading/writing past 640 bytes hits
+// live screen RAM. charset_save()/charset_load() apply this automatically
+// when base==CHARSET_ALT (see charset.c). This is also why the character
+// editor's ce_max_code() and V1's own visualchar[] both already cap the
+// Alt charset at code 0x6F.
+#define CHARSET_ALT_GLYPH_AREA_SIZE 640
+
 // Dimensions of a single Oric glyph: 8 bytes (one per pixel row), 6 visible
 // pixel columns per row (bits 5..0, bit5 = leftmost). Fixed by the hardware.
 #define CHARSET_GLYPH_BYTES  8
@@ -32,12 +44,22 @@
 // altorstd: 0 = standard charset (CHARSET_STD), 1 = alternate (CHARSET_ALT).
 uint16_t charset_address(uint8_t screencode, uint8_t altorstd);
 
-// Copy the displayable glyph range (CHARSET_GLYPH_AREA_SIZE bytes) from
-// charset bank `base` (CHARSET_STD or CHARSET_ALT) into dest[].
+// Displayable-range byte count for charset bank `base`: CHARSET_ALT_
+// GLYPH_AREA_SIZE (640) if base==CHARSET_ALT, else CHARSET_GLYPH_AREA_SIZE
+// (768). Used internally by charset_save()/charset_load(); also exported
+// for callers (src/fileio.c) that copy a charset bank's displayable range
+// directly without going through those two functions.
+uint16_t charset_area_size(uint16_t base);
+
+// Copy charset bank `base`'s displayable glyph range (charset_area_size()
+// bytes -- CHARSET_ALT only copies 640, see CHARSET_ALT_GLYPH_AREA_SIZE)
+// into dest[].
 void charset_save(uint16_t base, uint8_t *dest);
 
-// Copy CHARSET_GLYPH_AREA_SIZE bytes from src[] into charset bank `base`'s
-// displayable glyph range. src may be another charset bank or CHARSETROM.
+// Copy charset_area_size(base) bytes from src[] into charset bank `base`'s
+// displayable glyph range (CHARSET_ALT only writes 640, see
+// CHARSET_ALT_GLYPH_AREA_SIZE). src may be another charset bank or
+// CHARSETROM.
 void charset_load(uint16_t base, const uint8_t *src);
 
 // Pointer to screencode's 8-byte glyph in CHARSETROM (codes 0x20-0x7F only --

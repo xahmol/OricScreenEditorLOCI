@@ -30,36 +30,82 @@
 #include "filepicker.h"
 #include "fileio.h"
 
-// Magic number identifying an OSE screen/combined file (FileHeader.magic) --
-// a sanity check on load, not a real version negotiation.
+// Magic number identifying an OSE Project file (ProjectHeader.magic) --
+// a sanity check on load, and the signal fileio_load_project() uses to
+// tell OSE's own ProjectHeader apart from V1's original 19-byte layout
+// (see fileio_parse_v1_project()). Screen/Combined/Project's SC.BIN
+// files carry no header/magic at all -- by design, see fileio.h.
 #define FILEIO_MAGIC 0x4F53U
 
 // app.filename + the longest suffix ("CA.BIN") + NUL.
 #define FILEIO_PATH_MAXLEN (FILENAME_MAXLEN + 7)
 
-// Header shared by "Screen" and "Combined" files (screenmap[] dimensions),
-// and reused as the leading fields of Project's SC.BIN (see fileio_save_
-// project()/fileio_load_project(), Part 3).
-typedef struct {
-    uint16_t magic;
-    uint16_t width;
-    uint16_t height;
-} FileHeader;
+/**
+ * Parse a NUL-terminated decimal digit string into a uint16_t. Stops at
+ * the first non-digit. Returns 0 for an empty string. (A local copy of
+ * the same tiny helper several other files in this codebase already
+ * have their own copy of, e.g. menudata.c's parse_uint().)
+ *
+ * @param s NUL-terminated digit string.
+ * @return Parsed value.
+ */
+static uint16_t fileio_parse_uint(const char *s)
+{
+    uint16_t v = 0;
+    while (*s >= '0' && *s <= '9')
+    {
+        v = (uint16_t)(v * 10 + (uint16_t)(*s - '0'));
+        s++;
+    }
+    return v;
+}
 
 /**
- * Validate a FileHeader read from a "Screen"/"Combined"/Project-SC.BIN
- * file: magic must match, and width/height must pass the same bounds
- * canvas_resize() enforces.
+ * Prompt for screen width then height in a small popup (V1's exact
+ * "Enter screen width:"/"Enter screen height:" wording, same as
+ * V1's loadscreenmap()) -- used by fileio_load_screen()/
+ * fileio_load_combined() before reading a bare, metadata-free screen
+ * dump (see fileio.h for why these files carry no embedded size, by
+ * design). Both fields are pre-filled with the current app.canvas_width/
+ * height (matching V1's pre-fill). Does not itself validate the
+ * entered size -- the caller passes it straight to canvas_resize() and
+ * handles a 0 return from that.
  *
- * @param hdr Header to validate.
- * @return 1 if valid, 0 otherwise.
+ * @param title Title line (the calling action's label).
+ * @param outw  Out: entered width, only set if 1 is returned.
+ * @param outh  Out: entered height, only set if 1 is returned.
+ * @return 1 if both fields were entered (ENTER), 0 if ESC cancelled
+ *         either one.
  */
-static uint8_t fileio_header_valid(const FileHeader *hdr)
+static uint8_t fileio_get_dimensions(const char *title, uint16_t *outw, uint16_t *outh)
 {
-    if (hdr->magic != FILEIO_MAGIC) return 0;
-    if (hdr->width < VIEWPORT_WIDTH || hdr->height < VIEWPORT_HEIGHT) return 0;
-    if ((uint32_t)hdr->width * hdr->height > CANVAS_MAX_SIZE) return 0;
-    return 1;
+    OricCharWin win;
+    char        bufw[6], bufh[6];
+    uint8_t     ok = 0;
+
+    menu_winsave(5, 12, 1);
+    cwin_init(&win, 5, 5, 35, 12, A_FWBLACK, A_BGWHITE);
+    cwin_clear(&win);
+
+    cwin_putat_string(&win, 2, 1, title);
+    cwin_putat_string(&win, 2, 3, MSG_FILEIO_PROMPT_WIDTH);
+    sprintf(bufw, "%u", app.canvas_width);
+
+    if (cwin_textinput(&win, 2, 4, 8, bufw, 5, VINPUT_NUMS) >= 0)
+    {
+        cwin_putat_string(&win, 2, 6, MSG_FILEIO_PROMPT_HEIGHT);
+        sprintf(bufh, "%u", app.canvas_height);
+
+        if (cwin_textinput(&win, 2, 7, 8, bufh, 5, VINPUT_NUMS) >= 0)
+        {
+            *outw = fileio_parse_uint(bufw);
+            *outh = fileio_parse_uint(bufh);
+            ok = 1;
+        }
+    }
+
+    menu_winrestore();
+    return ok;
 }
 
 /**
@@ -107,29 +153,22 @@ uint8_t fileio_get_filename(const char *title)
 }
 
 /**
- * Save the canvas (no charset data) to app.filename+".BIN": a FileHeader
- * (magic, app.canvas_width/height) followed by screenmap[]
- * (canvas_width*canvas_height bytes), via loci_open()+loci_write()+
- * loci_close() -- screenmap[] is written directly from the array, no
- * staging buffer needed.
+ * Save the canvas (no charset data) to app.filename+".BIN": a bare raw
+ * dump of screenmap[] (canvas_width*canvas_height bytes), via
+ * loci_open()+loci_write()+loci_close() -- no header, by design, see
+ * fileio.h.
  *
  * @return (none)
  */
 void fileio_save_screen(void)
 {
-    char       path[FILEIO_PATH_MAXLEN];
-    FileHeader hdr;
-    int16_t    fd;
-    uint16_t   len;
+    char    path[FILEIO_PATH_MAXLEN];
+    int16_t fd;
 
     if (!loci_check_present()) return;
     if (!fileio_get_filename(MSG_FILE_SAVE_SCREEN)) return;
 
     sprintf(path, "%s.BIN", app.filename);
-    hdr.magic  = FILEIO_MAGIC;
-    hdr.width  = app.canvas_width;
-    hdr.height = app.canvas_height;
-    len        = (uint16_t)(app.canvas_width * app.canvas_height);
 
     fd = loci_open(path, O_WRONLY | O_CREAT | O_TRUNC);
     if (fd < 0)
@@ -137,28 +176,35 @@ void fileio_save_screen(void)
         menu_messagepopup(MSG_FILE_INVALID_FORMAT);
         return;
     }
-    loci_write(fd, &hdr, sizeof(hdr));
-    loci_write(fd, screenmap, len);
+    loci_write(fd, screenmap, (uint16_t)(app.canvas_width * app.canvas_height));
     loci_close(fd);
 }
 
 /**
- * Load a canvas-only file saved by fileio_save_screen(): reads and
- * validates the FileHeader (fileio_header_valid()), applies the size via
- * canvas_resize(), then reads screenmap[] directly. Shows
- * MSG_FILE_INVALID_FORMAT and aborts (canvas unchanged) if the header is
- * invalid or the file can't be opened.
+ * Load a canvas-only file saved by fileio_save_screen() (or any bare raw
+ * screen dump from elsewhere -- see fileio.h): prompts for width/height
+ * (fileio_get_dimensions(), V1's exact UX, since there is no embedded
+ * size to auto-detect), applies it via canvas_resize(), then reads the
+ * raw bytes directly. Shows MSG_RESIZE_INVALID and aborts (canvas
+ * unchanged) if the entered size is out of bounds, MSG_FILE_NOT_FOUND if
+ * the file can't be opened.
  *
  * @return (none)
  */
 void fileio_load_screen(void)
 {
-    char       path[FILEIO_PATH_MAXLEN];
-    FileHeader hdr;
-    int16_t    fd;
+    char     path[FILEIO_PATH_MAXLEN];
+    int16_t  fd;
+    uint16_t neww, newh;
 
     if (!loci_check_present()) return;
     if (!filepicker_run(MSG_FILE_LOAD_SCREEN, PICKER_FILTER_PLAIN)) return;
+    if (!fileio_get_dimensions(MSG_FILE_LOAD_SCREEN, &neww, &newh)) return;
+    if (!canvas_resize(neww, newh))
+    {
+        menu_messagepopup(MSG_RESIZE_INVALID);
+        return;
+    }
 
     sprintf(path, "%s.BIN", app.filename);
 
@@ -168,14 +214,7 @@ void fileio_load_screen(void)
         menu_messagepopup(MSG_FILE_NOT_FOUND);
         return;
     }
-    loci_read(fd, &hdr, sizeof(hdr));
-    if (!fileio_header_valid(&hdr) || !canvas_resize(hdr.width, hdr.height))
-    {
-        loci_close(fd);
-        menu_messagepopup(MSG_FILE_INVALID_FORMAT);
-        return;
-    }
-    loci_read(fd, screenmap, (uint16_t)(hdr.width * hdr.height));
+    loci_read(fd, screenmap, (uint16_t)(neww * newh));
     loci_close(fd);
 
     app.cursor_x = 0;
@@ -189,27 +228,22 @@ void fileio_load_screen(void)
 
 /**
  * Save the canvas together with CHARSET_STD's displayable glyph range to
- * app.filename+".BIN": a FileHeader followed by CHARSET_GLYPH_AREA_SIZE
- * (768) bytes written directly from charset RAM (CHARSET_STD +
- * CHARSET_GLYPH_AREA_OFFSET, no copy-to-buffer step), then screenmap[].
+ * app.filename+".BIN": CHARSET_GLYPH_AREA_SIZE (768) bytes written
+ * directly from charset RAM (CHARSET_STD + CHARSET_GLYPH_AREA_OFFSET, no
+ * copy-to-buffer step), immediately followed by screenmap[] -- no
+ * header, by design, see fileio.h.
  *
  * @return (none)
  */
 void fileio_save_combined(void)
 {
-    char       path[FILEIO_PATH_MAXLEN];
-    FileHeader hdr;
-    int16_t    fd;
-    uint16_t   len;
+    char    path[FILEIO_PATH_MAXLEN];
+    int16_t fd;
 
     if (!loci_check_present()) return;
     if (!fileio_get_filename(MSG_FILE_SAVE_COMBINED)) return;
 
     sprintf(path, "%s.BIN", app.filename);
-    hdr.magic  = FILEIO_MAGIC;
-    hdr.width  = app.canvas_width;
-    hdr.height = app.canvas_height;
-    len        = (uint16_t)(app.canvas_width * app.canvas_height);
 
     fd = loci_open(path, O_WRONLY | O_CREAT | O_TRUNC);
     if (fd < 0)
@@ -217,28 +251,34 @@ void fileio_save_combined(void)
         menu_messagepopup(MSG_FILE_INVALID_FORMAT);
         return;
     }
-    loci_write(fd, &hdr, sizeof(hdr));
     loci_write(fd, (const void *)(CHARSET_STD + CHARSET_GLYPH_AREA_OFFSET), CHARSET_GLYPH_AREA_SIZE);
-    loci_write(fd, screenmap, len);
+    loci_write(fd, screenmap, (uint16_t)(app.canvas_width * app.canvas_height));
     loci_close(fd);
 }
 
 /**
- * Load a file saved by fileio_save_combined(): validates the header,
- * resizes the canvas, reads CHARSET_GLYPH_AREA_SIZE bytes directly into
- * CHARSET_STD's displayable range, then reads screenmap[]. Sets
+ * Load a file saved by fileio_save_combined(): prompts for width/height
+ * (fileio_get_dimensions(), same as fileio_load_screen()), resizes the
+ * canvas, reads CHARSET_GLYPH_AREA_SIZE bytes directly into CHARSET_STD's
+ * displayable range, then reads the raw screen bytes. Sets
  * app.stdchanged=1 since CHARSET_STD was just replaced.
  *
  * @return (none)
  */
 void fileio_load_combined(void)
 {
-    char       path[FILEIO_PATH_MAXLEN];
-    FileHeader hdr;
-    int16_t    fd;
+    char     path[FILEIO_PATH_MAXLEN];
+    int16_t  fd;
+    uint16_t neww, newh;
 
     if (!loci_check_present()) return;
     if (!filepicker_run(MSG_FILE_LOAD_COMBINED, PICKER_FILTER_PLAIN)) return;
+    if (!fileio_get_dimensions(MSG_FILE_LOAD_COMBINED, &neww, &newh)) return;
+    if (!canvas_resize(neww, newh))
+    {
+        menu_messagepopup(MSG_RESIZE_INVALID);
+        return;
+    }
 
     sprintf(path, "%s.BIN", app.filename);
 
@@ -248,15 +288,8 @@ void fileio_load_combined(void)
         menu_messagepopup(MSG_FILE_NOT_FOUND);
         return;
     }
-    loci_read(fd, &hdr, sizeof(hdr));
-    if (!fileio_header_valid(&hdr) || !canvas_resize(hdr.width, hdr.height))
-    {
-        loci_close(fd);
-        menu_messagepopup(MSG_FILE_INVALID_FORMAT);
-        return;
-    }
     loci_read(fd, (void *)(CHARSET_STD + CHARSET_GLYPH_AREA_OFFSET), CHARSET_GLYPH_AREA_SIZE);
-    loci_read(fd, screenmap, (uint16_t)(hdr.width * hdr.height));
+    loci_read(fd, screenmap, (uint16_t)(neww * newh));
     loci_close(fd);
 
     app.stdchanged = 1;
@@ -288,11 +321,11 @@ typedef struct {
 /**
  * Save the current project to 2-4 LOCI files sharing app.filename as a
  * base name: "<name>PJ.BIN" (ProjectHeader, via file_save()),
- * "<name>SC.BIN" (FileHeader + screenmap[], same shape as
- * fileio_save_screen()), and -- only if that charset was edited this
- * session (app.stdchanged/altchanged, set from charsetedit.c's
- * ce_snapshot()) -- "<name>CS.BIN"/"<name>CA.BIN" (768 raw bytes each,
- * direct from CHARSET_STD/CHARSET_ALT's displayable range).
+ * "<name>SC.BIN" (bare screenmap[] dump, no header -- see fileio.h),
+ * and -- only if that charset was edited this session
+ * (app.stdchanged/altchanged, set from charsetedit.c's ce_snapshot()) --
+ * "<name>CS.BIN"/"<name>CA.BIN" (raw charset dumps, charset_area_size()
+ * bytes each, direct from CHARSET_STD/CHARSET_ALT's displayable range).
  *
  * @return (none)
  */
@@ -300,7 +333,6 @@ void fileio_save_project(void)
 {
     char          path[FILEIO_PATH_MAXLEN];
     ProjectHeader proj;
-    FileHeader    hdr;
     int16_t       fd;
 
     if (!loci_check_present()) return;
@@ -329,9 +361,6 @@ void fileio_save_project(void)
         return;
     }
 
-    hdr.magic  = FILEIO_MAGIC;
-    hdr.width  = app.canvas_width;
-    hdr.height = app.canvas_height;
     sprintf(path, "%sSC.BIN", app.filename);
     fd = loci_open(path, O_WRONLY | O_CREAT | O_TRUNC);
     if (fd < 0)
@@ -339,30 +368,78 @@ void fileio_save_project(void)
         menu_messagepopup(MSG_FILE_INVALID_FORMAT);
         return;
     }
-    loci_write(fd, &hdr, sizeof(hdr));
     loci_write(fd, screenmap, (uint16_t)(app.canvas_width * app.canvas_height));
     loci_close(fd);
 
     if (app.stdchanged)
     {
         sprintf(path, "%sCS.BIN", app.filename);
-        file_save(path, (const void *)(CHARSET_STD + CHARSET_GLYPH_AREA_OFFSET), CHARSET_GLYPH_AREA_SIZE);
+        file_save(path, (const void *)(CHARSET_STD + CHARSET_GLYPH_AREA_OFFSET), charset_area_size(CHARSET_STD));
     }
     if (app.altchanged)
     {
         sprintf(path, "%sCA.BIN", app.filename);
-        file_save(path, (const void *)(CHARSET_ALT + CHARSET_GLYPH_AREA_OFFSET), CHARSET_GLYPH_AREA_SIZE);
+        file_save(path, (const void *)(CHARSET_ALT + CHARSET_GLYPH_AREA_OFFSET), charset_area_size(CHARSET_ALT));
     }
 }
 
 /**
- * Load a project saved by fileio_save_project(). Reads and validates
- * "<name>PJ.BIN" first (missing/invalid -> error popup, abort before
- * touching anything else); applies canvas size/cursor/viewport/plot*
- * fields; reads "<name>SC.BIN" (validated independently, same as
- * fileio_load_screen()); then, if present, loads "<name>CS.BIN"/
- * "<name>CA.BIN" into CHARSET_STD/CHARSET_ALT (missing file leaves that
- * bank untouched, matching V1).
+ * Parse a buffer containing V1's original 19-byte PJ.BIN layout
+ * (/home/xahmol/git/OricScreenEditor/src/main.c saveproject()) into the
+ * current ProjectHeader fields, so Load Project transparently accepts
+ * V1 projects too -- see fileio_load_project(). V1 byte offsets:
+ *   0  charsetchanged[0] -> stdchanged
+ *   1  charsetchanged[1] -> altchanged
+ *   2  screen_col        -> cursor_x (same concept, direct copy)
+ *   3  screen_row        -> cursor_y
+ *   4-5 screenwidth (hi,lo)  -> canvas_width
+ *   6-7 screenheight (hi,lo) -> canvas_height
+ *   8-9 screentotal (hi,lo)  -- dropped, redundant (= width*height)
+ *   10 plotink, 11 plotpaper, 12 plotblink, 13 plotdouble,
+ *   14 plotaltchar, 15 plotscreencode
+ *   16 -- a dead byte, never assigned in V1's own saveproject(), skipped
+ *   17 xoffset (1 byte, zero-extended -- V1 itself truncates a 16-bit
+ *      runtime value to this single byte on save; nothing to recover
+ *      beyond whatever V1's own file already preserved)
+ *   18 yoffset (1 byte, zero-extended)
+ * proj->magic is deliberately left unset by this function -- the caller
+ * already knows it's parsing the V1 fallback path.
+ *
+ * @param raw  19-byte buffer holding V1's original PJ.BIN layout.
+ * @param proj Out: every ProjectHeader field except magic.
+ * @return (none)
+ */
+static void fileio_parse_v1_project(const uint8_t *raw, ProjectHeader *proj)
+{
+    proj->stdchanged     = raw[0];
+    proj->altchanged     = raw[1];
+    proj->cursor_x       = raw[2];
+    proj->cursor_y       = raw[3];
+    proj->canvas_width   = (uint16_t)(raw[4] * 256 + raw[5]);
+    proj->canvas_height  = (uint16_t)(raw[6] * 256 + raw[7]);
+    proj->plotink        = raw[10];
+    proj->plotpaper      = raw[11];
+    proj->plotblink      = raw[12];
+    proj->plotdouble     = raw[13];
+    proj->plotaltchar    = raw[14];
+    proj->plotscreencode = raw[15];
+    proj->xoffset        = raw[17];
+    proj->yoffset        = raw[18];
+}
+
+/**
+ * Load a project saved by fileio_save_project(), or one of V1's original
+ * 4-file projects (fileio_parse_v1_project()): reads "<name>PJ.BIN"
+ * first (missing -> error popup, abort before touching anything else);
+ * if its magic field doesn't match FILEIO_MAGIC, re-reads the same file
+ * as V1's 19-byte layout instead (V1 has no magic number, but its first
+ * 2 bytes -- charsetchanged[0]/[1], each 0 or 1 -- can never collide
+ * with FILEIO_MAGIC, so this fallback is unambiguous). Applies canvas
+ * size/cursor/viewport/plot* fields; reads "<name>SC.BIN" as a bare raw
+ * dump (sized from the just-parsed canvas_width/height -- no header of
+ * its own, matching V1's loadproject() exactly, see fileio.h); then, if
+ * present, loads "<name>CS.BIN"/"<name>CA.BIN" into CHARSET_STD/
+ * CHARSET_ALT (missing file leaves that bank untouched, matching V1).
  *
  * @return (none)
  */
@@ -370,14 +447,29 @@ void fileio_load_project(void)
 {
     char          path[FILEIO_PATH_MAXLEN];
     ProjectHeader proj;
-    FileHeader    hdr;
     int16_t       fd;
 
     if (!loci_check_present()) return;
     if (!filepicker_run(MSG_FILE_LOAD_PROJECT, PICKER_FILTER_PROJECT)) return;
 
     sprintf(path, "%sPJ.BIN", app.filename);
-    if (file_load(path, &proj, sizeof(proj)) < 0 || proj.magic != FILEIO_MAGIC)
+    if (file_load(path, &proj, sizeof(proj)) < 0)
+    {
+        menu_messagepopup(MSG_FILE_INVALID_FORMAT);
+        return;
+    }
+    if (proj.magic != FILEIO_MAGIC)
+    {
+        uint8_t v1buf[19];
+        if (file_load(path, v1buf, sizeof(v1buf)) < (int16_t)sizeof(v1buf))
+        {
+            menu_messagepopup(MSG_FILE_INVALID_FORMAT);
+            return;
+        }
+        fileio_parse_v1_project(v1buf, &proj);
+    }
+
+    if (!canvas_resize(proj.canvas_width, proj.canvas_height))
     {
         menu_messagepopup(MSG_FILE_INVALID_FORMAT);
         return;
@@ -390,14 +482,7 @@ void fileio_load_project(void)
         menu_messagepopup(MSG_FILE_NOT_FOUND);
         return;
     }
-    loci_read(fd, &hdr, sizeof(hdr));
-    if (!fileio_header_valid(&hdr) || !canvas_resize(hdr.width, hdr.height))
-    {
-        loci_close(fd);
-        menu_messagepopup(MSG_FILE_INVALID_FORMAT);
-        return;
-    }
-    loci_read(fd, screenmap, (uint16_t)(hdr.width * hdr.height));
+    loci_read(fd, screenmap, (uint16_t)(proj.canvas_width * proj.canvas_height));
     loci_close(fd);
 
     app.cursor_x       = proj.cursor_x;
@@ -414,13 +499,13 @@ void fileio_load_project(void)
     sprintf(path, "%sCS.BIN", app.filename);
     if (file_exists(path))
     {
-        file_load(path, (void *)(CHARSET_STD + CHARSET_GLYPH_AREA_OFFSET), CHARSET_GLYPH_AREA_SIZE);
+        file_load(path, (void *)(CHARSET_STD + CHARSET_GLYPH_AREA_OFFSET), charset_area_size(CHARSET_STD));
         app.stdchanged = 1;
     }
     sprintf(path, "%sCA.BIN", app.filename);
     if (file_exists(path))
     {
-        file_load(path, (void *)(CHARSET_ALT + CHARSET_GLYPH_AREA_OFFSET), CHARSET_GLYPH_AREA_SIZE);
+        file_load(path, (void *)(CHARSET_ALT + CHARSET_GLYPH_AREA_OFFSET), charset_area_size(CHARSET_ALT));
         app.altchanged = 1;
     }
 
@@ -458,10 +543,13 @@ static const char *fileio_charset_title(uint8_t altorstd, uint8_t save, uint16_t
 
 /**
  * Charset menu Load Standard/Alternate/Combined ('altorstd' 0/1/2).
- * Std/Alt load 768 raw bytes directly into that bank's displayable range.
- * Combined loads into CHARSET_STD then copies the result into CHARSET_ALT
- * too (charset_load(), include/charset.h) -- see fileio.h's header comment
- * for why. Sets app.stdchanged/altchanged for whichever bank(s) changed.
+ * Std loads 768 raw bytes, Alt loads 640 (charset_area_size(), see
+ * CHARSET_ALT_GLYPH_AREA_SIZE) directly into that bank's displayable
+ * range. Combined loads into CHARSET_STD then copies the result into
+ * CHARSET_ALT too (charset_load(), include/charset.h, 640 bytes -- see
+ * fileio.h's header comment for why Combined uses CHARSET_STD as its
+ * source either way). Sets app.stdchanged/altchanged for whichever
+ * bank(s) changed.
  *
  * @param altorstd 0=std, 1=alt, 2=combined.
  * @return (none)
@@ -476,7 +564,7 @@ void fileio_load_charset(uint8_t altorstd)
     if (!filepicker_run(title, PICKER_FILTER_PLAIN)) return;
 
     sprintf(path, "%s.BIN", app.filename);
-    if (file_load(path, (void *)(base + CHARSET_GLYPH_AREA_OFFSET), CHARSET_GLYPH_AREA_SIZE) < 0)
+    if (file_load(path, (void *)(base + CHARSET_GLYPH_AREA_OFFSET), charset_area_size(base)) < 0)
     {
         menu_messagepopup(MSG_FILE_NOT_FOUND);
         return;
@@ -500,9 +588,10 @@ void fileio_load_charset(uint8_t altorstd)
 
 /**
  * Charset menu Save Standard/Alternate/Combined ('altorstd' 0/1/2).
- * Std/Alt save 768 raw bytes directly from that bank's displayable range.
- * Combined is identical to Save Std -- CHARSET_STD's range is the only
- * source there is to save (see fileio.h's header comment).
+ * Std saves 768 raw bytes, Alt saves 640 (charset_area_size(), see
+ * CHARSET_ALT_GLYPH_AREA_SIZE) directly from that bank's displayable
+ * range. Combined is identical to Save Std -- CHARSET_STD's range is the
+ * only source there is to save (see fileio.h's header comment).
  *
  * @param altorstd 0=std, 1=alt, 2=combined.
  * @return (none)
@@ -517,6 +606,6 @@ void fileio_save_charset(uint8_t altorstd)
     if (!fileio_get_filename(title)) return;
 
     sprintf(path, "%s.BIN", app.filename);
-    if (file_save(path, (const void *)(base + CHARSET_GLYPH_AREA_OFFSET), CHARSET_GLYPH_AREA_SIZE) < 0)
+    if (file_save(path, (const void *)(base + CHARSET_GLYPH_AREA_OFFSET), charset_area_size(base)) < 0)
         menu_messagepopup(MSG_FILE_INVALID_FORMAT);
 }

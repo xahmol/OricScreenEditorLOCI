@@ -23,30 +23,44 @@ uint16_t charset_address(uint8_t screencode, uint8_t altorstd)
 }
 
 /**
- * Copy the displayable glyph range (codes 0x20-0x7F, CHARSET_GLYPH_AREA_SIZE
+ * Displayable-range byte count for charset bank `base` -- 640
+ * (CHARSET_ALT_GLYPH_AREA_SIZE) for CHARSET_ALT (the only 896 bytes of
+ * real RAM it has before screen RAM begins at $BB80), 768
+ * (CHARSET_GLYPH_AREA_SIZE) otherwise.
+ *
+ * @param base CHARSET_STD or CHARSET_ALT base address.
+ * @return The byte count to use for that bank's displayable range.
+ */
+uint16_t charset_area_size(uint16_t base)
+{
+    return (base == CHARSET_ALT) ? CHARSET_ALT_GLYPH_AREA_SIZE : CHARSET_GLYPH_AREA_SIZE;
+}
+
+/**
+ * Copy the displayable glyph range (codes 0x20-0x7F, charset_area_size()
  * bytes) of a charset bank into a RAM buffer.
  *
  * @param base CHARSET_STD or CHARSET_ALT base address.
- * @param dest Destination buffer, at least CHARSET_GLYPH_AREA_SIZE (768) bytes.
+ * @param dest Destination buffer, at least charset_area_size(base) bytes.
  * @return (none)
  */
 void charset_save(uint16_t base, uint8_t *dest)
 {
-    memcpy(dest, (uint8_t *)(base + CHARSET_GLYPH_AREA_OFFSET), CHARSET_GLYPH_AREA_SIZE);
+    memcpy(dest, (uint8_t *)(base + CHARSET_GLYPH_AREA_OFFSET), charset_area_size(base));
 }
 
 /**
  * Copy a buffer (as produced by charset_save()) back into the displayable
- * glyph range (codes 0x20-0x7F, CHARSET_GLYPH_AREA_SIZE bytes) of a
- * charset bank.
+ * glyph range (codes 0x20-0x7F, charset_area_size() bytes) of a charset
+ * bank.
  *
  * @param base CHARSET_STD or CHARSET_ALT base address.
- * @param src  Source buffer, at least CHARSET_GLYPH_AREA_SIZE (768) bytes.
+ * @param src  Source buffer, at least charset_area_size(base) bytes.
  * @return (none)
  */
 void charset_load(uint16_t base, const uint8_t *src)
 {
-    memcpy((uint8_t *)(base + CHARSET_GLYPH_AREA_OFFSET), src, CHARSET_GLYPH_AREA_SIZE);
+    memcpy((uint8_t *)(base + CHARSET_GLYPH_AREA_OFFSET), src, charset_area_size(base));
 }
 
 /**

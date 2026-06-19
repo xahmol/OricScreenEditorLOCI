@@ -961,29 +961,41 @@ to call) and aborts with a graceful popup if absent, then
 `fileio_get_filename()` (a `cwin_textinput` popup, same pattern as
 `resize_dialog()`, §6.6) to get/confirm `app.filename`.
 
-- **Save/Load Screen**: `<name>.BIN` = `FileHeader` (magic + width/height)
-  + `screenmap[]`. **Save/Load Combined**: same header + `CHARSET_STD`'s
-  displayable range (768B) + `screenmap[]`. Both write/read each piece
-  directly from where it lives via `loci_open`+`loci_write`/`read`+
+- **Save/Load Screen**: `<name>.BIN` = a bare raw `screenmap[]` dump --
+  no header, by design, matching V1 exactly (a saved screen is meant to
+  be a portable, tool-agnostic dump loadable from any source). Load
+  prompts for width/height (`fileio_get_dimensions()`, V1's exact
+  wording) since there's no embedded size. **Save/Load Combined**: same
+  bare-format rationale -- `CHARSET_STD`'s displayable range (768B)
+  immediately followed by `screenmap[]`, no header. Both write/read each
+  piece directly from where it lives via `loci_open`+`loci_write`/`read`+
   `loci_close` — no staging buffer (unlike V1, whose combined save relies
   on `CHARSET_STD` and `SCREENMEMORY` being memory-adjacent in *V1's* map,
   which doesn't hold for OSE).
 - **Save/Load Project**: V1's literal 4-file scheme — `<name>PJ.BIN`
   (`ProjectHeader` metadata, via `file_save`/`file_load`'s single-blob
-  convenience wrapper), `<name>SC.BIN` (same shape as Screen),
-  `<name>CS.BIN`/`<name>CA.BIN` (768 raw bytes, written only if
-  `app.stdchanged`/`altchanged`, read only if present).
+  convenience wrapper -- the one file genuinely justified in differing
+  from V1's own 19-byte layout, see "V1 file-format compatibility" in
+  CLAUDE.md), `<name>SC.BIN` (bare, sized from `ProjectHeader.canvas_
+  width/height`, no header of its own), `<name>CS.BIN`/`<name>CA.BIN`
+  (768 raw bytes for Std, 640 for Alt -- see `CHARSET_ALT_GLYPH_AREA_
+  SIZE` below -- written only if `app.stdchanged`/`altchanged`, read
+  only if present). `fileio_load_project()` transparently accepts V1's
+  original 19-byte `PJ.BIN` too (`fileio_parse_v1_project()`, format
+  auto-detected via the magic field) -- no new menu item.
 - `AppState` gained `stdchanged`/`altchanged`, set in `charsetedit.c`'s
   `ce_snapshot()` (§6.4) based on `ce_altorstd`.
-- **Charset menu** Load/Save Standard/Alternate/Combined: Std/Alt are 768
-  raw bytes direct to/from `CHARSET_STD`/`CHARSET_ALT`'s displayable
-  range; Combined save = Save Std; Combined load writes into *both* banks
-  (`charset_load()`, §4.5) since the ROM call V1 used to regenerate Alt
-  from Std is a no-op on this runtime (§6.5).
-- Headless coverage today is the LOCI-absent gate only (`test_fileio_no_
-  loci.sh`, §7); actual byte I/O isn't tested yet, but Phosphoric's LOCI
-  emulation (alpha-quality) makes that addable headlessly rather than
-  needing real hardware for every check — see §7's note.
+- **Charset menu** Load/Save Standard/Alternate/Combined: Std is 768 raw
+  bytes, **Alt is 640** (`charset_area_size()`, `include/charset.h` --
+  `CHARSET_ALT` only has 640 bytes of safely-addressable RAM before
+  screen RAM, was a bug, fixed) direct to/from `CHARSET_STD`/
+  `CHARSET_ALT`'s displayable range; Combined save = Save Std; Combined
+  load writes into *both* banks (`charset_load()`, §4.5) since the ROM
+  call V1 used to regenerate Alt from Std is a no-op on this runtime
+  (§6.5).
+- Headless coverage: `test_fileio_traffic.sh` (§7) asserts on the actual
+  bytes written/read for every Save/Load action, the Alt-charset size
+  fix, and a V1-`PJ.BIN`-import round-trip.
 
 ### 6.15 File picker (`src/filepicker.c`, every Load action, Phase 7)
 
@@ -1008,6 +1020,17 @@ COPYBUF_XRAM_SIZE` (`0x8800`, matching locifilemanager-v2's `DIR1BASE`),
 `PICKER_DIRSIZE = 0x0C00` (one pane's worth). Building the list stops
 early (silently truncating) if this budget would be exceeded, same guard
 `dir_read()` has.
+
+**Bug fixed (found via the V1-compatibility test work, see CLAUDE.md
+"V1 file-format compatibility")**: `picker_build_list()`'s
+`while ((de = loci_readdir(dir)) != 0)` loop was missing the
+`&& de->d_name[0] != '\0'` check locifilemanager-v2's own `dir.c` (the
+reference this was adapted from) already has -- `loci_readdir()` signals
+end-of-directory with an empty name, not only a negative return. Without
+that check, the loop never terminated once the real entries were
+exhausted, hanging every Load action indefinitely. Confirmed to predate
+this session's changes entirely; simply never exercised by an automated
+test before.
 
 Scrolling is **O(1) per row**, not a directory re-walk: `picker_firstprint`/
 `picker_present` (XRAM addresses) + `picker_cursorrow` (visible-row index)
@@ -1269,7 +1292,7 @@ make test-capture CYCLES=N TYPEKEYS='...'  # calibration helper for new scripts 
 - `tests/scripts/oric_screen.py` decodes the 40x28 `$BB80` text screen from a
   `--dump-ram-at` dump, providing `--find`/`--row`/`--bytes` assertions used
   by the shell scripts in `tests/scripts/test_*.sh`.
-- Current totals: 4+18+8+2+12+14+14+2+6+10+4+6+5+5+8+7+16+5+6+4+3+5+12 = **176/176**
+- Current totals: 4+18+8+2+12+14+14+2+6+10+4+6+5+5+8+7+18+5+6+4+3+5+12 = **178/178**
   (`test-boot` + `test-menus` + `test-screenresize` +
   `test-charsetram-spike` + `test-charsetedit` + `test-palette` +
   `test-colourpicker` + `test-cursor-autoscroll` + `test-linebox` +

@@ -339,9 +339,13 @@ detecte" au lieu de tenter l'opération, le reste de l'éditeur continuant
 
 Sauvegarde ou charge uniquement la zone de dessin (sans les jeux de
 caractères) dans/depuis `<nomfichier>.BIN` sur le périphérique LOCI : un
-petit en-tête enregistrant la largeur/hauteur de la zone de dessin, suivi
-des données d'écran. Le chargement applique automatiquement la largeur/
-hauteur sauvegardée -- aucune saisie séparée n'est nécessaire.
+simple dump des données d'écran, sans en-tête ni métadonnées d'aucune
+sorte -- c'est volontaire, exactement comme V1 : un écran sauvegardé est
+conçu pour être un fichier portable, chargeable ou intégrable depuis
+n'importe quelle source, pas seulement depuis OSE. C'est pourquoi Charger
+écran vous demande de saisir vous-même la largeur et la hauteur (pré-
+remplies avec la taille actuelle de la zone de dessin) avant de charger --
+rien dans le fichier ne permet de les déduire automatiquement.
 
 *Save project / Load project (sauvegarder/charger le projet)*
 
@@ -349,25 +353,37 @@ Sauvegarde ou charge la zone de dessin avec ses métadonnées (position du
 curseur, fenêtre visible, sélection encre/papier/clignotement/double
 hauteur/jeu alternatif) et, si vous les avez modifiés pendant la session,
 les deux jeux de caractères -- sous la forme de jusqu'à quatre fichiers
-partageant le nom saisi : `<nomfichier>PJ.BIN` (métadonnées),
-`<nomfichier>SC.BIN` (écran), `<nomfichier>CS.BIN` (jeu standard, écrit/
-attendu uniquement si vous l'avez modifié) et `<nomfichier>CA.BIN` (jeu
+partageant le nom saisi : `<nomfichier>PJ.BIN` (métadonnées, incluant la
+taille de la zone de dessin -- donc, contrairement à Charger écran
+ci-dessus, Charger projet ne vous demande pas de ressaisir la largeur/
+hauteur), `<nomfichier>SC.BIN` (écran, même format simple que Sauver/
+Charger écran), `<nomfichier>CS.BIN` (jeu standard, écrit/attendu
+uniquement si vous l'avez modifié) et `<nomfichier>CA.BIN` (jeu
 alternatif, même condition). Charger un projet sauvegardé avec un seul jeu
-modifié laisse l'autre jeu inchangé (tel qu'il était avant le chargement).
+modifié laisse l'autre jeu inchangé (tel qu'il était avant le
+chargement). **Charger projet accepte aussi directement les fichiers de
+projet de V1** -- aucune conversion nécessaire, pointez simplement le
+navigateur de fichiers vers un projet sauvegardé par l'OricScreenEditor
+original.
 
 *Save combined / Load combined (sauvegarder/charger combiné)*
 
 Sauvegarde ou charge la zone de dessin avec le jeu de caractères standard
-dans un seul fichier `<nomfichier>.BIN` (en-tête + les 768 octets du jeu
-standard + les données d'écran).
+dans un seul fichier `<nomfichier>.BIN` (les 768 octets du jeu standard
+immédiatement suivis des données d'écran, sans en-tête). Comme Charger
+écran ci-dessus, Charger combiné vous demande de saisir vous-même la
+largeur et la hauteur avant de charger.
 
 **_Charset : charger et sauvegarder le jeu de caractères_**
 
 ![Menu Charset](https://github.com/xahmol/OricScreenEditor/blob/main/screenshots/OSE%20charsetmenu.png?raw=true)
 
-Chargez ou sauvegardez le jeu standard ou alternatif séparément (768
-octets chacun, `<nomfichier>.BIN`), ou "combiné" : sauvegarder en combiné
-est identique à sauvegarder le jeu standard ; charger en combiné charge le
+Chargez ou sauvegardez le jeu standard ou alternatif séparément
+(`<nomfichier>.BIN` : 768 octets pour le jeu standard, 640 pour le jeu
+alternatif -- le jeu alternatif ne dispose que de 640 octets de mémoire
+réellement utilisable sur le matériel Oric réel, le reste chevauchant
+physiquement l'écran), ou "combiné" : sauvegarder en combiné est
+identique à sauvegarder le jeu standard ; charger en combiné charge le
 fichier dans **les deux** jeux standard et alternatif, qui deviennent donc
 identiques. (Ceci diffère de V1, qui utilisait un appel ROM pour régénérer
 le jeu alternatif à partir du standard au chargement -- cet appel ROM ne

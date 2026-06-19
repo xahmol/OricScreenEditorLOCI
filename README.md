@@ -332,39 +332,52 @@ so the rest of the editor keeps working normally without one attached.
 *Save screen / Load screen*
 
 Saves or loads just the canvas (no character sets) to/from
-`<filename>.BIN` on the LOCI device: a small header recording the canvas
-width/height, followed by the screen data. Loading applies the saved
-width/height automatically -- no need to enter them separately.
+`<filename>.BIN` on the LOCI device: a bare dump of the screen data, with
+no header or metadata of any kind -- this is deliberate, matching V1
+exactly: a saved screen is meant to be a portable file you can load or
+embed from any source, not just from OSE itself. Because of that, Load
+screen asks you to enter the width and height yourself (pre-filled with
+the canvas' current size) before loading -- there's nothing in the file
+to auto-detect it from.
 
 *Save project / Load project*
 
 Saves or loads the canvas together with its metadata (cursor position,
 viewport, ink/paper/blink/double/altchar selection) and, if you've edited
 them this session, both character sets -- as up to four files sharing your
-typed filename: `<filename>PJ.BIN` (metadata), `<filename>SC.BIN` (screen),
-`<filename>CS.BIN` (standard charset, only written/expected if you edited
-it) and `<filename>CA.BIN` (alternate charset, same condition). Loading a
-project that was saved with only one charset edited leaves the other
-charset bank untouched (still whatever was loaded/default beforehand).
+typed filename: `<filename>PJ.BIN` (metadata, including the canvas size --
+so, unlike standalone Load screen above, Load project does not ask you to
+re-enter width/height), `<filename>SC.BIN` (screen, same bare format as
+Save/Load screen), `<filename>CS.BIN` (standard charset, only
+written/expected if you edited it) and `<filename>CA.BIN` (alternate
+charset, same condition). Loading a project that was saved with only one
+charset edited leaves the other charset bank untouched (still whatever
+was loaded/default beforehand). **Load project also accepts V1's own
+project files directly** -- no conversion needed, just point the file
+picker at a project saved by the original OricScreenEditor.
 
 *Save combined / Load combined*
 
 Saves or loads the canvas together with the standard character set in a
-single `<filename>.BIN` file (header + the standard charset's 768 bytes +
-the screen data).
+single `<filename>.BIN` file (the standard charset's 768 bytes
+immediately followed by the screen data, no header). Like standalone
+Load screen above, Load combined asks you to enter width and height
+yourself before loading.
 
 **_Charset: Load and save character set_**
 
 ![Charset menu](https://github.com/xahmol/OricScreenEditor/blob/main/screenshots/OSE%20charsetmenu.png?raw=true)
 
-Load or save the standard or alternate character set separately (768 bytes
-each, `<filename>.BIN`), or "combined": saving combined is identical to
-saving the standard set; loading combined loads the file into **both** the
-standard and alternate banks, so they end up identical. (This differs from
-V1, which used a ROM call to regenerate the alternate set from the
-standard one on load -- that ROM call doesn't work in this rewrite, so
-copying the same data into both banks is the closest available
-equivalent.)
+Load or save the standard or alternate character set separately
+(`<filename>.BIN`: 768 bytes for the standard set, 640 for the alternate
+set -- the alternate character set only has 640 bytes of usable memory
+on real Oric hardware, the rest physically overlaps the screen), or
+"combined": saving combined is identical to saving the standard set;
+loading combined loads the file into **both** the standard and alternate
+banks, so they end up identical. (This differs from V1, which used a ROM
+call to regenerate the alternate set from the standard one on load --
+that ROM call doesn't work in this rewrite, so copying the same data into
+both banks is the closest available equivalent.)
 
 *Reset Std->ROM (OSE-LOCI new)*
 

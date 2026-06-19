@@ -8,14 +8,19 @@
 # read/write through) instead of plain `--loci` -- giving direct,
 # byte-level access to verify what fileio.c (src/fileio.c) actually
 # writes to LOCI storage, not just on-screen behaviour. Covers:
-#   - File > Save Screen: FileHeader (magic/width/height) + screenmap[]
-#   - File > Load Screen: round-trips a saved file back onto a cleared
-#     canvas (statusbar's S field confirms the restored screencode)
-#   - File > Save Combined: FileHeader + 768-byte charset + screenmap[]
+#   - File > Save Screen: a bare raw screenmap[] dump, no header -- by
+#     design, matches V1 exactly (see fileio.h)
+#   - File > Load Screen: prompts for width/height (no embedded size to
+#     auto-detect), round-trips a saved file back onto a cleared canvas
+#     (statusbar's S field confirms the restored screencode)
+#   - File > Save Combined: 768-byte charset immediately followed by
+#     screenmap[], no header
 #   - File > Save Project: ProjectHeader fields (canvas size, cursor,
-#     plotscreencode, stdchanged/altchanged) in "<name>PJ.BIN", plus
-#     "<name>SC.BIN" matching the Screen format
+#     plotscreencode, stdchanged/altchanged) in "<name>PJ.BIN", plus a
+#     bare "<name>SC.BIN" (size known from PJ.BIN, no header of its own)
 #   - Charset > Save Standard: raw 768-byte charset dump
+#   - Charset > Save Alternate: raw 640-byte charset dump (not 768 -- see
+#     CHARSET_ALT_GLYPH_AREA_SIZE, include/charset.h)
 #
 # Filenames are typed as single characters (Phosphoric's `--type-keys`
 # needs a `\p1` pause between every distinct keypress, so longer names
@@ -53,6 +58,19 @@ check_found() {
         pass=$((pass+1))
     else
         echo "  [FAIL] $label -- '$needle' not found"
+        fail=$((fail+1))
+    fi
+}
+
+check_bytes() {
+    local label="$1" addr_len="$2" expected="$3" dump="$4"
+    local actual
+    actual=$(python3 "$SCREEN" "$dump" --bytes "$addr_len")
+    if [ "$actual" = "$expected" ]; then
+        echo "  [PASS] $label"
+        pass=$((pass+1))
+    else
+        echo "  [FAIL] $label -- expected '$expected', got '$actual'"
         fail=$((fail+1))
     fi
 }
@@ -104,23 +122,30 @@ if [ ! -x "$PHOS" ]; then
 fi
 
 # --- Scenario 1: File > Save Screen -----------------------------------------
+# Bare raw dump, no header -- matches V1 exactly (see fileio.h: a saved
+# screen is meant to be a portable, tool-agnostic raw dump, loadable from
+# any source, not just OSE's own saves).
 reset_flash
 DUMP1="$OUT/capture_fileio_save_screen.bin"
 run_capture 24000000 '\p1 \p1\f1\p1\r\p1\n\p1\n\p1T\p1\n' "$DUMP1"
 echo ""
-echo "File > Save Screen writes FileHeader + screenmap[]"
+echo "File > Save Screen writes a bare screenmap[] dump (no header)"
 check_found "statusbar shows 'A' plotted" "Main      XY 0, 0C41A S41I7P0S" "$DUMP1"
-check_file_bytes "t.BIN: size 1086 (6 + 40x27)" "$LOCIFLASH/t.BIN" \
-    "len(data) == 1086"
-check_file_bytes "t.BIN: FileHeader magic/width/height" "$LOCIFLASH/t.BIN" \
-    "data[0:6] == bytes([0x53, 0x4F, 40, 0, 27, 0])"
-check_file_bytes "t.BIN: 'A' (0x41) at screen offset 6" "$LOCIFLASH/t.BIN" \
-    "data[6] == 0x41"
+check_file_bytes "t.BIN: size 1080 (40x27, no header)" "$LOCIFLASH/t.BIN" \
+    "len(data) == 1080"
+check_file_bytes "t.BIN: 'A' (0x41) at screen offset 0" "$LOCIFLASH/t.BIN" \
+    "data[0] == 0x41"
 
 # --- Scenario 2: File > Load Screen round-trip ------------------------------
+# Save 'A', ESC, Screen > Clear (confirm cleared, not just stale content --
+# the original version of this scenario had no Clear step and so could
+# never actually distinguish "load worked" from "save never got
+# overwritten"), then File > Load Screen: filepicker selects t.BIN,
+# then ENTER/ENTER accepts the pre-filled width/height defaults
+# (fileio_get_dimensions(), see fileio.c).
 DUMP2="$OUT/capture_fileio_load_screen.bin"
-run_capture 50000000 \
-    '\p1 \p1\f1\p1\r\p1\n\p1\n\p1T\p1\n\p1\e\p1\f1\p1\r\p1\n\p1\d\p1\n' "$DUMP2"
+run_capture 35000000 \
+    '\p1 \p1\f1\p1\r\p1\n\p1\n\p1T\p1\n\p1\e\p1\f1\p1\n\p1\d\p1\d\p1\n\p1\e\p1\f1\p1\r\p1\n\p1\d\p1\n\p1\n\p1\n\p1\n' "$DUMP2"
 echo ""
 echo "File > Load Screen restores a saved canvas after Screen > Clear"
 check_found "statusbar shows 'A' restored" "Main      XY 0, 0C41A S41I7P0S" "$DUMP2"
@@ -131,12 +156,12 @@ DUMP3="$OUT/capture_fileio_save_combined.bin"
 run_capture 30000000 \
     '\p1 \p1\f1\p1\r\p1\n\p1\d\p1\d\p1\d\p1\d\p1\n\p1C\p1\n' "$DUMP3"
 echo ""
-echo "File > Save Combined writes FileHeader + 768B charset + screenmap[]"
+echo "File > Save Combined writes 768B charset + screenmap[] (no header)"
 check_found "statusbar shows 'A' plotted" "Main      XY 0, 0C41A S41I7P0S" "$DUMP3"
-check_file_bytes "c.BIN: size 1854 (6 + 768 + 1080)" "$LOCIFLASH/c.BIN" \
-    "len(data) == 1854"
-check_file_bytes "c.BIN: 'A' at screen-section offset 774" "$LOCIFLASH/c.BIN" \
-    "data[774] == 0x41"
+check_file_bytes "c.BIN: size 1848 (768 + 1080, no header)" "$LOCIFLASH/c.BIN" \
+    "len(data) == 1848"
+check_file_bytes "c.BIN: 'A' at screen-section offset 768" "$LOCIFLASH/c.BIN" \
+    "data[768] == 0x41"
 
 # --- Scenario 4: File > Save Project -----------------------------------------
 reset_flash
@@ -154,8 +179,8 @@ check_file_bytes "pPJ.BIN: plotscreencode is 'A'" "$LOCIFLASH/pPJ.BIN" \
     "data[14] == 0x41"
 check_file_bytes "pPJ.BIN: stdchanged/altchanged both 0" "$LOCIFLASH/pPJ.BIN" \
     "data[20] == 0 and data[21] == 0"
-check_file_bytes "pSC.BIN: size 1086, 'A' at offset 6" "$LOCIFLASH/pSC.BIN" \
-    "len(data) == 1086 and data[6] == 0x41"
+check_file_bytes "pSC.BIN: size 1080, 'A' at offset 0 (no header)" "$LOCIFLASH/pSC.BIN" \
+    "len(data) == 1080 and data[0] == 0x41"
 [ -f "$LOCIFLASH/pCS.BIN" ] && { echo "  [FAIL] pCS.BIN should not exist (charset unedited)"; fail=$((fail+1)); } \
     || { echo "  [PASS] pCS.BIN correctly absent (charset unedited)"; pass=$((pass+1)); }
 
@@ -167,6 +192,53 @@ run_capture 22000000 \
 echo ""
 echo "Charset > Save Standard writes a raw 768-byte charset dump"
 check_file_bytes "s.BIN: size 768" "$LOCIFLASH/s.BIN" "len(data) == 768"
+
+# --- Scenario 6: Charset > Save Alternate -- 640 bytes, not 768 -------------
+# CHARSET_ALT only has 896 real bytes of RAM before screen RAM begins at
+# $BB80 (see CHARSET_ALT_GLYPH_AREA_SIZE, include/charset.h) -- codes
+# 0x70-0x7F have no independent storage there. Regression test for the
+# bug where charset_save()/fileio_save_charset() copied the full 768-byte
+# Std-sized range for Alt too, reading 128 bytes of live screen RAM as if
+# it were charset data.
+reset_flash
+DUMP6="$OUT/capture_fileio_save_charset_alt.bin"
+run_capture 23000000 \
+    '\p1\f1\p1\r\p1\r\p1\n\p1\d\p1\d\p1\d\p1\n\p1A\p1\n' "$DUMP6"
+echo ""
+echo "Charset > Save Alternate writes exactly 640 bytes (not 768)"
+check_file_bytes "a.BIN: size 640" "$LOCIFLASH/a.BIN" "len(data) == 640"
+
+# --- Scenario 7: Load Project accepts V1's original 19-byte PJ.BIN ---------
+# fileio_load_project() transparently falls back to V1's 19-byte layout
+# (fileio_parse_v1_project(), src/fileio.c) when the magic field doesn't
+# match. Writes a synthetic V1-format "V1PJ.BIN" (cursor (5,3), plotink=3,
+# plotpaper=2, plotscreencode='B') + bare "V1SC.BIN" ('C' at offset 0) and
+# confirms every field translates correctly.
+reset_flash
+python3 -c "
+data = bytes([
+    0, 0,        # stdchanged, altchanged
+    5, 3,        # cursor_x, cursor_y
+    0, 40,       # width=40
+    0, 27,       # height=27
+    0x04, 0x38,  # screentotal (ignored)
+    3, 2, 0, 0, 0, # plotink, plotpaper, plotblink, plotdouble, plotaltchar
+    0x42,        # plotscreencode = 'B'
+    0xFF,        # dead byte
+    0, 0,        # xoffset, yoffset
+])
+open('$LOCIFLASH/V1PJ.BIN', 'wb').write(data)
+scr = bytearray(b' ' * 1080)
+scr[0] = 0x43  # 'C' at (0,0)
+open('$LOCIFLASH/V1SC.BIN', 'wb').write(bytes(scr))
+"
+DUMP7="$OUT/capture_fileio_load_v1project.bin"
+run_capture 21000000 \
+    '\p1\f1\p1\r\p1\n\p1\d\p1\d\p1\d\p1\n\p1\n\p1\e' "$DUMP7"
+echo ""
+echo "Load Project accepts V1's original 19-byte PJ.BIN layout"
+check_found "cursor/plot fields translated (XY 5,3 C42B I3 P2)" "XY 5, 3C42B S20I3P2" "$DUMP7"
+check_bytes "screen content loaded ('C'=0x43 at (0,0))" "0xBB80:1" "43" "$DUMP7"
 
 echo ""
 echo "==========================================================="

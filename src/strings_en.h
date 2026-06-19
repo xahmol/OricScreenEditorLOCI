@@ -46,6 +46,8 @@
 #define MSG_FILE_NOT_FOUND        "File not found."
 #define MSG_FILE_NO_FILES         "No matching files found."
 #define MSG_FILE_PATH_TOO_LONG    "Path too long."
+#define MSG_FILEIO_PROMPT_WIDTH   "Enter screen width:"
+#define MSG_FILEIO_PROMPT_HEIGHT  "Enter screen height:"
 
 // ── Pulldown 2 -- Charset ───────────────────────────────────────────────────
 #define MSG_CHARSET_LOAD_STD       "Load standard"

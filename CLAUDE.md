@@ -224,8 +224,9 @@ gap).
 **Correction (was wrong in an earlier draft of this section)**:
 `visualchar[]`'s reordering is designed around the Oric's own
 native ROM-resident alternate (semigraphics) charset, **not** any
-PETSCII asset file — `assets/Petscii.css.bin` is unrelated to this
-feature. V1 normally populates `CHARSET_ALT` with that ROM-native
+PETSCII asset file — `assets/PETSCIICS.BIN` (V1's own PETSCII demo
+project's standard charset, see "V1 file-format compatibility" below)
+is unrelated to this feature. V1 normally populates `CHARSET_ALT` with that ROM-native
 bitmap via `jsr $F816` (`ROM_ALTCHARS`) — which, per "Charset-swap
 mechanism" below, is a no-op when called from Oscar64 in this runtime.
 So `CHARSET_ALT` starts uninitialised at boot, and `visualmap` (a pure
@@ -460,37 +461,53 @@ reference: locifilemanager-v2's `loci_present()`/`file_save()`/
   degradation path — left in place since removing it buys nothing.
   `loci_present()` is a simple memory read (`*LOCI_SIGNATURE_ADDR ==
   'L'`, `include/loci.c`), always safe to call.
-- **File > Save/Load Screen**: `<name>.BIN`, a 6-byte `FileHeader` (magic +
-  `canvas_width`/`height`) followed by `screenmap[]`. No charset data.
-- **File > Save/Load Combined**: `<name>.BIN`, the same header followed by
-  `CHARSET_STD`'s displayable glyph range (768 bytes) then `screenmap[]`.
-  Both this and Screen write each piece directly from where it already
-  lives (`screenmap[]`, charset RAM) via `loci_open()`+sequential
-  `loci_write()`+`loci_close()` — **no staging buffer**, unlike V1, whose
-  "combined" save works only because `CHARSET_STD` happens to sit directly
-  before `SCREENMEMORY` in *V1's* CC65 memory map (letting it treat both as
-  one contiguous span); OSE's `CHARSET_STD` ($B400) and `screenmap[]`
-  (`$0580-$B1FF` somewhere) aren't adjacent, and `screenmap[]` is
-  variable-size now where V1's was fixed.
+- **File > Save/Load Screen**: `<name>.BIN`, a **bare raw dump** of
+  `screenmap[]` — no header, no metadata, **deliberately matching V1
+  exactly** (reversed from an earlier design, see "V1 file-format
+  compatibility" below: a saved screen is meant to be a portable,
+  tool-agnostic raw dump, loadable/embeddable from any source, not just
+  OSE's own saves — exactly V1's own intent). Load prompts for width then
+  height (`fileio_get_dimensions()`, V1's exact "Enter screen width:"/
+  "Enter screen height:" wording) since there's no embedded size to
+  auto-detect — the accepted cost of that portability, not a gap.
+- **File > Save/Load Combined**: `<name>.BIN`, `CHARSET_STD`'s displayable
+  glyph range (768 bytes) immediately followed by `screenmap[]` — no
+  header, same rationale as Screen above (and the same width/height
+  prompt on load). Both this and Screen write each piece directly from
+  where it already lives (`screenmap[]`, charset RAM) via
+  `loci_open()`+sequential `loci_write()`+`loci_close()` — **no staging
+  buffer**, unlike V1, whose "combined" save works only because
+  `CHARSET_STD` happens to sit directly before `SCREENMEMORY` in *V1's*
+  CC65 memory map (letting it treat both as one contiguous span); OSE's
+  `CHARSET_STD` ($B400) and `screenmap[]` (`$0580-$B1FF` somewhere)
+  aren't adjacent, and `screenmap[]` is variable-size now where V1's was
+  fixed.
 - **File > Save/Load Project**: V1's literal 4-file scheme — `<name>PJ.BIN`
   (a `ProjectHeader` metadata struct: canvas size, cursor/viewport, plot*
   attributes, `stdchanged`/`altchanged`, via `file_save()`/`file_load()`'s
-  single-contiguous-blob convenience wrapper), `<name>SC.BIN` (same shape
-  as Screen), and `<name>CS.BIN`/`<name>CA.BIN` (768 raw bytes each,
-  written only if that charset was edited this session, read only if
-  present — a missing file leaves that bank untouched, matching V1).
+  single-contiguous-blob convenience wrapper — **this is the one file
+  genuinely justified in differing from V1's own 19-byte layout**, see
+  "V1 file-format compatibility" below), `<name>SC.BIN` (bare, same shape
+  as Screen, sized from `ProjectHeader.canvas_width/height` — no header
+  of its own, exactly like V1's `loadproject()`), and `<name>CS.BIN`/
+  `<name>CA.BIN` (raw charset dumps — 768 bytes for Std, 640 for Alt, see
+  `CHARSET_ALT_GLYPH_AREA_SIZE` below — written only if that charset was
+  edited this session, read only if present — a missing file leaves that
+  bank untouched, matching V1).
 - **`AppState` gains `stdchanged`/`altchanged`** (0/1, mirroring V1's
   `charsetchanged[2]`), set from `charsetedit.c`'s `ce_snapshot()` — the
   existing chokepoint called before every destructive glyph edit, based on
   `ce_altorstd` — so Project save knows which charset file(s) to write.
 - **Charset menu Load/Save Standard/Alternate/Combined** (`altorstd`
-  0/1/2, matching V1's `stdoralt` exactly): Std/Alt read/write 768 raw
-  bytes directly from/to `CHARSET_STD`/`CHARSET_ALT`'s displayable range.
-  **Combined save is identical to Save Std** (`CHARSET_STD`'s range is the
-  only source there is to save); **combined load writes into both**
-  `CHARSET_STD` and `CHARSET_ALT` (`charset_load()`, `include/charset.h`)
-  — the closest available equivalent to V1's intent, since V1's ROM call
-  to regenerate Alt from Std (`jsr $F816`) is a no-op on this runtime (see
+  0/1/2, matching V1's `stdoralt` exactly): Std reads/writes 768 raw
+  bytes, **Alt reads/writes 640** (`charset_area_size()`, see
+  `CHARSET_ALT_GLYPH_AREA_SIZE` below — was a bug, fixed) directly
+  from/to `CHARSET_STD`/`CHARSET_ALT`'s displayable range. **Combined save
+  is identical to Save Std** (`CHARSET_STD`'s range is the only source
+  there is to save); **combined load writes into both** `CHARSET_STD` and
+  `CHARSET_ALT` (`charset_load()`, `include/charset.h`) — the closest
+  available equivalent to V1's intent, since V1's ROM call to regenerate
+  Alt from Std (`jsr $F816`) is a no-op on this runtime (see
   "Charset-swap mechanism" below).
 - **Filenames are typed for Save, browsed for Load**: `fileio_get_filename()`
   (Save actions) is a popup reusing `resize_dialog()`'s `cwin_textinput`
@@ -511,6 +528,127 @@ reference: locifilemanager-v2's `loci_present()`/`file_save()`/
   — same Save UI pattern already proven, addable the same way if
   needed. Real hardware stays the authoritative check given the
   emulation's alpha status.
+
+### V1 file-format compatibility (post-launch correction)
+
+The user asked, after distributing V1's PETSCII demo project alongside
+OSE-LOCI turned out not to load cleanly, for a strict audit of every
+place OSE-LOCI's file formats differ from V1's — fix anything not
+genuinely justified, and only keep/import-bridge whatever difference
+*is* justified. Investigated V1's actual source
+(`/home/xahmol/git/OricScreenEditor/src/main.c`: `saveproject()`/
+`loadproject()`/`loadscreenmap()`/`savecharset()`/`loadcharset()`) and
+the canonical hardware reference (`~/.claude/oric_atmos_reference.md`).
+Verdict: of three apparent differences, only the project metadata file
+was actually justified; the other two were a real bug and a redundant
+byte respectively.
+
+- **Alt-charset 640 vs 768 bytes — a real bug, not a deliberate
+  difference.** `CHARSET_ALT` ($B800) only has 896 bytes of real RAM
+  before screen RAM begins at $BB80 (`~/.claude/oric_atmos_reference.md`:
+  "$B800–$BB7F Alternate character set RAM, 896 bytes") — unlike
+  `CHARSET_STD` ($B400-$B7FF), a full non-overlapping 1024-byte bank.
+  The displayable range for Alt (`base+0x100` through `+767`) ran to
+  `$BBFF`, 128 bytes past the real boundary, **directly into live screen
+  RAM**. This project's own character editor (`ce_max_code()`) and V1's
+  own `visualchar[]` already cap Alt at code 0x6F for exactly this
+  reason — the file-I/O layer (`charset_save()`/`charset_load()`,
+  `include/charset.c`, and every `src/fileio.c` call site touching
+  `CHARSET_ALT`) just never picked up the same limit. Fixed: new
+  `charset_area_size(base)` (`include/charset.h/.c`) returns
+  `CHARSET_ALT_GLYPH_AREA_SIZE` (640) for `CHARSET_ALT`, the existing
+  768-byte constant otherwise. V1's own Alt-charset save (`CHARSET_ALT`
+  to `CHARSET_ALT+639`) already respected this same boundary, just from
+  its own (different) base address — so this fix also makes
+  `assets/PETSCIICA.BIN` (640 bytes, V1-original, see "Demo assets"
+  below) directly loadable again, unchanged.
+- **Screen/Combined/Project's `SC.BIN` `FileHeader` — redundant/
+  unjustified, removed.** An earlier draft of this file framed
+  OSE-LOCI's 6-byte `FileHeader` (magic+width+height) prepended to these
+  files as a justified UX improvement over V1's manual width/height
+  re-entry on load. **The user corrected this**: V1's bare,
+  metadata-free screen format is deliberate, not a limitation — a saved
+  screen is meant to be a portable, tool-agnostic raw dump, loadable or
+  embeddable from *any* source (not just OSE's own saves), which is
+  *why* project metadata was separated into its own file in the first
+  place. Manual width/height entry on load (`fileio_get_dimensions()`,
+  `src/fileio.c`, V1's exact "Enter screen width:"/"Enter screen
+  height:" wording) is the accepted cost of that portability, not a gap
+  to fix. The `FileHeader` struct, `fileio_header_valid()`, and
+  `FILEIO_MAGIC`'s use for these files are gone entirely; `FILEIO_MAGIC`
+  itself survives only as `ProjectHeader.magic` (see below). Project's
+  own `SC.BIN` also dropped its header — `proj.canvas_width/height`
+  (already known from `PJ.BIN`) sizes the read/write, exactly like V1's
+  `loadproject()`, which never re-derives size from `SC.BIN` itself.
+- **`ProjectHeader` (`PJ.BIN`) — genuinely necessary to differ, kept,
+  with a V1-format importer.** V1's `PJ.BIN` is a hand-packed 19-byte
+  struct (`saveproject()`) with two confirmed defects in V1 itself: its
+  `xoffset`/`yoffset` are `unsigned int` (16-bit) at runtime but
+  truncated to a single byte on save (`projbuffer[17]=xoffset;`
+  silently drops the high byte) — more likely to bite given OSE-LOCI's
+  bigger 10240-cell max canvas vs V1's 6655 (`MEMORYLIMIT -
+  SCREENMAPBASE`) — and byte offset 16 is simply never assigned (a dead
+  byte in V1's own format). OSE-LOCI's `ProjectHeader` (`uint16_t` for
+  those fields, drops the redundant `screentotal` and the dead byte) is
+  a genuine, necessary correctness fix, kept as-is.
+
+  `fileio_load_project()` now transparently accepts V1's original format
+  too: reads `<name>PJ.BIN` into a `ProjectHeader`-sized buffer; if
+  `proj.magic` doesn't match `FILEIO_MAGIC`, re-reads the same file as a
+  19-byte buffer and parses it via the new `fileio_parse_v1_project()`
+  (`src/fileio.c`) instead, translating field-by-field (direct copies for
+  `cursor_x/y`<-`screen_col/row`, `plotink/paper/blink/double/altchar/
+  screencode`, `stdchanged/altchanged`<-`charsetchanged[0]/[1]`;
+  zero-extends the single-byte `xoffset/yoffset`; drops `screentotal`
+  and the dead byte). **No new menu item needed** — V1's `PJ.BIN` bytes
+  0-1 (`charsetchanged[0]/[1]`, each 0 or 1, read as a little-endian
+  `uint16_t`) can only be `0x0000/0x0001/0x0100/0x0101`, never
+  `FILEIO_MAGIC` (`0x4F53`), so the fallback is unambiguous. Once the
+  two fixes above land, `SC.BIN`/`CS.BIN`/`CA.BIN` are already
+  byte-identical to V1's, so this is the *only* translation the importer
+  needs.
+
+  **A severe, unrelated bug was found and fixed while testing this**:
+  `src/filepicker.c`'s `picker_build_list()` looped
+  `while ((de = loci_readdir(dir)) != 0)` — but `loci_readdir()` signals
+  end-of-directory with an **empty `d_name`**, not (only) a negative
+  return value. locifilemanager-v2's own directory code (`dir.c`, the
+  reference this loop was adapted from) already checks both
+  (`file->d_name[0] != '\0'`); this loop was missing that second check,
+  so once the real directory entries were exhausted, it span forever on
+  whatever Phosphoric's `--loci-flash` emulation returns past
+  end-of-directory (confirmed via direct testing: a counter incremented
+  every iteration kept climbing for hundreds of iterations across
+  200M+ emulated cycles with no sign of stopping). **This meant every
+  Load action (Screen/Combined/Project, Charset Load) hung
+  indefinitely** — confirmed to reproduce identically on the
+  last-committed code before any of this session's changes, so it
+  predates this work entirely; it had simply never been exercised by an
+  automated test before (the one test that looked like it covered this,
+  `test_fileio_traffic.sh`'s old "Load Screen round-trip" scenario, never
+  actually cleared the canvas first, so it passed regardless of whether
+  the load really happened — also fixed, see below). Fix: add the
+  missing `&& de->d_name[0] != '\0'` to the loop condition.
+- **New/updated test coverage**: `test_fileio_traffic.sh` gained a
+  regression test for the Alt-charset size (Charset > Save Alternate is
+  asserted to write exactly 640 bytes) and a V1-`PJ.BIN`-import scenario
+  (writes a synthetic V1-format 19-byte `PJ.BIN` + bare `SC.BIN` by hand,
+  loads it via the normal Load Project action, confirms every field
+  translated correctly). The pre-existing "Load Screen round-trip"
+  scenario was corrected to actually clear the canvas before loading
+  (the old version's weak assertion could never distinguish a working
+  load from a no-op).
+- **Demo assets**: `assets/PETSCII{PJ,SC,CS,CA}.BIN` (renamed in place
+  from `assets/Petscii.{prj,scr,css,csa}.bin`, carried over early in
+  this project but never wired into anything) are V1's actual original
+  PETSCII demo project files — confirmed byte-identical to what V1
+  itself wrote, and confirmed to load correctly end-to-end through the
+  real `fileio_load_project()` path (cursor position, plot attributes,
+  and the rendered PETSCII border artwork all came through correctly).
+  `make usb` now distributes these 4 files alongside the built `.tap`s
+  so a fresh build's File > Load project has something real to try
+  immediately — not embedded in the binary, distributed as separate
+  files, matching how V1 itself shipped them.
 
 ### File picker (Phase 7)
 
@@ -570,13 +708,15 @@ Save — browsing to pick a name to overwrite isn't the same UX problem).
   path relative to the LOCI root, e.g. `"DIR1/DIR2/name"`).
   `FILENAME_MAXLEN` grew from 24 to 48 (`src/appstate.h`) to leave room
   for this.
-- **No new automated test coverage yet**: `filepicker_run()` is only
-  reachable from a Load action that already requires
-  `loci_check_present()` to pass first, so `test_fileio_no_loci.sh`'s
-  existing 12 assertions (every Load/Save action's LOCI-absent path) are
-  all that's automated today — the actual browsing isn't covered yet, but
-  (per the Phase 6 correction above) Phosphoric's LOCI emulation makes
-  this addable headlessly; not just a real-hardware-only walkthrough.
+- **Now exercised by automated tests**: `test_fileio_traffic.sh`'s Load
+  Screen round-trip and V1-`PJ.BIN`-import scenarios both go through
+  `filepicker_run()` for real (see "V1 file-format compatibility"
+  above, which also documents a severe `picker_build_list()` infinite-loop
+  bug found and fixed via this testing — every Load action hung
+  indefinitely before that fix, since this function had never actually
+  been exercised by an automated test before). Subdirectory navigation
+  specifically still isn't covered by an automated test, only the
+  top-level single-pane listing/selection path.
 
 ### Canvas undo/redo (Phase 8)
 
@@ -912,11 +1052,11 @@ feature during planning, hence 7 parts covering 9 conceptual items).
 canvas thumbnail/overview mode (poor feasibility, not implemented).
 
 **Documentation correction made alongside this work**: an earlier draft
-of the "Palette mode" section above claimed V1 ships
-`assets/Petscii.css.bin` as the default Alt charset, making `visualmap`
-meaningful. This was wrong (corrected directly by the user) -- see the
-"Correction" paragraph already inline in that section above. Flagged
-here too since it was discovered/fixed in the same work session as the
+of the "Palette mode" section above claimed V1 ships a PETSCII asset
+file as the default Alt charset, making `visualmap` meaningful. This was
+wrong (corrected directly by the user) -- see the "Correction" paragraph
+already inline in that section above. Flagged here too since it was
+discovered/fixed in the same work session as the
 features below.
 
 #### Try mode (`t` in Main mode)
@@ -1198,7 +1338,7 @@ make test         # full automated Phosphoric test suite (test-boot, test-menus,
                   # path) and test-fileio-traffic (uses --loci-flash DIR
                   # instead, a real host filesystem directory for
                   # byte-level LOCI file I/O assertions).
-                  # Current total: 176/176.
+                  # Current total: 178/178.
 make test-boot    # headless boot smoke test (splash + canvas/statusbar render)
 make test-capture CYCLES=N TYPEKEYS='...'
                   # calibration helper: dumps tests/out/capture.bin + .png

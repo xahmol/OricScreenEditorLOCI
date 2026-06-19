@@ -123,7 +123,14 @@ static void picker_build_list(const char *path, uint8_t filter)
     dir = loci_opendir(path);
     if (!dir) return;
 
-    while ((de = loci_readdir(dir)) != 0)
+    // loci_readdir() signals end-of-directory with an empty d_name, not
+    // (only) a negative return -- locifilemanager-v2's own directory code
+    // (dir.c, this loop's reference) already checks both; this loop was
+    // missing the d_name check, causing an infinite loop once the real
+    // entries were exhausted (confirmed: Phosphoric's --loci-flash keeps
+    // returning non-error reads with an empty name past end-of-directory,
+    // rather than ever returning a negative error code).
+    while ((de = loci_readdir(dir)) != 0 && de->d_name[0] != '\0')
     {
         if (!picker_entry_matches(de, filter)) continue;
 

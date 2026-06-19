@@ -243,6 +243,11 @@ all-langs:
 # -------------------------------------------------------------------------
 # USB stick transfer
 # -------------------------------------------------------------------------
+# usb also copies assets/PETSCII{PJ,SC,CS,CA}.BIN -- V1's original PETSCII
+# demo project, unmodified (byte-identical to what V1 itself wrote; see
+# CLAUDE.md "V1 file-format compatibility"), so a fresh build's File >
+# Load project has something real to try immediately. Not embedded in
+# the binary -- distributed alongside it.
 
 check-usb:
 	@test "$(USBPATH)" != "NOT_SET" || \
@@ -259,6 +264,7 @@ check-usb:
 usb: check-usb all-langs
 	cp build/$(MAIN).tap      "$(USBPATH)/"
 	cp build/$(MAIN)_fr.tap   "$(USBPATH)/"
+	cp assets/PETSCIIPJ.BIN assets/PETSCIISC.BIN assets/PETSCIICS.BIN assets/PETSCIICA.BIN "$(USBPATH)/"
 	@if [ "$(IS_WSL2)" = "1" ]; then \
 	    echo "WSL2: unmounting $(USBMOUNT)..."; \
 	    sudo umount $(USBMOUNT); \
