@@ -243,61 +243,65 @@ rather than a quick fix.
 `src/colourpicker.c/h` — entered via `c` from main mode, a **new OSE-LOCI
 feature over V1** (see README.md "Planned feature additions over V1": "Enhanced
 palette mode also showing inverse ink/paper colour combinations"). Popup
-(`CP_WIN_SX=2/SY=0/WX=36/WY=13`, screen cols 2-37 rows 0-12,
-`menu_winsave(0, 13, 1)`) for selecting `app.plotink`/`app.plotpaper` from an
-8x8 ink x paper grid.
+(`CP_WIN_SX=2/SY=0/WX=36/WY=20`, `menu_winsave(0, 20, 1)`) for selecting
+`app.plotink`/`app.plotpaper` from an 8x8 ink x paper grid, **split 4-wide/
+16-row** (see "Colour picker rendering fix" below for why) — grid column =
+`ink%4`, grid row = `paper*2 + ink/4` (`cp_grid_pos()`).
 
-- **Layout**: row 0 = title (`MSG_COLOURPICKER_TITLE`); rows 1-8
-  (`CP_ROW_GRID0=1`) = one row per paper value 0-7, each with 8 cells (one per
-  ink value 0-7) at `CP_GRID_X0=2`, `CP_CELL_STEP=4` cols/cell: `[ink-attr
-  byte, paper-attr byte (16+paper), normal swatch, inverse swatch]`. Rows
-  10-12 are feedback lines: `"Ink:    N"` + swatch (`CP_ROW_INK`), `"Paper:
+- **Layout**: row 0 = title (`MSG_COLOURPICKER_TITLE`); rows 1-16
+  (`CP_ROW_GRID0=1`) = the split grid, 4 cells per row (`CP_GRID_X0=2`,
+  `CP_CELL_STEP=5` cols/cell): `[A_BGWHITE reset byte, ink-attr byte,
+  paper-attr byte (16+paper), normal swatch, inverse swatch]`. Rows 17-19
+  are feedback lines: `"Ink:    N"` + swatch (`CP_ROW_INK`), `"Paper:
   N"` + swatch (`CP_ROW_PAPER`), `"Result:"` + ink/paper attrs + normal+inverse
   preview pair (`CP_ROW_RESULT`).
 - **Cursor**: the highlighted cell swaps its two swatch chars
   (`CH_SPACE`<->`CH_INVSPACE`; normal = paper-colour swatch then ink-colour
   swatch, highlighted = reversed) — a 2-char analogue of charsetedit's `^0x80`
   cursor. Initial position = `(app.plotink, app.plotpaper)`.
-- **Keys**: LEFT/RIGHT cycle ink (wrap 0-7), UP/DOWN cycle paper (wrap 0-7);
-  `SPACE`/`ENTER` commit the highlighted cell to `plotink`/`plotpaper` and
-  close the popup; `FUNCT+6` toggles the statusbar; `ESC` closes the popup
-  unchanged.
+- **Keys**: LEFT/RIGHT cycle ink (wrap 0-7, jumping between the two grid-row
+  halves when crossing the 3/4 boundary), UP/DOWN cycle paper (wrap 0-7,
+  moves by exactly 2 grid rows, same column); `SPACE`/`ENTER` commit the
+  highlighted cell to `plotink`/`plotpaper` and close the popup; `FUNCT+6`
+  toggles the statusbar; `ESC` closes the popup unchanged.
 - **Adapted from** V1's `colourpicker()`/`colorpicker_cursorplot()` (archived
-  `nonworkingcc65:src/colorpicker.c`) — same 8x8 grid + Ink:/Paper:/Result:
-  feedback concept; the border-drawing cursor is replaced with the simpler
-  2-char swatch swap.
+  `nonworkingcc65:src/colorpicker.c`) — same ink x paper grid + Ink:/Paper:/
+  Result: feedback concept; the border-drawing cursor is replaced with the
+  simpler 2-char swatch swap.
 - **Charset-swap**: opts IN — swatch glyphs (`CH_SPACE`/`CH_INVSPACE`) are
   plain Std-charset chars, no live-edit-preview requirement.
 
-**Known issue (parked 2026-06-17, not blocking)**: user-tested on real Oric
-Atmos hardware and reports the colour picker's grid colours do not render
-correctly (screenshot pending — not yet reproduced in any emulator: this
-was tested before it was confirmed that Phosphoric's LOCI emulation
-(alpha-quality, see "Phosphoric Testing Notes") could be used here; worth
-retrying under Phosphoric before assuming a real-hardware-only ULA
-timing quirk. Oricutron still cannot emulate LOCI at all, so it remains
-unusable for this regardless). Suspected scope: this popup is
-the first place in the codebase that changes ink *and* paper 8 times each
-within a single 36-column row (16 attribute changes/row) — `cp_draw_grid()`'s
-per-cell `[ink-attr, paper-attr, swatch0, swatch1]` write in
-`src/colourpicker.c`. Everywhere else (statusbar swatches, palette) changes
-colour at most twice per row. Deviations from V1's `colourpicker()` (4-col
-cells with no leading reset byte, vs V1's 5-col `[A_BGWHITE, ink, paper+16,
-'-', '-'+128]`; `CH_SPACE`/`CH_INVSPACE` swatches vs V1's `'-'`/`'-'+128`;
-swap-based cursor vs V1's bordered `colorpicker_cursorplot()`) were reviewed
-and should be colour-neutral under the documented Oric attribute model (ink
-and paper are independent, left-to-right, V1's leading `A_BGWHITE` is
-immediately overwritten by the following `paper+16` so has no effect on
-final cell colour) — so this is suspected to be either a real bug in dense
-per-row attribute writing, or a genuine real-hardware ULA timing quirk not
-present in emulation. Not confirmed either way pending a real-hardware
-screenshot. **Does not block Phase 5**: `app.plotink`/`plotpaper` can already
-be set without this popup via the `,`/`.`/`;`/`'` cycling keys (Phase 4a,
-`src/editor.c`), and Phase 5's write/line-box/select-move modes and the
-deferred `G`/`I`/`O`/`U` serial-attribute-plotting keys write one attribute
-byte at a time into `canvas.c`'s `screenmap[]` — a different, much simpler
-code path than this widget's dense per-row grid, so they're not expected to
-inherit this bug. Revisit once a real-hardware screenshot is available.
+**Colour picker rendering fix (was a known issue, now fixed)**: a user
+screenshot from real Oric Atmos hardware showed each grid cell rendering as
+repeating rainbow bands instead of a solid ink/paper swatch pair — never
+reproduced in emulation. The original 8-wide/8-row grid's per-cell write
+was `[ink-attr, paper-attr, swatch0, swatch1]` (4 bytes), **dropping the
+leading `A_BGWHITE` reset byte V1's own `colourpicker()` always writes**
+(`[A_BGWHITE, ink, paper+16, '-', '-'+128]`, 5 bytes) — an earlier draft of
+this section reasoned that byte was colour-neutral ("immediately
+overwritten by the following `paper+16`"), which **the user confirmed is
+wrong**: an attribute byte's own character-cell-wide slot renders using
+whatever colour state was active *before* it takes effect, so without
+that reset, each cell's first attribute byte visibly showed the *previous*
+cell's actual colour for one cell-width — exactly the banding artifact
+reported. The user also confirmed there is **no inherent hardware limit**
+on attribute-change density (ruling out the other theory this section used
+to float, a ULA timing quirk from 16 attribute changes packed into one
+36-column row).
+
+**Fix**: restore V1's 5-byte-per-cell pattern exactly. This needs a 5th
+column per cell, which doesn't fit if all 8 ink values share one row
+(8*5=40 columns, plus this popup reserves 2 border columns V1's own window
+system didn't use) — so the grid is now split 4-wide/16-row (`cp_grid_pos()`
+maps `(ink, paper)` to `(col=ink%4, row=paper*2+ink/4)`) instead, keeping
+both swatches and the reset byte without exceeding the screen width.
+Verified directly via Phosphoric byte dumps: e.g. cell (ink=7, paper=0) now
+writes `17 07 10 a0 20` (reset, ink, paper, swatches) at the correct split
+grid position — confirmed byte-for-byte against the formula by hand before
+trusting the dump. `tests/scripts/test_colourpicker.sh` updated for the new
+cell addresses/5-byte shape; `app.plotink`/`plotpaper` remain settable
+without this popup via the `,`/`.`/`;`/`'` cycling keys (Phase 4a,
+`src/editor.c`) regardless.
 
 ### Cursor auto-scroll fix (Phase 5)
 

@@ -820,16 +820,18 @@ there's no live-edit-preview requirement.
 ### 6.8 Colour picker (`src/colourpicker.c`, entered via `c`)
 
 **New OSE-LOCI feature over V1** (see README.md "Planned feature additions
-over V1"). Popup (`CP_WIN_SX=2/SY=0/WX=36/WY=13`, screen cols 2-37 rows 0-12,
-`menu_winsave(0, 13, 1)`) for selecting `app.plotink`/`app.plotpaper` from an
-8x8 ink x paper grid.
+over V1"). Popup (`CP_WIN_SX=2/SY=0/WX=36/WY=20`, `menu_winsave(0, 20, 1)`)
+for selecting `app.plotink`/`app.plotpaper` from an 8x8 ink x paper grid,
+**split 4-wide/16-row** (`cp_grid_pos()`: column=`ink%4`,
+row=`paper*2+ink/4`) — see CLAUDE.md "Colour picker rendering fix" for why.
 
-Layout: row 0 = title (`MSG_COLOURPICKER_TITLE`); rows 1-8 (`CP_ROW_GRID0=1`)
-= one row per paper value 0-7, 8 cells (ink 0-7) at `CP_GRID_X0=2`,
-`CP_CELL_STEP=4` cols/cell: `[ink-attr byte, paper-attr byte (16+paper),
-normal swatch, inverse swatch]`. Rows 10-12 are feedback lines: `Ink:` +
-swatch (`CP_ROW_INK`), `Paper:` + swatch (`CP_ROW_PAPER`), `Result:` +
-ink/paper attrs + normal+inverse preview pair (`CP_ROW_RESULT`).
+Layout: row 0 = title (`MSG_COLOURPICKER_TITLE`); rows 1-16
+(`CP_ROW_GRID0=1`) = the split grid, 4 cells/row at `CP_GRID_X0=2`,
+`CP_CELL_STEP=5` cols/cell: `[A_BGWHITE reset byte, ink-attr byte,
+paper-attr byte (16+paper), normal swatch, inverse swatch]`. Rows 17-19 are
+feedback lines: `Ink:` + swatch (`CP_ROW_INK`), `Paper:` + swatch
+(`CP_ROW_PAPER`), `Result:` + ink/paper attrs + normal+inverse preview pair
+(`CP_ROW_RESULT`).
 
 Cursor highlight swaps a cell's two swatch chars (`CH_SPACE`<->`CH_INVSPACE`;
 normal = paper-colour swatch then ink-colour swatch, highlighted = reversed)
@@ -842,9 +844,12 @@ the popup; `FUNCT+6` toggles the statusbar; `ESC` closes the popup leaving
 `plotink`/`plotpaper` unchanged.
 
 Adapted from V1's `colourpicker()`/`colorpicker_cursorplot()` (archived
-`nonworkingcc65:src/colorpicker.c`) — same 8x8 grid + Ink:/Paper:/Result:
-feedback concept; the border-drawing cursor is replaced with the simpler
-2-char swatch swap. Opts IN to the charset-swap — swatch glyphs
+`nonworkingcc65:src/colorpicker.c`) — same ink x paper grid +
+Ink:/Paper:/Result: feedback concept; the border-drawing cursor is replaced
+with the simpler 2-char swatch swap, and the 5-byte-per-cell pattern
+(including the `A_BGWHITE` reset byte) is now restored exactly, after an
+earlier 4-byte version (dropping that reset byte) caused a real-hardware-only
+rendering bug -- see CLAUDE.md. Opts IN to the charset-swap — swatch glyphs
 (`CH_SPACE`/`CH_INVSPACE`) are plain Std-charset chars.
 
 ### 6.9 Shared rectangle-grower (`rect_select()`, `src/select.c`)

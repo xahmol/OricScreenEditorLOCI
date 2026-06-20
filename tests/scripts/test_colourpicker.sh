@@ -18,12 +18,14 @@
 #   key indefinitely. Cycle budget: 8,080,000 (boot+splash) +
 #   N_pairs*1,100,000 + 300,000 margin.
 #
-# Grid layout (src/colourpicker.c): CP_GRID_X0=2, CP_CELL_STEP=4,
-# CP_ROW_GRID0=1, popup at screen cols 2-37, rows 0-12. Cell (ink, paper) is
-# 4 bytes at screen col (2 + CP_GRID_X0 + ink*CP_CELL_STEP), row
-# (CP_ROW_GRID0 + paper): [ink-attr, paper-attr, swatch0, swatch1]. When
-# highlighted, swatch0/1 = CH_INVSPACE(0xa0)/CH_SPACE(0x20); normal =
-# CH_SPACE/CH_INVSPACE (0x20/0xa0).
+# Grid layout (src/colourpicker.c, rewritten -- see that file's header
+# comment for the real-hardware rendering bug this fixed): split 4-wide/
+# 16-row grid (CP_GRID_X0=2, CP_CELL_STEP=5, CP_ROW_GRID0=1,
+# CP_INKS_PER_ROW=4) -- grid column = ink%4, grid row = paper*2 + ink/4.
+# Cell (ink, paper) is 5 bytes at screen col (2 + CP_GRID_X0 + col*5), row
+# (CP_ROW_GRID0 + row): [A_BGWHITE reset, ink-attr, paper-attr, swatch0,
+# swatch1]. When highlighted, swatch0/1 = CH_INVSPACE(0xa0)/CH_SPACE(0x20);
+# normal = CH_SPACE/CH_INVSPACE (0x20/0xa0).
 #
 # Required env vars (set by `make test-colourpicker`):
 #   PHOS      path to oric1-emu
@@ -94,7 +96,8 @@ if [ ! -x "$PHOS" ]; then
 fi
 
 # --- Scenario 1: 'c' opens the popup on the default ink/paper (7/0) -------
-# Cell (ink=7, paper=0): col = 2+2+7*4 = 32, row = 1 -> addr 0xBBC8.
+# Cell (ink=7, paper=0): col=7%4=3, row=0*2+7/4=1 -> screen col=4+3*5=19,
+# screen row=1+1=2 -> addr 0xBB80+2*40+19=0xBBE3.
 DUMP1="$OUT/capture_cp_open.bin"
 run_capture 9480000 '\p1c' "$DUMP1"
 echo ""
@@ -103,27 +106,29 @@ check_found "title shown" "Select ink and paper colour" "$DUMP1"
 check_found "Ink: 7 feedback line"   "Ink:    7" "$DUMP1"
 check_found "Paper: 0 feedback line" "Paper:  0" "$DUMP1"
 check_found "Result: feedback line"  "Result:"   "$DUMP1"
-check_bytes "cell (7,0) highlighted (ink-attr,paper-attr,inv,norm)" \
-    "0xBBC8:4" "07 10 a0 20" "$DUMP1"
+check_bytes "cell (7,0) highlighted (reset,ink,paper,inv,norm)" \
+    "0xBBE3:5" "17 07 10 a0 20" "$DUMP1"
 
 # --- Scenario 2: RIGHT wraps ink 7 -> 0 ------------------------------------
-# Cell (ink=0, paper=0): col = 2+2+0*4 = 4, row = 1 -> addr 0xBBAC.
+# Cell (ink=0, paper=0): col=0%4=0, row=0 -> screen col=4+0*5=4,
+# screen row=1+0=1 -> addr 0xBB80+1*40+4=0xBBAC.
 DUMP2="$OUT/capture_cp_right_wrap.bin"
 run_capture 10580000 '\p1c\p1\r' "$DUMP2"
 echo ""
 echo "RIGHT wraps ink 7 -> 0"
 check_found "Ink: 0 feedback line" "Ink:    0" "$DUMP2"
-check_bytes "cell (0,0) now highlighted" "0xBBAC:4" "00 10 a0 20" "$DUMP2"
-check_bytes "cell (7,0) back to normal" "0xBBC8:4" "07 10 20 a0" "$DUMP2"
+check_bytes "cell (0,0) now highlighted" "0xBBAC:5" "17 00 10 a0 20" "$DUMP2"
+check_bytes "cell (7,0) back to normal" "0xBBE3:5" "17 07 10 20 a0" "$DUMP2"
 
 # --- Scenario 3: UP wraps paper 0 -> 7 -------------------------------------
-# Cell (ink=7, paper=7): col = 32, row = 1+7=8 -> addr 0xBCE0.
+# Cell (ink=7, paper=7): col=7%4=3, row=7*2+7/4=15 -> screen col=4+3*5=19,
+# screen row=1+15=16 -> addr 0xBB80+16*40+19=0xBE13.
 DUMP3="$OUT/capture_cp_up_wrap.bin"
-run_capture 10580000 '\p1c\p1\u' "$DUMP3"
+run_capture 12500000 '\p1c\p1\u' "$DUMP3"
 echo ""
 echo "UP wraps paper 0 -> 7"
 check_found "Paper: 7 feedback line" "Paper:  7" "$DUMP3"
-check_bytes "cell (7,7) now highlighted" "0xBCE0:4" "07 17 a0 20" "$DUMP3"
+check_bytes "cell (7,7) now highlighted" "0xBE13:5" "17 07 17 a0 20" "$DUMP3"
 
 # --- Scenario 4: ENTER commits the highlighted cell ------------------------
 DUMP4="$OUT/capture_cp_enter.bin"
