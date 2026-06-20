@@ -13,6 +13,7 @@
 static uint8_t swap_depth;
 static uint8_t charset_changed;
 static uint8_t backup_std[CHARSET_GLYPH_AREA_SIZE];
+static uint8_t backup_alt_current[CHARSET_ALT_GLYPH_AREA_SIZE];
 
 /**
  * Record that the user has redefined at least one glyph. Until this is
@@ -69,4 +70,32 @@ void charsetswap_exit(void)
     {
         charset_load(CHARSET_STD, backup_std);
     }
+}
+
+/**
+ * Back up CHARSET_ALT's displayable range into backup_alt_current, then
+ * overwrite it with the ROM-stock Alt glyphs (CHARSETROM -- a valid
+ * source for Alt too, see charsetswap.h's header comment). Unconditional:
+ * no charset_changed gate, no depth-counting -- this has exactly one call
+ * site (src/info.c's idi8b_logo draw), never nested with itself.
+ *
+ * @return (none)
+ */
+void charsetswap_alt_enter(void)
+{
+    charset_save(CHARSET_ALT, backup_alt_current);
+    disable_overlay_ram();
+    charset_load(CHARSET_ALT, (const uint8_t *)CHARSETROM);
+    enable_overlay_ram();
+}
+
+/**
+ * Counterpart to charsetswap_alt_enter(): restores CHARSET_ALT's
+ * displayable range from the backup taken there.
+ *
+ * @return (none)
+ */
+void charsetswap_alt_exit(void)
+{
+    charset_load(CHARSET_ALT, backup_alt_current);
 }

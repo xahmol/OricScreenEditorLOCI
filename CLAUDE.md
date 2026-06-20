@@ -226,17 +226,33 @@ gap).
 native ROM-resident alternate (semigraphics) charset, **not** any
 PETSCII asset file — `assets/PETSCIICS.BIN` (V1's own PETSCII demo
 project's standard charset, see "V1 file-format compatibility" below)
-is unrelated to this feature. V1 normally populates `CHARSET_ALT` with that ROM-native
-bitmap via `jsr $F816` (`ROM_ALTCHARS`) — which, per "Charset-swap
-mechanism" below, is a no-op when called from Oscar64 in this runtime.
-So `CHARSET_ALT` starts uninitialised at boot, and `visualmap` (a pure
-index permutation over whatever bytes are in `CHARSET_ALT`) has nothing
-meaningful to reorder until the user loads *some* charset by hand. No
-embedded or otherwise available source for the Oric ROM's native
-alt-charset bitmap is confirmed to exist in this codebase — fixing this
-properly would need that data sourced first (e.g. extracted from a ROM
-dump), not just "load an existing asset," so it's left as an open gap
-rather than a quick fix.
+is unrelated to this feature. V1 normally re-populates `CHARSET_ALT`
+with that ROM-native bitmap via `jsr $F816` (`ROM_ALTCHARS`) — which,
+per "Charset-swap mechanism" below, is a no-op when called from Oscar64
+in this runtime.
+
+**Second correction (2026-06-20, supersedes the "uninitialised at boot"
+claim two paragraphs below in earlier drafts)**: `CHARSET_ALT` does
+**not** start uninitialised — confirmed via `~/.claude/
+oric_atmos_reference.md` ("Character Set ROM Data") and verified
+directly (Phosphoric screenshot of Information > Version's logo
+rendering correctly on a fresh boot, see "Information menu" above): the
+Oric ROM's own boot/RESET sequence copies the master font at
+`$FC78-$FF77` to *both* `$B400` (Std) and `$B800` (Alt), independent of
+whether `jsr $F816` is ever called again afterward. So at a fresh boot,
+`CHARSET_ALT` actually holds a byte-identical copy of `CHARSET_STD`'s
+own glyphs (the "mosaic" look is purely the `A_ALT` attribute changing
+how the ULA *interprets* those bytes, not a different ROM table) —
+there genuinely is a deterministic, ROM-sourced bitmap available, and
+it's directly recoverable any time via `charset_load(CHARSET_ALT,
+CHARSETROM)` (now used by `charsetswap_alt_enter()`,
+`src/charsetswap.c`). What's still **unconfirmed/unclear** is whether
+reordering *that* data (plain Std-font letter shapes, not genuine
+mosaic-block patterns) via `visualchar[]` actually produces a
+*useful* result for `visualmap`'s original intent — the factual premise
+("nothing meaningful to reorder, CHARSET_ALT is garbage") is now known
+to be wrong, but whether the feature is *worth* anything beyond that
+correction is a separate, still-open question, not resolved by this fix.
 
 ### Colour picker (Phase 4c)
 
@@ -1083,6 +1099,45 @@ permanent stubs since Phase 2.
   testable (a real reset is indistinguishable from a crash to the test
   harness from outside).
 
+**`idi8b_logo[]`'s Alt-charset dependency, protected (post-launch
+fix)**: `idi8b_logo[]` embeds `A_ALT` attribute bytes (e.g. byte index 5
+of each of its first ~11 rows) before drawing block/mosaic glyph codes
+(`0x35` etc.) — its colourful block-letter shapes depend on
+`CHARSET_ALT` holding the Oric ROM's stock semigraphics font, not
+whatever the user may have redefined via the character editor's Alt
+mode. The general charset-swap mechanism (next section) deliberately
+only protects `CHARSET_STD`, so this logo was a latent corruption risk:
+edit any Alt-charset glyph, then open Information > Version, and the
+logo would render with the user's edited glyphs instead of the
+original artwork (never reported as an actual visible bug — found by
+inspecting the embedded `A_ALT` bytes and the charset-swap mechanism's
+own documented Std-only scope — but the mechanism for it was real).
+
+Fixed with `charsetswap_alt_enter()`/`charsetswap_alt_exit()`
+(`src/charsetswap.c/h`, new) — see "Charset-swap mechanism" below for
+why `CHARSETROM` ($FC78) is a valid restore source for `CHARSET_ALT`
+too, not just `CHARSET_STD` (confirmed via
+`~/.claude/oric_atmos_reference.md`: the Oric ROM's own boot sequence
+copies the *same* `$FC78-$FF77` data to *both* `$B400` and `$B800` at
+RESET — Alt's "mosaic" look comes entirely from the `A_ALT` attribute
+changing how the ULA *interprets* those bytes, not from a separate ROM
+table). `info_version_show()` brackets the logo's on-screen lifetime
+(from just before the blit until the user advances past page 1 — not
+just the instant of the blit, since the ULA re-renders from charset RAM
+every frame) with `charsetswap_alt_enter()`/`_exit()`, restoring the
+user's live Alt edits before page 2 (which doesn't use Alt at all).
+Costs one new 640-byte static buffer (`backup_alt_current`,
+`src/charsetswap.c`) — confirmed via the build's `.map` file output
+that this left ~5.05KB of main-RAM headroom still free (down from
+~5.68KB before this fix), comfortably within budget. No permanent
+"stock Alt charset" snapshot buffer was needed — restoring directly
+from `CHARSETROM` on demand (exactly how `charsetswap_enter()` already
+restores `CHARSET_STD`) is sufficient and halves the RAM cost a naive
+boot-time-snapshot approach would have needed. Verified via Phosphoric
+screenshot: the logo still renders correctly through this new code
+path (confirming `CHARSETROM` really is byte-identical to what boot
+already put in `CHARSET_ALT`).
+
 ### Charset-swap mechanism
 
 `src/charsetswap.c/h` + `include/charset.c/h` ensure popup chrome (menu bar,
@@ -1099,13 +1154,25 @@ user's edits.
   (`charset_glyph_invert/mirror_v/mirror_h/scroll_up/scroll_down/rotate_left/
   rotate_right`) used by the character editor's `i`/`x`/`y`/`u`/`d`/`l`/`r`
   commands.
-- **Std-only** (Part 1 spike outcome): `jsr $F816` (`ROM_ALTCHARS`, used by V1
-  to regenerate `CHARSET_ALT` from `CHARSET_STD`) is a no-op when called from
-  Oscar64 in this runtime -- `CHARSET_ALT` is left untouched by the swap.
-  Only `CHARSET_STD`'s 768-byte displayable range is backed up/restored.
-  `CHARSET_ALT` keeps whatever the user has edited, even while popups are
-  open; this is acceptable because popup chrome (menu bar, pulldowns,
-  dialogs) only ever uses `CHARSET_STD` glyphs (`A_STD` attribute).
+- **Std-only for general popup chrome** (Part 1 spike outcome): `jsr $F816`
+  (`ROM_ALTCHARS`, used by V1 to regenerate `CHARSET_ALT` from
+  `CHARSET_STD`) is a no-op when called from Oscar64 in this runtime --
+  but this is about that specific ROM *subroutine call*, not about
+  whether `CHARSET_ALT` can be restored at all (see below). The general
+  `charsetswap_enter()`/`exit()` only backs up/restores `CHARSET_STD`'s
+  768-byte displayable range; `CHARSET_ALT` keeps whatever the user has
+  edited during ordinary popups, which is acceptable because popup
+  chrome (menu bar, pulldowns, dialogs) only ever uses `CHARSET_STD`
+  glyphs (`A_STD` attribute). **One exception**: Information > Version's
+  `idi8b_logo[]` does use `A_ALT`, and has its own dedicated
+  `charsetswap_alt_enter()`/`_exit()` pair for exactly that popup -- see
+  "Information menu" above. `CHARSETROM` is a valid direct restore
+  source for `CHARSET_ALT` too (not just `CHARSET_STD`), confirmed via
+  `~/.claude/oric_atmos_reference.md`: the Oric ROM's own boot sequence
+  copies the same `$FC78-$FF77` data to both `$B400` and `$B800` at
+  RESET. This correction supersedes an earlier, less precise version of
+  this bullet that implied `CHARSET_ALT` simply has no available ROM
+  restore source at all.
 - **`charset_changed` gate**: `charsetswap_mark_changed()` is called once,
   from `ce_snapshot()` (the chokepoint already called before every
   destructive glyph edit in `charsetedit.c`). Until the user edits a glyph
