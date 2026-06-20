@@ -57,7 +57,8 @@ void statusbar_draw(void)
     }
 
     cwin_putat_printf(&statusbar_win, STATUSBAR_MODE_WIDTH, 0, MSG_STATUSBAR_MAIN_FMT,
-                       app.cursor_x, app.cursor_y,
+                       (uint16_t)(app.cursor_x + app.xoffset),
+                       (uint16_t)(app.cursor_y + app.yoffset),
                        app.plotscreencode,
                        canvas_get(app.cursor_x + app.xoffset, app.cursor_y + app.yoffset),
                        app.plotink, app.plotpaper,

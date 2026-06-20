@@ -184,6 +184,21 @@ separate `cwin_putat_char()` calls after `cwin_putat_printf()` — the literal
 attribute bytes, which are `<0x20` and so render as nothing (not a visible
 gap).
 
+**XY field bugfix (post-launch)**: user-reported (2026-06-20) — once the
+canvas is larger than the 40x27 viewport and the view auto-scrolls (see
+"Cursor auto-scroll fix" below), the statusbar's `XY` field froze at the
+viewport-relative coordinate instead of continuing to show the true
+canvas-absolute position. Root cause: `statusbar_draw()` passed
+`app.cursor_x`/`app.cursor_y` (viewport-relative) directly to
+`MSG_STATUSBAR_MAIN_FMT`, never adding `app.xoffset`/`app.yoffset` —
+unlike the adjacent `S` field's `canvas_get()` call, which already
+correctly added them. Fixed by adding the offsets the same way. Two
+regression scenarios added to `tests/scripts/test_cursor_autoscroll.sh`
+(now 3 total): the existing vertical-scroll scenario's assertion was
+corrected from the old (buggy) "XY 0,26" to "XY 0,27" (viewport row26 +
+yoffset1), and a new horizontal-scroll scenario (resize width 40->41,
+RIGHT x41 from col0) asserts "XY40, 0" (viewport col39 + xoffset1).
+
 ### Palette mode (Phase 4b)
 
 `src/palette.c/h` — entered via `p` from main mode, a near-full-width popup
@@ -1763,7 +1778,7 @@ make test         # full automated Phosphoric test suite (test-boot, test-menus,
                   # path) and test-fileio-traffic (uses --loci-flash DIR
                   # instead, a real host filesystem directory for
                   # byte-level LOCI file I/O assertions).
-                  # Current total: 179/179.
+                  # Current total: 180/180.
 make test-boot    # headless boot smoke test (splash + canvas/statusbar render)
 make test-capture CYCLES=N TYPEKEYS='...'
                   # calibration helper: dumps tests/out/capture.bin + .png
