@@ -551,15 +551,19 @@ Appuyer sur **ESC** quitte le mode palette et revient au mode principal. Il n'y 
 
 Appuyer sur **C** en mode principal démarre le sélecteur de couleurs. Il s'agit d'un ajout par rapport à l'OricScreenEditor original : une grille visuelle permettant de sélectionner ensemble les couleurs d'encre et de papier à tracer, avec un aperçu de la combinaison normale et inversée résultante.
 
-Une fenêtre comme celle-ci apparaît, montrant une grille 8x8 de toutes les combinaisons Encre/Papier, ainsi que des lignes d'information indiquant l'Encre et le Papier actuellement en surbrillance et l'aperçu normal/inversé résultant :
+Une fenêtre comme celle-ci apparaît, montrant les 64 combinaisons Encre/Papier sous forme d'une grille de 4 colonnes x 16 lignes (cette répartition, plutôt qu'une grille 8x8, permet à chaque cellule d'afficher un echantillon normal et un echantillon inverse côte à côte sans depasser la largeur de l'ecran), ainsi que des lignes d'information indiquant l'Encre et le Papier actuellement en surbrillance et l'aperçu normal/inversé résultant :
 
 ```
 Choisir encre et papier
-<grille 8x8 de cellules encre x papier, chacune montrant l'echantillon normal et inverse pour cette combinaison>
+<grille de 4 colonnes x 16 lignes de cellules encre x papier, chacune montrant l'echantillon normal et inverse pour cette combinaison>
 Encre:  N <echantillon>
 Papier: N <echantillon>
 Result: <apercu normal/inverse>
 ```
+
+*(Capture d'ecran a venir -- cette section n'a pas d'equivalent dans V1
+pour en reprendre une image temporaire, le selecteur de couleurs etant
+une nouveaute propre a OSE-LOCI.)*
 
 Commandes clavier dans ce mode :
 
@@ -571,7 +575,7 @@ Commandes clavier dans ce mode :
 
 *Déplacer le curseur*
 
-Appuyez sur les **touches curseur** pour déplacer le curseur dans la grille 8x8. **GAUCHE**/**DROITE** font défiler la couleur d'Encre, **HAUT**/**BAS** font défiler la couleur de Papier, les deux bouclant entre les couleurs 0 et 7.
+Appuyez sur les **touches curseur** pour déplacer le curseur dans la grille. **GAUCHE**/**DROITE** font défiler la couleur d'Encre (en bouclant entre les deux moities de 4 colonnes de la grille), **HAUT**/**BAS** font défiler la couleur de Papier par pas de deux lignes, les deux bouclant entre les couleurs 0 et 7.
 
 *Sélectionner l'encre et le papier*
 

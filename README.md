@@ -539,15 +539,23 @@ Pressing **ESC** leaves the palette mode and returns to main mode. There is no s
 
 Pressing **C** in main mode starts the Colour picker. This is an addition over the original OricScreenEditor: a visual grid for selecting the Ink and Paper colors to plot with together, including a preview of the resulting normal and inverse color combination.
 
-A window like this appears, showing an 8x8 grid of all Ink/Paper combinations, plus feedback lines for the currently highlighted Ink, Paper and the resulting normal/inverse preview:
+A window like this appears, showing all 64 Ink/Paper combinations as a
+4-column x 16-row grid (split this way, rather than 8x8, so each cell
+can show both a normal and an inverse swatch side by side without
+running out of screen width), plus feedback lines for the currently
+highlighted Ink, Paper and the resulting normal/inverse preview:
 
 ```
 Select ink and paper colour
-<8x8 grid of ink x paper colour cells, each showing the normal and inverse swatch for that combination>
+<4-wide x 16-row grid of ink x paper colour cells, each showing the normal and inverse swatch for that combination>
 Ink:    N <swatch>
 Paper:  N <swatch>
 Result: <normal/inverse preview>
 ```
+
+*(Screenshot to follow -- this section currently has no V1 equivalent
+to borrow a placeholder image from, since the colour picker is new to
+OSE-LOCI.)*
 
 Keyboard commands in this mode:
 
@@ -559,7 +567,7 @@ Keyboard commands in this mode:
 
 *Moving cursor*
 
-Press the **cursor keys** to move the cursor around the 8x8 grid. **LEFT**/**RIGHT** cycle the Ink color, **UP**/**DOWN** cycle the Paper color, both wrapping between color 0 and 7.
+Press the **cursor keys** to move the cursor around the grid. **LEFT**/**RIGHT** cycle the Ink color (wrapping between the grid's two 4-wide halves), **UP**/**DOWN** cycle the Paper color by two grid rows at a time, both wrapping between color 0 and 7.
 
 *Selecting ink and paper*
 
