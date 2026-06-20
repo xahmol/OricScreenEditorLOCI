@@ -1161,6 +1161,30 @@ on the gap columns' bytes (they were never part of any byte-level
 check), so the full 179/179 suite stayed green with no test changes
 needed — this fix only touches bytes no test was checking before.
 
+**Trailing space after pulldown options, and the charset-attr concern
+that turned out already fixed (post-launch, user-requested 2026-06-20)**:
+a user report asked for two things: (1) pulldown rows starting with an
+explicit `A_STD` attribute byte so they stay readable over canvas
+content using the alternate charset, and (2) a trailing space after
+each option's text. Checking (1) against the bleed-through fix above
+(which already blanks every pulldown row in full, starting at column 0,
+before any item is drawn) showed it was **already resolved as a side
+effect**: confirmed via a direct repro (plotted `A_ALT`-attributed
+content on the exact canvas row a pulldown's body would open over, then
+opened that pulldown) — the row-blank already overwrites that content
+with plain spaces (not attribute bytes) before the item is drawn, and
+the Oric ULA resets to Standard charset at the start of every scanline
+regardless, so there was nothing left to fix there. (2) was genuinely
+still open: `menu_draw_item()`'s padding loop padded short items up to
+`width` characters but never added space *past* the longest item in a
+pulldown, so that one item's text could butt directly against the
+`endcolor` byte with no breathing room. Fixed by padding to `width + 1`
+instead of `width` — safe even at the theoretical worst case (`xpos`
+clamped to 20, `width` up to `PULLDOWN_MAXLENGTH-1`=16): rightmost
+column becomes `20+2+16+1=39`, the last valid column, confirmed via a
+direct byte dump of the Charset menu's longest item ("Reset Std->ROM",
+14 chars) showing exactly one space column before `endcolor`.
+
 **Secondary-option statusbar hints (matches V1's mechanism):**
 
 User bug report: Line/Box mode's `o`/`c` toggles and Select mode's

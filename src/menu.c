@@ -283,9 +283,15 @@ static void menu_draw_item(uint8_t y, uint8_t xpos, uint8_t menunumber,
     row[xpos]     = paper;
     row[xpos + 1] = pfx;
     menu_screen_putn(xpos + 2, y, (const uint8_t *)title, len);
-    for (uint8_t x = len; x < width; x++)
+    // Pad to width+1, not width -- the extra column is a trailing space
+    // of breathing room after the longest item's own text (user-
+    // requested 2026-06-20), not just after shorter items. Safe against
+    // the screen's 40-column width even at the worst case (xpos clamped
+    // to 20, width up to PULLDOWN_MAXLENGTH-1=16): rightmost column
+    // becomes xpos+2+width+1 = 20+2+16+1 = 39, the last valid column.
+    for (uint8_t x = len; x < (uint8_t)(width + 1); x++)
         row[xpos + 2 + x] = CH_SPACE;
-    row[xpos + 2 + width] = endcolor;
+    row[xpos + 2 + width + 1] = endcolor;
 
     sprintf((char *)debug, "draw_item: y=%u, menunumber=%u, item=%u, sel=%u, title=\"%s\", width=%u", y, menunumber, item, selected, title, width);
 }
