@@ -39,7 +39,7 @@ excluding import/export since no established Oric formats exist): Try
 mode (`t`), Goto coordinates + jump-to-origin (`j`/`h`), a hollow-box
 toggle in Line/Box mode (`o`), Charset > Reset Std->ROM, a unified
 Find/Replace (`f`), and hex-direct attribute entry in Write mode
-(`FUNCT+5`) — see their own sections below, after "Charset-swap
+(`FUNCT+4`) — see their own sections below, after "Charset-swap
 mechanism".
 A previous CC65-based attempt at this got stuck and is archived
 in the `nonworkingcc65` branch (full history + uncommitted state). `main` was
@@ -1236,9 +1236,9 @@ character editor's `h` hex-row-input (`src/charsetedit.c`, since Phase
 bug had gone unnoticed since that feature shipped. Fixed both call
 sites in the same change.
 
-#### Hex-direct attribute entry in Write mode (`FUNCT+5`, `src/write.c`)
+#### Hex-direct attribute entry in Write mode (`FUNCT+4`, `src/write.c`)
 
-New `write_hex_attr()` (static helper) and `case KEY_F5:` in
+New `write_hex_attr()` (static helper) and `case KEY_F4:` in
 `write_run()`'s key switch: prompts for which attribute (`1`=Ink/
 `2`=Paper/`3`=Mod, ESC cancels), then a single hex digit 0-7
 (`cwin_textinput`, `VINPUT_NUMS | VINPUT_ALPHA`), and plots the
@@ -1248,18 +1248,12 @@ alongside the existing `CTRL+Z/X`/`CTRL+C/V` cycling, not a
 replacement for it -- useful when you already know the exact value you
 want instead of cycling to it one step at a time.
 
-**Picked `FUNCT+5` over the originally-planned `FUNCT+4` deliberately**:
-`include/keyboard.c`'s `decode_funct[]` (V1's own physical FUNCT-row
-keyboard mapping, present since this project's very first commit) maps
-`KEY_F4` to physical **FUNCT+R**, not FUNCT+digit-4 -- only
-`KEY_F1/F2/F3/F6/F8/F9` are genuine FUNCT+digit combos in this
-codebase's decode table. Phosphoric's `--type-keys` `\fN` escape only
-supports FUNCT+digit (see "Phosphoric Testing Notes" below), so
-`FUNCT+4` as originally planned would have been untestable headless.
-`KEY_F5` is a genuine FUNCT+5, unused anywhere else in `src/`, and lets
-`test-write-hexattr` (below) drive it directly -- caught and corrected
-during implementation, before any test was written against the wrong
-key.
+**Originally bound to `FUNCT+5` instead, temporarily**: `include/
+keyboard.c`'s `decode_funct[]` (this codebase's own physical FUNCT-row
+keyboard mapping) had a transcription bug mapping `KEY_F4` to physical
+**FUNCT+R** instead of the real hardware's FUNCT+digit-4. Since that
+bug is now fixed (see "FUNCT+digit keys now match real hardware
+exactly" below), this moved back to the originally-intended `FUNCT+4`.
 
 #### New automated test coverage
 
@@ -1275,6 +1269,67 @@ session -- these scripts were added retroactively in the final
 docs-and-tests pass to close that gap, per the project's established
 "every feature gets headless Phosphoric coverage where practical"
 convention.
+
+### FUNCT+digit keys now match real hardware exactly
+
+While testing the V1 file-format work above (FUNCT+8 failing to open
+help during manual testing), found and fixed a real transcription bug
+in `include/keyboard.c`'s `decode_funct[]` table — the matrix-position
+lookup consulted when `MOD_FUNCT` is the active modifier.
+
+**Real hardware/firmware fact, confirmed against CC65's actual Oric
+Atmos platform code** (`~/cc65/libsrc/atmos/cgetc.s`,
+`~/cc65/include/atmos.h`): the Oric ROM's own IRQ-driven keyboard
+scanner produces F-keys via a simple rule — hold FUNCT, press digit N,
+and the ROM's `KEYBUF`/`MODEKEY` system variables already contain the
+digit's normal ASCII code; CC65's `cgetc()` just ORs `0x80` onto it.
+`CH_F1`..`CH_F9` = `0xB1`..`0xB9` (`'1'|0x80`..`'9'|0x80`), `CH_F10` =
+`0xB0` (`'0'|0x80`) — confirmed by checking every value in
+`~/cc65/include/atmos.h`. This codebase's own `KEY_F1`-`KEY_F10`
+constants (`include/keyboard.h`) already use these exact same numeric
+values — they were copied correctly. The bug was entirely in
+`decode_funct[]`'s *wiring*: it placed `KEY_F4`/`KEY_F8`/`KEY_F10` at
+the matrix positions for letters **R**/**U**,**I**/**O** instead of
+the matrix positions for digits **4**/**8**/**0** — a transcription
+error (the misleading comment "FUNCT+R=F4 (per v1 convention)" was
+itself wrong; there is no such V1 convention, V1 inherits the same
+real-hardware FUNCT+digit rule via CC65, like every other Oric program).
+This is **not** related to the keyboard scanning algorithm itself
+(`keyb_scan()`, based on the LOCI ROM's direct VIA/AY matrix read, not
+the Oric ROM's IRQ handler this codebase deliberately bypasses) — only
+the separate `decode_funct[]` lookup table layered on top of it was
+wrong.
+
+**Fix**: `decode_funct[]` rebuilt by finding each digit 0-9's actual
+matrix position in `decode_normal[]` and placing the corresponding
+`KEY_F*` value there (`KEY_F1`-`KEY_F9` at digits 1-9, `KEY_F10` at
+digit 0) — i.e. each entry is now simply "this digit's normal position,
+with the F-key value substituted in", not an independently-chosen
+mapping. `KEY_F1/F2/F3/F6/F9` happened to already be at the correct
+digit positions (only `F4`/`F8`/`F10` were wrong); the `FUNCT+ESC=ESC`
+entry was left untouched (harmless, unrelated to digits).
+
+**User-facing consequence**: `FUNCT+8` (help), `FUNCT+4` (Write mode
+hex-attribute entry, see above — moved back from the `FUNCT+5`
+workaround), and every other `FUNCT+N` binding in this app's docs now
+work via the literal physical combo the docs already named — no more
+"FUNCT+8 doesn't do anything, try FUNCT+U instead" confusion.
+
+**Found via a cascade of corrections during manual testing**: the
+ostensibly-passing `test_help_funct8.sh` had silently been testing a
+no-op the whole time — under the old broken table, `FUNCT+8` decoded
+to nothing at all (`decode_funct[pos]==0`, skipped by `keyb_decode()`,
+returning `KEY_NONE`), which looks identical to "help opened then
+auto-dismissed" from a dump showing unchanged statusbar/no help text —
+exactly what a genuine no-op also produces. The test's own comment
+("Phosphoric's `\fN` escape delivers the 2-key FUNCT combo as a single
+matrix event that `key_read()`'s second... call also picks up...")
+was a plausible-sounding but incorrect explanation for that symptom.
+Confirmed directly: with the fix applied, a single `\f8` leaves the
+help screen open indefinitely (30M+ cycles, no auto-dismiss) — every
+scenario in `test_help_funct8.sh` now sends an explicit second key to
+dismiss it, and a new scenario asserts the open-and-stays-open behavior
+directly as a regression test for the fix itself.
 
 ## Code Style
 
@@ -1338,7 +1393,7 @@ make test         # full automated Phosphoric test suite (test-boot, test-menus,
                   # path) and test-fileio-traffic (uses --loci-flash DIR
                   # instead, a real host filesystem directory for
                   # byte-level LOCI file I/O assertions).
-                  # Current total: 178/178.
+                  # Current total: 179/179.
 make test-boot    # headless boot smoke test (splash + canvas/statusbar render)
 make test-capture CYCLES=N TYPEKEYS='...'
                   # calibration helper: dumps tests/out/capture.bin + .png
@@ -1537,7 +1592,7 @@ src/
   move.c/h        Move mode ('m'): nudges the visible canvas content by one
                   row/col (see "Move mode (Phase 5d)")
   write.c/h       Write mode ('w'): free-typing screencodes with CTRL-key
-                  attribute toggles, plus FUNCT+5 hex-direct attribute
+                  attribute toggles, plus FUNCT+4 hex-direct attribute
                   entry (see "Write mode (Phase 5e)"/"Post-Phase-9
                   feature additions")
   menu.c/h        Menu bar/pulldown/popup engine + main-RAM window-save stack
@@ -1714,15 +1769,15 @@ tests:
   digit N together. If `make test-menus`/`test-screenresize` start failing
   with "FUNCT does nothing", check whether PHOSDIR points at a checkout with
   this patch.
-- **`\fN` only reaches `KEY_F1/F2/F3/F6/F8/F9` -- not `KEY_F4`.**
-  `include/keyboard.c`'s `decode_funct[]` (V1's own physical FUNCT-row
-  mapping) binds `KEY_F4` to physical **FUNCT+R**, not FUNCT+digit-4.
-  Any new feature wired to a `KEY_F*` constant for the sake of headless
-  test coverage should pick an unused genuine-FUNCT+digit slot
-  (`KEY_F5`/`F7`/`F9`/`F10`) rather than `KEY_F4` -- this is exactly
-  why Write mode's hex-attribute-entry feature (see "Post-Phase-9
-  feature additions") uses `FUNCT+5`, not the originally-planned
-  `FUNCT+4`.
+- **`\fN` now reaches all of `KEY_F1`-`KEY_F10` correctly** (see
+  "FUNCT+digit keys now match real hardware exactly" above) --
+  `decode_funct[]` had a transcription bug binding `KEY_F4`/`KEY_F8`/
+  `KEY_F10` to physical FUNCT+letter combos instead of genuine
+  FUNCT+digit, since fixed. Historical note: this previously caused a
+  silently-passing-but-meaningless `test_help_funct8.sh` (a no-op looks
+  identical to "opened then dismissed" in a single-dump assertion) and
+  forced Write mode's hex-attribute-entry feature onto `FUNCT+5` as a
+  workaround before moving back to the intended `FUNCT+4`.
 - **`+`/`=` keys were unmapped in Phosphoric's `char_map`** (`0x2B`/`0x3D`
   entries used matrix position `(7,7)`, which is unused in both Oric and OSE
   decode tables — should be `(7,6)`, the actual `=`/`+` key). Fixed locally in

@@ -710,7 +710,7 @@ Colors and attribute can be plotted while in write mode by first modifying the a
 - Pressing **FUNCT+1** plots ink
 - Pressing **FUNCT+2** plots paper
 - Pressing **FUNCT+3** plots character modifier.
-- **OSE-LOCI new:** Pressing **FUNCT+5** opens a popup to enter an
+- **OSE-LOCI new:** Pressing **FUNCT+4** opens a popup to enter an
   attribute directly as a hex digit: choose **1** for ink, **2** for
   paper or **3** for character modifier, then type a value 0-7. This is
   an alternative to cycling with CTRL+Z/X/C/V when you already know the
@@ -733,7 +733,7 @@ Leave Write mode by pressing **ESC**. **FUNCT+8** will show a help screen with t
 |**FUNCT+1**|Plots ink
 |**FUNCT+2**|Plots paper
 |**FUNCT+3**|Plots character modifier
-|**FUNCT+5**|**OSE-LOCI new:** Enter ink/paper/modifier as a hex digit
+|**FUNCT+4**|**OSE-LOCI new:** Enter ink/paper/modifier as a hex digit
 |**ESC** |Go back to main mode
 |**FUNCT+6**|Toggle statusbar visibility
 |**FUNCT+8**|Help screen

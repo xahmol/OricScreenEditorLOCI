@@ -58,24 +58,34 @@ static const uint8_t decode_shifted[64] = {
     '*', 'L', ')', '?',  0,   KEY_ENTER, '+', 0,
 };
 
-// FUNCT + digit/key maps: FUNCT+1=F1, FUNCT+2=F2, ... FUNCT+0=F10
+// FUNCT + digit maps: FUNCT+1=F1, FUNCT+2=F2, ... FUNCT+9=F9, FUNCT+0=F10 --
+// matches real Oric Atmos firmware exactly (confirmed against CC65's atmos
+// platform: cgetc.s just ORs 0x80 onto whatever digit's normal decode the
+// ROM's own KEYBUF/MODEKEY already produced; CH_F1..CH_F10 in CC65's
+// atmos.h are literally '1'|0x80..'9'|0x80,'0'|0x80, i.e. 0xB1..0xB9,0xB0 --
+// exactly this codebase's own KEY_F1..KEY_F10 values). So this table is
+// simply each digit's decode_normal[] matrix position with that bit-7-set
+// value substituted in -- not a separate, independently-chosen mapping.
+// An earlier version of this table incorrectly placed F4/F8/F10 at letter
+// positions (R/U,I/O) instead of the digit positions (4/8/0) -- a
+// transcription bug, not a deliberate V1/hardware difference; fixed here.
 static const uint8_t decode_funct[64] = {
-    // Row 0: FUNCT+7=F7  FUNCT+N  FUNCT+5=F5  FUNCT+V  --  FUNCT+1=F1  FUNCT+X  FUNCT+3=F3
+    // Row 0: FUNCT+7=F7  --  FUNCT+5=F5  --  --  FUNCT+1=F1  --  FUNCT+3=F3
     KEY_F7,  0,      KEY_F5, 0,  0,  KEY_F1, 0,  KEY_F3,
-    // Row 1: FUNCT+R=F4 (per v1 convention), FUNCT+ESC=ESC at col 5
-    0, 0, KEY_F4, 0, 0, KEY_ESC, 0, 0,
-    // Row 2: FUNCT+6=F6  FUNCT+2=F2
-    0, KEY_F6, 0, 0,  0,  0,  KEY_F2, 0,
+    // Row 1: FUNCT+ESC=ESC at col 5 (no digits in this row)
+    0, 0, 0, 0, 0, KEY_ESC, 0, 0,
+    // Row 2: FUNCT+6=F6  FUNCT+4=F4  FUNCT+2=F2
+    0, KEY_F6, 0, KEY_F4,  0,  0,  KEY_F2, 0,
     // Row 3: FUNCT+9=F9
     0, KEY_F9, 0, 0,  0,  0,   0,     0,
-    // Row 4: unused
+    // Row 4: unused (no digits)
     0, 0, 0,  0,      0,  0,   0,     0,
-    // Row 5: FUNCT+U=F8, FUNCT+I=F8, FUNCT+O=F10
-    0, KEY_F8, KEY_F10, 0,  0,  0,  0, 0,
-    // Row 6: unused
+    // Row 5: unused (no digits)
+    0, 0, 0, 0,  0,  0,  0, 0,
+    // Row 6: unused (no digits)
     0, 0, 0,  0,  0, 0, 0,  0,
-    // Row 7: FUNCT+0=F10
-    0, 0, KEY_F10, 0,  0,  0, 0, 0,
+    // Row 7: FUNCT+8=F8  FUNCT+0=F10
+    KEY_F8, 0, KEY_F10, 0,  0,  0, 0, 0,
 };
 
 // -------------------------------------------------------------------------

@@ -726,7 +726,7 @@ Les couleurs et attributs peuvent être tracés en mode écriture en modifiant d
 - Appuyer sur **FUNCT+1** trace l'encre
 - Appuyer sur **FUNCT+2** trace le papier
 - Appuyer sur **FUNCT+3** trace le modificateur de caractère.
-- **Nouveau OSE-LOCI :** Appuyer sur **FUNCT+5** ouvre une fenêtre pour
+- **Nouveau OSE-LOCI :** Appuyer sur **FUNCT+4** ouvre une fenêtre pour
   saisir un attribut directement en hexadécimal : choisissez **1** pour
   l'encre, **2** pour le papier ou **3** pour le modificateur de
   caractère, puis saisissez une valeur 0-7. C'est une alternative au
@@ -750,7 +750,7 @@ Quittez le mode Écriture en appuyant sur **ESC**. **FUNCT+8** affiche un écran
 |**FUNCT+1**|Trace l'encre
 |**FUNCT+2**|Trace le papier
 |**FUNCT+3**|Trace le modificateur de caractère
-|**FUNCT+5**|**Nouveau OSE-LOCI :** Saisir encre/papier/modificateur en hexadécimal
+|**FUNCT+4**|**Nouveau OSE-LOCI :** Saisir encre/papier/modificateur en hexadécimal
 |**ESC** |Revenir au mode principal
 |**FUNCT+6**|Basculer la visibilité de la barre d'état
 |**FUNCT+8**|Écran d'aide

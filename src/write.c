@@ -9,13 +9,13 @@
 // here. V1 uses FUNCT+1/2/3 (CH_F1/F2/F3) for the same three actions inside
 // writemode(); this port does the same (KEY_F1/F2/F3).
 //
-// New functionality, no V1 precedent: FUNCT+5 (KEY_F5) opens a hex-direct
-// attribute-entry popup (write_hex_attr()). Picked FUNCT+5 over FUNCT+4
-// deliberately -- include/keyboard.c's decode_funct[] (V1's own physical
-// FUNCT-row mapping) binds KEY_F4 to FUNCT+R, not FUNCT+digit-4, while
-// KEY_F5 is a genuine FUNCT+5. Using FUNCT+4 here would have been
-// untestable via Phosphoric's --type-keys, which only supports \fN for
-// FUNCT+digit combos, not FUNCT+letter.
+// New functionality, no V1 precedent: FUNCT+4 (KEY_F4) opens a hex-direct
+// attribute-entry popup (write_hex_attr()). This was briefly bound to
+// FUNCT+5 instead, because include/keyboard.c's decode_funct[] table had
+// a transcription bug binding KEY_F4 to FUNCT+R instead of the real
+// hardware's FUNCT+digit-4 (since fixed -- see CLAUDE.md "FUNCT+digit
+// keys now match real hardware exactly") -- moved back to the originally
+// intended FUNCT+4 once that was fixed.
 
 #include <string.h>
 #include "oric.h"
@@ -46,7 +46,7 @@ static uint8_t write_hex_digit(char c)
 }
 
 /**
- * FUNCT+5 in Write mode: an alternate, hex-direct input method alongside
+ * FUNCT+4 in Write mode: an alternate, hex-direct input method alongside
  * the existing CTRL+Z/X (ink)/CTRL+C/V (paper) cycling and FUNCT+1/2/3
  * (plot at cursor) -- prompts for which attribute (1=Ink/2=Paper/3=Mod),
  * then a single hex digit 0-7, and plots the resulting attribute byte at
@@ -100,7 +100,7 @@ static void write_hex_attr(void)
  * auto-scroll, cursor_move_scroll()); CTRL+B/A/D toggle blink/altchar/
  * double; CTRL+Z/X cycle ink down/up; CTRL+C/V cycle paper down/up;
  * FUNCT+1/2/3 plot ink/paper/modifier-attribute at the cursor and advance
- * right; FUNCT+5 is an alternate hex-direct attribute entry (see
+ * right; FUNCT+4 is an alternate hex-direct attribute entry (see
  * write_hex_attr()); DEL clears the cell under the cursor (no advance);
  * CTRL+R toggles a local reverse-video flag; any other printable key
  * plots its screencode (+0x80 if reverse-video is on) and advances
@@ -177,7 +177,7 @@ void write_run(void)
             cursor_move_scroll(1, 0);
             break;
 
-        case KEY_F5:
+        case KEY_F4:
             write_hex_attr();
             break;
 

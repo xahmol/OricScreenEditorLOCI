@@ -244,7 +244,7 @@ src/
                   (§6.9/§6.10/§6.11/§6.17)
   move.c/h        Move mode ('m'): nudges visible canvas content (§6.12)
   write.c/h       Write mode ('w'): free-typing screencodes, incl.
-                  FUNCT+5 hex-direct attribute entry (§6.13)
+                  FUNCT+4 hex-direct attribute entry (§6.13)
   fileio.c/h      LOCI file I/O backing the File/Charset menus (§6.14)
   filepicker.c/h  XRAM-backed LOCI directory browser for every Load
                   action (§6.15)
@@ -940,13 +940,15 @@ flag; any other printable key plots its screencode (`+0x80` if
 reverse-video) and advances right. `FUNCT+6` toggles the statusbar. ESC
 exits to Main.
 
-**Hex-direct attribute entry (new, no V1 precedent)**: `FUNCT+5`
-(`KEY_F5`, not `FUNCT+4` — see §7's `decode_funct[]` testability note)
-opens `write_hex_attr()`: choose `1`/`2`/`3` for ink/paper/modifier,
-type a single hex digit 0-7, and the resulting attribute byte is
-plotted at the cursor exactly like `FUNCT+1/2/3` do (advance right
-after). An alternative input method alongside the existing
-`CTRL+Z/X`/`CTRL+C/V` cycling, not a replacement for it.
+**Hex-direct attribute entry (new, no V1 precedent)**: `FUNCT+4`
+(`KEY_F4`) opens `write_hex_attr()`: choose `1`/`2`/`3` for
+ink/paper/modifier, type a single hex digit 0-7, and the resulting
+attribute byte is plotted at the cursor exactly like `FUNCT+1/2/3` do
+(advance right after). An alternative input method alongside the
+existing `CTRL+Z/X`/`CTRL+C/V` cycling, not a replacement for it. (Was
+briefly bound to `FUNCT+5` instead, due to a now-fixed `decode_funct[]`
+transcription bug — see §8's "FUNCT+digit keys now match real hardware
+exactly".)
 
 ### 6.14 LOCI file I/O (`src/fileio.c`, File/Charset menus, Phase 6)
 
@@ -1241,7 +1243,7 @@ first match, no canvas change). For ink/paper targets, a candidate byte
 must first pass the serial-attribute test `(b & 0x60) == 0` before its
 sub-range (`0x00-0x07`/`0x10-0x17`) is checked.
 
-(Write mode's hex-direct attribute entry, `FUNCT+5`, is documented
+(Write mode's hex-direct attribute entry, `FUNCT+4`, is documented
 inline in §6.13 above alongside the rest of Write mode's key table,
 not as a separate section here, since it's a single new case with no
 standalone state of its own.)
@@ -1278,7 +1280,7 @@ make test-undo-overflow                     # Clear/Fill on an oversized canvas:
 make test-help-funct8                       # FUNCT+8 round-trips cleanly, Main + Character editor (Phase 9b)
 make test-fileio-traffic                     # actual LOCI file bytes: Save Screen/Combined/Project, Load Screen, Charset Save Std (--loci-flash)
 make test-findreplace                       # Find/Replace ('f'): cancel, find-only jump, replace-all, undo, ink recolor
-make test-write-hexattr                     # Write mode FUNCT+5 hex-direct attribute entry: cancel + ink/paper/modifier
+make test-write-hexattr                     # Write mode FUNCT+4 hex-direct attribute entry: cancel + ink/paper/modifier
 make test-trymode                           # Try mode ('t'): commit/cancel/undo
 make test-goto                              # Goto ('j') + Home ('h'): cancel, jump, jump-back
 make test-hollowbox                         # Line/Box 'o' toggle: hollow border vs filled, toggle-back
@@ -1292,7 +1294,7 @@ make test-capture CYCLES=N TYPEKEYS='...'  # calibration helper for new scripts 
 - `tests/scripts/oric_screen.py` decodes the 40x28 `$BB80` text screen from a
   `--dump-ram-at` dump, providing `--find`/`--row`/`--bytes` assertions used
   by the shell scripts in `tests/scripts/test_*.sh`.
-- Current totals: 4+18+8+2+12+14+14+2+6+10+4+6+5+5+8+7+18+5+6+4+3+5+12 = **178/178**
+- Current totals: 4+18+8+2+12+14+14+2+6+10+4+6+5+5+8+8+18+5+6+4+3+5+12 = **179/179**
   (`test-boot` + `test-menus` + `test-screenresize` +
   `test-charsetram-spike` + `test-charsetedit` + `test-palette` +
   `test-colourpicker` + `test-cursor-autoscroll` + `test-linebox` +
@@ -1327,16 +1329,18 @@ make test-capture CYCLES=N TYPEKEYS='...'  # calibration helper for new scripts 
   way if needed. Real hardware remains the authoritative check given
   Phosphoric's LOCI emulation is alpha-quality, same caveat as the
   colour picker's hardware-rendering issue.
-- **`KEY_F4` is bound to physical FUNCT+R, not FUNCT+digit-4** —
-  `include/keyboard.c`'s `decode_funct[]` (V1's own physical FUNCT-row
-  mapping) maps `KEY_F1/F2/F3/F6/F8/F9` to genuine FUNCT+digit combos,
-  but `KEY_F4` specifically to FUNCT+R. Phosphoric's `--type-keys`
-  `\fN` escape only supports FUNCT+digit, so any new FUNCT-combo
-  feature that needs headless coverage should use an unused
-  digit-bound slot (`KEY_F5/F7/F9/F10`) rather than `KEY_F4`. This bit
-  the Write mode hex-attribute-entry feature (§6.13) during
-  development — it was moved from the originally-planned FUNCT+4 to
-  FUNCT+5 specifically so `test-write-hexattr` could drive it.
+- **`KEY_F4`/`KEY_F8`/`KEY_F10` used to be bound to the wrong physical
+  keys (FUNCT+R, FUNCT+U/I, FUNCT+O) instead of genuine FUNCT+digit
+  combos** — a transcription bug in `include/keyboard.c`'s
+  `decode_funct[]` table, since fixed (see "FUNCT+digit keys now match
+  real hardware exactly" in CLAUDE.md). All ten `KEY_F1`-`KEY_F10` are
+  now genuine `FUNCT+1`...`FUNCT+9`/`FUNCT+0` combos, confirmed against
+  CC65's own Oric Atmos platform code (`cgetc.s`/`atmos.h`) and fully
+  drivable via Phosphoric's `--type-keys` `\fN` escape. This bit the
+  Write mode hex-attribute-entry feature (§6.13) during development —
+  it was temporarily moved to `FUNCT+5` to work around the bug, then
+  moved back to the originally-intended `FUNCT+4` once the real fix
+  landed.
 - **`cwin_textinput()`'s `VINPUT_ALPHA` flag does not include digits**,
   despite its `include/charwin.h` comment ("Alpha + digits") — the
   validation in `include/charwin.c` checks `validation & VINPUT_NUMS`
