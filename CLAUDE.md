@@ -250,8 +250,8 @@ palette mode also showing inverse ink/paper colour combinations"). Popup
 
 - **Layout**: row 0 = title (`MSG_COLOURPICKER_TITLE`); rows 1-16
   (`CP_ROW_GRID0=1`) = the split grid, 4 cells per row (`CP_GRID_X0=2`,
-  `CP_CELL_STEP=5` cols/cell): `[A_BGWHITE reset byte, ink-attr byte,
-  paper-attr byte (16+paper), normal swatch, inverse swatch]`. Rows 17-19
+  `CP_CELL_STEP=4` cols/cell): `[paper-attr byte (16+paper), ink-attr byte,
+  normal swatch, inverse swatch]`. Rows 17-19
   are feedback lines: `"Ink:    N"` + swatch (`CP_ROW_INK`), `"Paper:
   N"` + swatch (`CP_ROW_PAPER`), `"Result:"` + ink/paper attrs + normal+inverse
   preview pair (`CP_ROW_RESULT`).
@@ -271,37 +271,61 @@ palette mode also showing inverse ink/paper colour combinations"). Popup
 - **Charset-swap**: opts IN — swatch glyphs (`CH_SPACE`/`CH_INVSPACE`) are
   plain Std-charset chars, no live-edit-preview requirement.
 
-**Colour picker rendering fix (was a known issue, now fixed)**: a user
-screenshot from real Oric Atmos hardware showed each grid cell rendering as
-repeating rainbow bands instead of a solid ink/paper swatch pair — never
-reproduced in emulation. The original 8-wide/8-row grid's per-cell write
-was `[ink-attr, paper-attr, swatch0, swatch1]` (4 bytes), **dropping the
-leading `A_BGWHITE` reset byte V1's own `colourpicker()` always writes**
-(`[A_BGWHITE, ink, paper+16, '-', '-'+128]`, 5 bytes) — an earlier draft of
-this section reasoned that byte was colour-neutral ("immediately
-overwritten by the following `paper+16`"), which **the user confirmed is
-wrong**: an attribute byte's own character-cell-wide slot renders using
-whatever colour state was active *before* it takes effect, so without
-that reset, each cell's first attribute byte visibly showed the *previous*
-cell's actual colour for one cell-width — exactly the banding artifact
-reported. The user also confirmed there is **no inherent hardware limit**
-on attribute-change density (ruling out the other theory this section used
-to float, a ULA timing quirk from 16 attribute changes packed into one
-36-column row).
+**Colour picker rendering fix, round 1 (history)**: a user screenshot from
+real Oric Atmos hardware showed each grid cell rendering as repeating
+rainbow bands instead of a solid ink/paper swatch pair — never reproduced
+in emulation at the time. The original 8-wide/8-row grid's per-cell write
+was `[ink-attr, paper-attr, swatch0, swatch1]` (4 bytes); the fix applied
+then added a leading `A_BGWHITE` reset byte (5 bytes total,
+`[A_BGWHITE, ink, paper+16, swatch0, swatch1]`, matching V1's
+`colourpicker()` literally) and split the grid 4-wide/16-row
+(`cp_grid_pos()` maps `(ink, paper)` to `(col=ink%4, row=paper*2+ink/4)`)
+since 8 cells x 5 bytes = 40 columns didn't fit alongside this popup's 2
+reserved border columns.
 
-**Fix**: restore V1's 5-byte-per-cell pattern exactly. This needs a 5th
-column per cell, which doesn't fit if all 8 ink values share one row
-(8*5=40 columns, plus this popup reserves 2 border columns V1's own window
-system didn't use) — so the grid is now split 4-wide/16-row (`cp_grid_pos()`
-maps `(ink, paper)` to `(col=ink%4, row=paper*2+ink/4)`) instead, keeping
-both swatches and the reset byte without exceeding the screen width.
-Verified directly via Phosphoric byte dumps: e.g. cell (ink=7, paper=0) now
-writes `17 07 10 a0 20` (reset, ink, paper, swatches) at the correct split
-grid position — confirmed byte-for-byte against the formula by hand before
-trusting the dump. `tests/scripts/test_colourpicker.sh` updated for the new
-cell addresses/5-byte shape; `app.plotink`/`plotpaper` remain settable
-without this popup via the `,`/`.`/`;`/`'` cycling keys (Phase 4a,
-`src/editor.c`) regardless.
+**Round 2 (the actual root cause, found via Phosphoric screenshot pixel
+inspection, not real hardware)**: round 1's fix reduced the artifact but
+didn't eliminate it — a later user screenshot (this time reproduced
+directly in Phosphoric, which evidently *can* emulate this ULA behaviour
+correctly, unlike the "never reproduced in emulation" framing above)
+still showed visible white gaps inside and between cells. Diagnosed by
+sampling `--screenshot-at`'s PPM pixel-by-pixel per text column for a
+known cell and comparing against the exact byte sequence written there:
+**paper-setting attribute bytes take effect immediately, on their own
+column; ink-setting attribute bytes do not affect that (blank) column's
+rendering at all** — the opposite of the "takes effect one column late"
+model round 1 assumed for *all* attribute bytes. Round 1's 5-byte order
+(`reset=A_BGWHITE, ink, paper, swatch0, swatch1`) writes paper *twice* (the
+reset and the real paper-attr) with an ink-attr sandwiched between them;
+since paper only "sticks" instantly and ink doesn't matter until a glyph
+is drawn, the reset's column and the ink-attr's column both rendered as
+stale **white** (from the reset) before the real paper-attr column
+finally switched to the cell's actual paper colour — visible as a
+2-column-wide white flash at the start of every cell. The same backwards
+order in the end-of-row trailing reset (`ink-reset` written before
+`paper-reset`) left a 1-column stale-colour artifact at the row's tail
+for the same reason.
+
+**Fix**: drop the redundant leading reset byte entirely and write
+**paper before ink**: `[paper-attr (16+paper), ink-attr, normal swatch,
+inverse swatch]`, 4 bytes/cell (`CP_CELL_STEP=4`). The paper-attr byte is
+self-resetting (it overrides whatever paper was active before, immediately,
+on its own column) so no separate reset is needed; the trailing end-of-row
+reset pair was reordered the same way (`A_BGWHITE` before `A_FWBLACK`).
+Verified via Phosphoric `--screenshot-at` PPM pixel sampling, before and
+after: the before-image showed exactly the predicted 2-column white gaps
+per cell and a 1-column tail artifact; the after-image showed clean,
+gap-free colour blocks with no stale bleed anywhere in the row. Byte-level
+sanity-checked too: cell (ink=7, paper=0) now writes `10 07 a0 20`
+(paper, ink, swatches) at the recomputed split-grid address.
+`tests/scripts/test_colourpicker.sh` updated for the new cell
+addresses/4-byte shape (179/179 full suite still green);
+`app.plotink`/`plotpaper` remain settable without this popup via the
+`,`/`.`/`;`/`'` cycling keys (Phase 4a, `src/editor.c`) regardless. The
+freed 5th column per cell wasn't reclaimed by widening back to a single
+8-wide row in this pass (would need re-deriving `CP_ROW_INK/PAPER/RESULT`
+positions and window height, and re-touching every test address again) —
+left as a possible future simplification, not done here.
 
 ### Cursor auto-scroll fix (Phase 5)
 

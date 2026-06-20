@@ -60,7 +60,7 @@
 
 #define CP_TITLE_X    2   // x of MSG_COLOURPICKER_TITLE
 #define CP_GRID_X0    2   // window-relative x of grid column 0 (ink%4==0)
-#define CP_CELL_STEP  5   // columns per grid cell (reset, ink, paper, 2 swatches)
+#define CP_CELL_STEP  4   // columns per grid cell (paper, ink, 2 swatches)
 #define CP_INKS_PER_ROW 4 // ink values per grid row (the split: 0-3, then 4-7)
 #define CP_RESET_X   (CP_GRID_X0 + CP_INKS_PER_ROW * CP_CELL_STEP) // end-of-row reset pair
 
@@ -101,12 +101,14 @@ static void cp_grid_pos(uint8_t ink, uint8_t paper, uint8_t *outcol, uint8_t *ou
 
 /**
  * Draw (or erase) the cursor highlight on grid cell (ink, paper) by
- * rewriting its 5-byte cell: a leading A_BGWHITE reset (matching V1's
- * colorpicker() exactly -- see this file's header comment for why this
- * byte is required, not cosmetic), the ink/paper attribute bytes, then
- * the two swatch characters with CH_SPACE/CH_INVSPACE swapped to show
- * the highlight (matching charsetedit's ^0x80 cursor-rendering
- * convention applied to a 2-char cell).
+ * rewriting its 4-byte cell: the paper attribute byte first (paper-setting
+ * attribute bytes take effect immediately on their own column on real Oric
+ * hardware, confirmed via Phosphoric pixel-level screenshot inspection --
+ * see this file's header comment), then the ink attribute byte (taking
+ * effect for the swatches that follow), then the two swatch characters
+ * with CH_SPACE/CH_INVSPACE swapped to show the highlight (matching
+ * charsetedit's ^0x80 cursor-rendering convention applied to a 2-char
+ * cell).
  *
  * @param ink       Ink value, 0-7.
  * @param paper     Paper value, 0-7.
@@ -125,11 +127,10 @@ static void cp_draw_cell(uint8_t ink, uint8_t paper, uint8_t highlight)
     x = (uint8_t)(CP_GRID_X0 + col * CP_CELL_STEP);
     y = (uint8_t)(CP_ROW_GRID0 + row);
 
-    cwin_putat_char(&cp_win, x, y, A_BGWHITE);
+    cwin_putat_char(&cp_win, x, y, (uint8_t)(16 + paper));
     cwin_putat_char(&cp_win, (uint8_t)(x + 1), y, ink);
-    cwin_putat_char(&cp_win, (uint8_t)(x + 2), y, (uint8_t)(16 + paper));
-    cwin_putat_char(&cp_win, (uint8_t)(x + 3), y, normal);
-    cwin_putat_char(&cp_win, (uint8_t)(x + 4), y, inverse);
+    cwin_putat_char(&cp_win, (uint8_t)(x + 2), y, normal);
+    cwin_putat_char(&cp_win, (uint8_t)(x + 3), y, inverse);
 }
 
 /**
@@ -153,8 +154,8 @@ static void cp_draw_grid(void)
     for (row = 0; row < 16; row++)
     {
         uint8_t y = (uint8_t)(CP_ROW_GRID0 + row);
-        cwin_putat_char(&cp_win, CP_RESET_X, y, A_FWBLACK);
-        cwin_putat_char(&cp_win, (uint8_t)(CP_RESET_X + 1), y, A_BGWHITE);
+        cwin_putat_char(&cp_win, CP_RESET_X, y, A_BGWHITE);
+        cwin_putat_char(&cp_win, (uint8_t)(CP_RESET_X + 1), y, A_FWBLACK);
     }
 }
 
