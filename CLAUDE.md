@@ -797,6 +797,45 @@ Save — browsing to pick a name to overwrite isn't the same UX problem).
   specifically still isn't covered by an automated test, only the
   top-level single-pane listing/selection path.
 
+**Styling and key-overview row (post-launch, user-requested)**: the
+browser originally highlighted the cursor row via whole-row inverse
+video (XOR `0x80` on every character) with no other key-binding
+discoverability at all. Restyled to match this codebase's own pulldown-
+menu convention (`src/menu.c`'s `menu_draw_item()`: cyan paper for
+unselected rows, yellow paper + a leading `-` for the selected one) —
+also confirmed against the archived `nonworkingcc65` branch's own
+`dir_print_entry()` (`A_BGYELLOW`/`A_BGCYAN` + a `'-'`/`' '` indicator,
+the same single-paper-attribute-byte approach, no separate ink byte
+needed since the window's own base ink is already established at
+absolute columns 0/1 by `cwin_clear()`'s `row_setattr()`) and
+`locifilemanager-v2`'s `dir.c` (same `A_BGYELLOW`/`A_BGCYAN` pairing,
+confirming this is this codebase family's established convention, not
+something invented for this fix). `picker_draw_list()` now writes the
+paper attribute + indicator at window-relative columns 0/1 (previously
+spare — the filename area always started at column 2, `PICKER_NAME_
+COLS`, unchanged) instead of XOR-ing the whole row.
+
+A new key-overview row (`MSG_FILE_PICKER_KEYS`, `"UpDn:Move Ent:Open
+Esc:Cancel"` EN / `"UpDn:Deplacer Ent:Ouvrir Esc:Annuler"` FR, both
+exactly 36 characters — the full window width) was added below the
+list (`PICKER_KEYS_Y=14`, `PICKER_WIN_WY` grown 14->15 to fit it,
+`PICKER_PAGE_ROWS` unchanged at 12 — there was room without shrinking
+the visible list). Drawn by `picker_draw_header()` (already called on
+every redraw, so the hint never needs a separate draw path) at
+window-relative column 0 (not column 2 like the title/path rows) to use
+the full 36-column width, since this row needs no reserved
+attribute/indicator columns of its own. Left (ascend to parent) isn't
+mentioned in the hint — no room left in the 36-character budget after
+the three most essential keys; the README documents it fully.
+
+No test changes needed: every existing assertion checks the plain
+displayed text via `oric_screen.py --find` (which already masks off the
+inverse-video bit), none asserted on the raw highlighted-row bytes this
+change replaced. Verified visually via Phosphoric screenshots (both EN
+and FR builds) that the cyan/yellow split, the `-` indicator, and the
+key-overview row all render correctly and the FR string fits its full
+36-character budget with no truncation.
+
 ### Homedir-relative LOCI paths (post-launch fix)
 
 User report (2026-06-20, real hardware): the boot splash (`OSETSC.BIN`)

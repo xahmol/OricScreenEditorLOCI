@@ -29,13 +29,14 @@
 #define PICKER_WIN_SX  2
 #define PICKER_WIN_SY  0
 #define PICKER_WIN_WX 36
-#define PICKER_WIN_WY 14
+#define PICKER_WIN_WY 15
 
 #define PICKER_TITLE_Y   0
 #define PICKER_PATH_Y    1
 #define PICKER_LIST_Y0   2
 #define PICKER_PAGE_ROWS 12
 #define PICKER_NAME_COLS 34   // display width for a row (window is 36 wide)
+#define PICKER_KEYS_Y    14   // key-overview row, below the list (PICKER_WIN_WY-1)
 
 // XRAM layout for the directory linked list -- matches
 // locifilemanager-v2's DIR1BASE/DIRSIZE (dir.h), but only one list (OSE's
@@ -165,7 +166,12 @@ static void picker_build_list(const char *path, uint8_t filter)
 }
 
 /**
- * Draw the title and path rows.
+ * Draw the title and path rows, plus the key-overview row below the list
+ * (MSG_FILE_PICKER_KEYS, user-requested 2026-06-20 -- the browser's
+ * controls weren't discoverable without already knowing them from the
+ * README). Redrawn on every reload (cheap, and never changes), not just
+ * once at popup entry, since this is the function every redraw path
+ * already calls.
  *
  * @param w     Popup window.
  * @param title Title row text.
@@ -176,15 +182,29 @@ static void picker_draw_header(OricCharWin *w, const char *title, const char *pa
 {
     cwin_putat_string(w, 2, PICKER_TITLE_Y, title);
     cwin_putat_string(w, 2, PICKER_PATH_Y, path);
+    cwin_putat_string(w, 0, PICKER_KEYS_Y, MSG_FILE_PICKER_KEYS);
 }
 
 /**
  * Redraw all PICKER_PAGE_ROWS list rows starting from picker_firstprint,
  * following each element's `next` pointer, highlighting picker_cursorrow
- * (XOR 0x80 on every displayed character -- a whole-row analogue of this
- * codebase's usual single-cell cursor convention, since a filename spans
- * many columns). Directory entries get a trailing '/' marker. Rows beyond
- * the end of the list are blanked.
+ * to match this codebase's pulldown-menu convention (src/menu.c's
+ * menu_draw_item(): cyan paper for unselected rows, yellow paper +
+ * leading '-' for the selected one) instead of the previous whole-row
+ * inverse-video (XOR 0x80) scheme -- user-requested 2026-06-20, also
+ * matching the archived `nonworkingcc65` branch's own dir_print_entry()
+ * (`A_BGYELLOW`/`A_BGCYAN` + a `'-'`/`' '` indicator at the column right
+ * after the paper-attribute byte). Window-relative columns 0/1 (the
+ * window's own base ink/paper attrs, set once by cwin_clear()'s
+ * row_setattr() at absolute columns 0/1, already established the row's
+ * ink before column 2 -- so only a fresh PAPER byte is needed here, no
+ * separate ink byte, exactly matching nonworkingcc65's single-attribute-
+ * byte approach) hold the per-row paper attribute and the '-'/' '
+ * indicator; the filename itself is unchanged, starting at column 2
+ * (PICKER_NAME_COLS, unaffected -- columns 0/1 were already spare,
+ * never part of that budget). Directory entries get a trailing '/'
+ * marker. Rows beyond the end of the list are blanked (still coloured,
+ * though the cursor can never actually land on one in practice).
  *
  * @param w Popup window.
  * @return (none)
@@ -195,7 +215,8 @@ static void picker_draw_list(OricCharWin *w)
     char       name[64];
     PickerMeta meta;
     uint16_t   addr = picker_firstprint;
-    uint8_t    row, i, len;
+    uint8_t    row, i, len, y;
+    uint8_t    selected;
 
     for (row = 0; row < PICKER_PAGE_ROWS; row++)
     {
@@ -219,10 +240,12 @@ static void picker_draw_list(OricCharWin *w)
         for (i = len; i < PICKER_NAME_COLS; i++) line[i] = CH_SPACE;
         line[PICKER_NAME_COLS] = '\0';
 
-        if (row == picker_cursorrow)
-            for (i = 0; i < PICKER_NAME_COLS; i++) line[i] = (char)(line[i] | 0x80);
+        selected = (row == picker_cursorrow);
+        y = (uint8_t)(PICKER_LIST_Y0 + row);
 
-        cwin_putat_string(w, 2, (uint8_t)(PICKER_LIST_Y0 + row), line);
+        cwin_putat_char(w, 0, y, selected ? A_BGYELLOW : A_BGCYAN);
+        cwin_putat_char(w, 1, y, selected ? '-' : CH_SPACE);
+        cwin_putat_string(w, 2, y, line);
     }
 }
 

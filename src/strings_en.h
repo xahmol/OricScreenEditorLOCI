@@ -46,6 +46,7 @@
 #define MSG_FILE_NOT_FOUND        "File not found."
 #define MSG_FILE_NO_FILES         "No matching files found."
 #define MSG_FILE_PATH_TOO_LONG    "Path too long."
+#define MSG_FILE_PICKER_KEYS      "UpDn:Move Ent:Open Esc:Cancel"
 #define MSG_FILEIO_PROMPT_WIDTH   "Enter screen width:"
 #define MSG_FILEIO_PROMPT_HEIGHT  "Enter screen height:"
 
