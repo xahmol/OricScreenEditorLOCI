@@ -101,7 +101,10 @@ static void write_hex_attr(void)
  * double; CTRL+Z/X cycle ink down/up; CTRL+C/V cycle paper down/up;
  * FUNCT+1/2/3 plot ink/paper/modifier-attribute at the cursor and advance
  * right; FUNCT+4 is an alternate hex-direct attribute entry (see
- * write_hex_attr()); DEL clears the cell under the cursor (no advance);
+ * write_hex_attr()); DEL moves left (a no-op at canvas-absolute column 0)
+ * then clears that cell -- backspace-style, a deliberate departure from
+ * V1's writemode() (whose CH_DEL clears the cell under the cursor in
+ * place with no movement), per explicit user request 2026-06-20;
  * CTRL+R toggles a local reverse-video flag; any other printable key
  * plots its screencode (+0x80 if reverse-video is on) and advances
  * right. FUNCT+6 toggles the statusbar. ESC exits to Main. The cursor
@@ -187,6 +190,12 @@ void write_run(void)
             break;
 
         case KEY_DEL:
+            // Backspace-style (user-requested 2026-06-20 departure from
+            // V1's writemode(), whose CH_DEL clears the cell under the
+            // cursor in place with no movement): move left first (a
+            // no-op at canvas-absolute column 0, same as KEY_LEFT), then
+            // clear whatever cell the cursor now sits on.
+            cursor_move_scroll(-1, 0);
             undo_snapshot(app.cursor_x + app.xoffset, app.cursor_y + app.yoffset, 1, 1);
             canvas_put(app.cursor_x + app.xoffset, app.cursor_y + app.yoffset, CH_SPACE);
             break;

@@ -15,13 +15,15 @@
 #
 # NOT exercised here (no automated coverage possible): the CTRL+letter
 # toggles (CTRL+B/A/D blink/altchar/double, CTRL+Z/X/C/V ink/paper cycling,
-# CTRL+R reverse-video) and DEL-clears-cell. Phosphoric's --type-keys has
-# no CTRL-modifier escape (only Shift, via uppercase letters) and DEL
-# (0x7F) is unmapped in its char_map (see CLAUDE.md "Phosphoric testing
-# notes") -- both are covered by the manual Oricutron/Phosphoric walkthrough
-# in the Phase 5 plan instead, and by code review (the bit-packing/cycling
-# logic is identical to the already-tested Main-mode ','/'.'/';'/'\''/'b'/
-# 'd'/'a' handlers in src/editor.c).
+# CTRL+R reverse-video) and DEL (backspace-style: move left, then clear --
+# see write.c's header comment, a 2026-06-20 departure from V1's
+# in-place-clear). Phosphoric's --type-keys has no CTRL-modifier escape
+# (only Shift, via uppercase letters) and DEL (0x7F) is unmapped in its
+# char_map (see CLAUDE.md "Phosphoric testing notes") -- both are covered
+# by the manual Oricutron/Phosphoric walkthrough in the Phase 5 plan
+# instead, and by code review (the bit-packing/cycling logic is identical
+# to the already-tested Main-mode ','/'.'/';'/'\''/'b'/'d'/'a' handlers in
+# src/editor.c; DEL reuses the already-tested cursor_move_scroll()).
 #
 # --type-keys notes (see CLAUDE.md "Phosphoric testing notes"):
 #   \p1 = pause 1s (releases all keys). \fN = FUNCT+N. A \p1 MUST precede

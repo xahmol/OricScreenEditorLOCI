@@ -455,9 +455,12 @@ of V1's free-typing key table: cursor keys move (with auto-scroll); `CTRL+B`/
 `CTRL+A`/`CTRL+D` toggle blink/altchar/double; `CTRL+Z`/`CTRL+X` cycle ink
 down/up; `CTRL+C`/`CTRL+V` cycle paper down/up; `FUNCT+1`/`FUNCT+2`/`FUNCT+3`
 plot ink/paper/modifier-attribute at the cursor and advance right; `DEL`
-clears the cell (no advance); `CTRL+R` toggles a local reverse-video flag;
-any other printable key plots its screencode (`+0x80` if reverse-video is
-on) and advances right. `FUNCT+6` toggles the statusbar. ESC exits to Main.
+moves left (a no-op at canvas-absolute column 0) then clears that cell --
+backspace-style, see "DEL is backspace-style" below for why this is a
+deliberate departure from V1 rather than a straight port; `CTRL+R` toggles
+a local reverse-video flag; any other printable key plots its screencode
+(`+0x80` if reverse-video is on) and advances right. `FUNCT+6` toggles the
+statusbar. ESC exits to Main.
 
 **Why `FUNCT+1/2/3`, not `i`/`o`/`u`**: Main mode's `i`/`o`/`u` keys
 (below) plot ink/paper/modifier at the cursor, but Write mode can't reuse
@@ -479,6 +482,23 @@ via uppercase letters) and `DEL` (0x7F) is unmapped in its `char_map` (see
 Phosphoric walkthrough instead, and by code review (identical bit-packing/
 cycling logic to the already-tested Main-mode `,`/`.`/`;`/`'`/`b`/`d`/`a`
 handlers).
+
+**DEL is backspace-style, a deliberate departure from V1 (post-launch
+change)**: user-reported (2026-06-20) — DEL "does not have expected
+behaviour of clearing last char". Checked V1's `writemode()` first: its
+own `CH_DEL` case clears the cell *under the cursor* with no movement at
+all ("Delete present screencode and attributes" — V1's own comment says
+"present", not "previous") — so the pre-change OSE behaviour was already
+a faithful, byte-for-byte port of V1, not a porting bug. The user
+confirmed they want different (backspace-style) behaviour regardless,
+a deliberate choice to diverge from V1 here. Changed to: `cursor_move_
+scroll(-1, 0)` first (a no-op at canvas-absolute column 0, the same
+function `KEY_LEFT` already uses — no row-wrap, consistent with how
+forward-typing's own right-advance never wraps rows either), then clear
+whatever cell the cursor now sits on. Still not exercised by an
+automated test (same Phosphoric `DEL`-unmapped limitation as before);
+the implementation reuses `cursor_move_scroll()`, which *is* exercised
+extensively elsewhere, so the change rides on already-tested logic.
 
 ### `G`/`I`/`O`/`U`/`R` main-mode keys (Phase 5f)
 
