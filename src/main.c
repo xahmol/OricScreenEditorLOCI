@@ -2,16 +2,27 @@
 //
 // Phase 1: splash screen, canvas + statusbar init, main-mode editor loop.
 // Phase 9 (revised after Phase 9c shipped): the splash is V1's actual
-// title screen image (assets/OSEforLOCI-Title.bin, carried over from V1
-// -- see ARCHITECTURE.md/CLAUDE.md "Source Layout"), matching V1's own
-// boot sequence (local reference at
+// title screen image, matching V1's own boot sequence (local reference at
 // /home/xahmol/git/OricScreenEditor/src/main.c: loads "OSETSC.BIN" into
-// SCREENMEMORY, overlays "Press key." at row 26, waits for a key). OSE
-// embeds the image at compile time (#embed lzo, no LOCI dependency)
-// instead of V1's tape load, and overlays MSG_SPLASH_PRESSKEY the same
-// way. The image's own rows 24-25 already contain V1's "IDreamtIn8Bits.com
-// / Written in 2022 by Xander Mol" credit text baked in; row 26 is blank,
+// SCREENMEMORY, overlays "Press key." at row 26, waits for a key). The
+// image's own rows 24-25 already contain V1's "IDreamtIn8Bits.com /
+// Written in 2022 by Xander Mol" credit text baked in; row 26 is blank,
 // reserved for the "press key" overlay.
+//
+// Loaded from LOCI at runtime (assets/OSETSC.BIN, distributed via `make
+// usb` to the LOCI device's root, see Makefile) -- a deliberate reversal
+// of the earlier #embed-at-compile-time approach (Phase 9b/9c), which
+// cost ~5.4KB of the $0580-$B200 code/data/bss region purely to keep
+// these 5 screens (this title image + the 4 help screens, see
+// src/help.c) usable with no LOCI device attached. Now that LOCI is
+// mandatory to even boot (below), that tradeoff buys nothing any more --
+// loading from LOCI instead frees that headroom AND makes the title
+// image editable directly in OSE itself (dog-fooding, since OSE can now
+// load/save its own bare screen-dump format, see "LOCI file I/O").
+// Missing/unreadable file degrades gracefully (skips the image, still
+// shows the press-key prompt and proceeds) rather than erroring -- same
+// spirit as V1's own helpscreen_load(), whose "Insert application disk."
+// fallback popup is commented out in V1's actual source.
 //
 // LOCI is now REQUIRED, not optional: screenmap[] (src/canvas.h) lives in
 // Oric-side overlay RAM, which only exists with a LOCI device attached.
@@ -22,7 +33,6 @@
 // those two strings were already defined in strings_en.h/strings_fr.h,
 // unused, pre-staged for exactly this. See CLAUDE.md "Memory Layout".
 
-#include <oscar.h>
 #include "oric.h"
 #include "charwin.h"
 #include "appstate.h"
@@ -38,15 +48,12 @@
 
 AppState app;
 
-static const char title_screen[] = {
-    #embed lzo "../assets/OSEforLOCI-Title.bin"
-};
-
 /**
- * Program entry point. Shows the splash screen (V1's title image,
- * MSG_SPLASH_PRESSKEY overlaid at row 26) and waits for a keypress, then
- * initialises the canvas, statusbar, and menu system before handing
- * control to the main-mode editor loop (editor_run(), never returns).
+ * Program entry point. Shows the splash screen (V1's title image, loaded
+ * from LOCI at runtime, MSG_SPLASH_PRESSKEY overlaid at row 26) and waits
+ * for a keypress, then initialises the canvas, statusbar, and menu system
+ * before handing control to the main-mode editor loop (editor_run(),
+ * never returns).
  *
  * @return 0 (never reached).
  */
@@ -67,7 +74,14 @@ int main(void)
     }
     enable_overlay_ram();
 
-    oscar_expand_lzo((char *)TEXTVRAM, title_screen);
+    {
+        int16_t fd = loci_open("OSETSC.BIN", O_RDONLY);
+        if (fd >= 0)
+        {
+            loci_read(fd, (void *)TEXTVRAM, VIEWPORT_HEIGHT * SCREEN_COLS);
+            loci_close(fd);
+        }
+    }
     {
         uint8_t *row = (uint8_t *)TEXTVRAM + 26 * SCREEN_COLS;
         const char *msg = MSG_SPLASH_PRESSKEY;

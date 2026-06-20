@@ -12,10 +12,10 @@
 #define MSG_PRESS_KEY_EXIT  "Press any key to exit."
 
 // ── Splash screen (src/main.c) ────────────────────────────────────────────
-// MSG_SPLASH_PRESSKEY is overlaid on the title image (assets/
-// OSEforLOCI-Title.bin) at row 26 -- the title/version text V1 showed
-// alongside its own title screen now lives only in the Information menu's
-// Version popup (src/info.c).
+// MSG_SPLASH_PRESSKEY is overlaid on the title image (assets/OSETSC.BIN,
+// loaded from LOCI at runtime) at row 26 -- the title/version text V1
+// showed alongside its own title screen now lives only in the
+// Information menu's Version popup (src/info.c).
 #define MSG_SPLASH_PRESSKEY   "Press any key to start"
 
 // ── Menu bar titles (src/menudata.c, menubar.titles) ──────────────────────

@@ -5,11 +5,19 @@
 #
 # Fast-loads the freshly built oseloci.tap under Atmos BASIC 1.1 in
 # Phosphoric and decodes the $BB80 screen-text dump to assert:
-#   - the splash screen renders (V1's title image, assets/
-#     OSEforLOCI-Title.bin, with "Press any key to start" overlaid at row
-#     26) before any key is pressed
+#   - the splash screen renders (V1's title image, loaded from LOCI at
+#     runtime as OSETSC.BIN -- src/main.c -- with "Press any key to
+#     start" overlaid at row 26) before any key is pressed
 #   - after a key is pressed, the splash is dismissed and the blank canvas
 #     + statusbar render correctly
+#
+# Uses --loci-flash "$SANDBOX" (not plain --loci) so the runtime
+# loci_open("OSETSC.BIN", ...) actually finds a file: tests/fixtures/
+# (copied into tests/sandbox/ by sandbox-reset) carries OSETSC.BIN
+# alongside the built .tap for exactly this. Every other test still uses
+# plain --loci, since main()/help_show() degrade gracefully (skip the
+# image, still wait for a key) when the file isn't found -- only this
+# test and test_help_funct8.sh actually assert on screen image text.
 #
 # Required env vars (set by `make test-boot`):
 #   PHOS      path to oric1-emu
@@ -66,12 +74,12 @@ if [ ! -x "$PHOS" ]; then
 fi
 
 "$PHOS" -r "$ATMOSROM" \
-    -t "$SANDBOX/$TAPFILE" -f --loci \
+    -t "$SANDBOX/$TAPFILE" -f --loci-flash "$SANDBOX" \
     --headless -c $SPLASH_CYCLES \
     --dump-ram-at $SPLASH_CYCLES:"$SPLASH_DUMP" >/dev/null 2>&1
 
 "$PHOS" -r "$ATMOSROM" \
-    -t "$SANDBOX/$TAPFILE" -f --loci \
+    -t "$SANDBOX/$TAPFILE" -f --loci-flash "$SANDBOX" \
     --headless -c $MAIN_CYCLES \
     --type-keys "$DISMISS_AT: " \
     --dump-ram-at $MAIN_CYCLES:"$MAIN_DUMP" >/dev/null 2>&1

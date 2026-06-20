@@ -11,9 +11,10 @@
 // GitHub URL). Adapted: window save/restore uses this project's main-RAM
 // menu_winsave()/menu_winrestore() instead of locifilemanager-v2's
 // overlay-RAM menu_popup_open/close(). An earlier draft of this file used
-// OSE's own OSEforLOCI-Title.bin image as a dedicated first page instead
-// -- reverted per explicit instruction to match locifilemanager-v2
-// exactly; that asset is used for the boot splash instead (src/main.c).
+// OSE's own title-screen image (assets/OSETSC.BIN) as a dedicated first
+// page instead -- reverted per explicit instruction to match
+// locifilemanager-v2 exactly; that asset is used for the boot splash
+// instead (src/main.c).
 //
 // info_exit() has no V1/locifilemanager-v2 precedent: V1 (CC65) just
 // returns control to the OS-level tape loader, but OSE's bare-metal Oscar64

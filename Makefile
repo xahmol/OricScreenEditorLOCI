@@ -155,12 +155,7 @@ MAIN_SRCS = \
   include/ijk.c          \
   include/ijk.h          \
   include/loci.c         \
-  include/loci.h         \
-  assets/OSEforLOCI-Help1.bin \
-  assets/OSEforLOCI-Help2.bin \
-  assets/OSEforLOCI-Help3.bin \
-  assets/OSEforLOCI-Help4.bin \
-  assets/OSEforLOCI-Title.bin
+  include/loci.h
 
 # -------------------------------------------------------------------------
 # USB stick transfer -- variable declarations
@@ -265,6 +260,7 @@ usb: check-usb all-langs
 	cp build/$(MAIN).tap      "$(USBPATH)/"
 	cp build/$(MAIN)_fr.tap   "$(USBPATH)/"
 	cp assets/PETSCIIPJ.BIN assets/PETSCIISC.BIN assets/PETSCIICS.BIN assets/PETSCIICA.BIN "$(USBPATH)/"
+	cp assets/OSETSC.BIN assets/OSEHS1.BIN assets/OSEHS2.BIN assets/OSEHS3.BIN assets/OSEHS4.BIN "$(USBPATH)/"
 	@if [ "$(IS_WSL2)" = "1" ]; then \
 	    echo "WSL2: unmounting $(USBMOUNT)..."; \
 	    sudo umount $(USBMOUNT); \

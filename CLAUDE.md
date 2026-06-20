@@ -865,21 +865,24 @@ peripheral-specific knowledge).
 
 ### Help system (Phase 9b)
 
-`src/help.c/h` (new): `help_show(screennumber)` shows one of 4 help
-screens (1=Main, 2=Character editor, 3=Select/Move/Line-Box, 4=Write —
-ported from V1's `helpscreen_load(screennumber)`), each a raw 1080-byte
-(40x27) screencode dump **embedded at compile time**
-(`assets/OSEforLOCI-Help{1..4}.bin`, Oscar64's `#embed`) rather than
-tape-loaded at runtime like V1 — written when LOCI was still optional,
-since reversed (see "Canvas storage is overlay RAM, LOCI is required");
-the embedding choice stands regardless, just no longer for that reason.
+`src/help.c/h` (new, **reverted from `#embed` to runtime LOCI loads** —
+see "Title/help screens reverted to runtime LOCI loads" below):
+`help_show(screennumber)` shows one of 4 help screens (1=Main,
+2=Character editor, 3=Select/Move/Line-Box, 4=Write — ported from V1's
+`helpscreen_load(screennumber)`), each a raw 1080-byte (40x27)
+screencode dump loaded from LOCI at runtime as `OSEHS<n>.BIN` (matching
+V1's own filenames exactly, `loci_open`/`loci_read`/`loci_close`).
 `charsetswap_enter()`/`exit()` bracket the raw `$BB80` blit (same
 direct-write approach `canvas_blit()` uses, for the same reason: a
 pre-rendered image can use arbitrary attribute bytes in columns 0-1 that
 `cwin_clear()`-based popups would clobber); `key_read()` waits for a key,
 then `canvas_blit()` + `statusbar_draw()` restore the real canvas (no
 manual screen-RAM save/restore needed, unlike V1, since OSE already has
-the real content in `screenmap[]`/`AppState`).
+the real content in `screenmap[]`/`AppState`). A missing/unreadable file
+(`loci_open()` returns negative) degrades gracefully — skips drawing the
+screen, `key_read()` still waits for a key — rather than erroring, the
+same spirit as V1's own commented-out "Insert application disk." fallback
+in `helpscreen_load()`.
 
 Wired to `FUNCT+8` (`KEY_F8`): `editor.c` (Main, unconditional) →
 `help_show(1)`; `charsetedit.c` → `help_show(2)` (also redraws the popup's
@@ -896,59 +899,42 @@ unconditionally (no rect-growing concern there); `write.c` →
 precedent (V1 has no help screen for Palette, and `README.md` previously
 had an incorrect claim that it did — corrected in Phase 9d).
 
-**Embedding gotcha** (see `oscar64manual.md`'s "Embedded Data" section for
-the full writeup): `#embed` must be the only thing on its source line —
-`byte data[] = { #embed "file.bin" };` all on one line mis-tokenizes the
-embedded bytes. A second, size-budget gotcha: embedding the 4 help
-screens raw (1080 bytes each) plus, in Phase 9c, the title image and QR
-code pushed the `$0580-$B200` code/data/bss region too close to its
-ceiling for `oscar64`'s heap section to be placed at all (`error 3034:
-Cannot place heap section`) even though the total binary size was well
-under the region's nominal size. Since `malloc`/`free` are fully stubbed
-in this bare-metal runtime (`crt_math.c`'s `crt_malloc` always returns
-NULL — no real heap is ever used), the fix was to drop `heap` from
-`oric_crt.c`'s main region section list, **and** to switch all 5 raw
-1080-byte screen dumps (4 help screens + the title image, Phase 9c) to
-LZO compression (`#embed lzo "file.bin"`, `oscar.h`'s
-`oscar_expand_lzo()` decompressing straight into `$BB80` screen RAM,
-which sits outside the code/data/bss region entirely) — this both shrinks
-the embedded data and avoids needing any decompression scratch buffer in
-BSS.
-
-**Prime target if more memory is ever needed**: these 5 embedded screens
-(4 help screens + the title image, ~5.4KB raw, still a few KB even
-LZO-compressed) are the single largest static-data cost in the binary
-purely for the sake of LOCI-optionality (see "LOCI file I/O (Phase 6)"'s
-"LOCI stays optional" point). If a future feature needs the freed
-`$0580-$B200` headroom, converting these 5 assets to load from LOCI
-storage at runtime (`loci_open`/`loci_read`, same mechanism as
-`fileio.c`) instead of `#embed` is the first thing to consider — at the
-cost of losing help and the boot splash's title image when no LOCI
-device is attached, and losing `test_help_funct8.sh`'s headless coverage unless
-ported to run against Phosphoric's LOCI emulation (which can run these
-tests too, just not yet wired up — see "Phosphoric Testing Notes").
+**Historical note (Phase 9b/9c, since reversed)**: these 4 help screens
+plus, separately, the title image (below) and the Information menu's QR
+code were originally `#embed`'d into the binary at compile time. See
+`oscar64manual.md`'s "Embedded Data" section for the `#embed`-must-be-
+alone-on-its-line gotcha that applied while this was the case. Embedding
+all 5 raw 1080-byte screen dumps pushed the `$0580-$B200` code/data/bss
+region too close to its ceiling for `oscar64`'s heap section to be
+placed at all (`error 3034: Cannot place heap section`); the fix at the
+time was dropping `heap` from `oric_crt.c`'s main region section list
+(harmless — `malloc`/`free` are fully stubbed in this bare-metal
+runtime, no real heap is ever used; this stays dropped, independent of
+the embedding question) and LZO-compressing all 5 dumps (`#embed lzo`,
+`oscar.h`'s `oscar_expand_lzo()`). **Superseded**: see "Title/help
+screens reverted to runtime LOCI loads" below — the 4 help screens (and
+the title image, but *not* the QR code/`idi8b_logo[]`, which stay
+embedded) now load from LOCI at runtime instead, for exactly the
+size-budget reason this section used to flag as a future option.
 
 ### Boot splash (`src/main.c`, revised after Phase 9c shipped)
 
-`main()`'s splash is V1's actual title screen image
-(`assets/OSEforLOCI-Title.bin`, carried over from V1, listed in
-"Source Layout" — see V1's own boot sequence, local reference at
+`main()`'s splash is V1's actual title screen image, loaded from LOCI at
+runtime as `OSETSC.BIN` (see "Title/help screens reverted to runtime
+LOCI loads" below) — matching V1's own boot sequence, local reference at
 `/home/xahmol/git/OricScreenEditor/src/main.c`: loads `OSETSC.BIN` into
 `SCREENMEMORY`, overlays `"Press key."` centered at row 26, waits for a
-key). OSE embeds the image at compile time (`#embed lzo`, `oscar.h`'s
-`oscar_expand_lzo()` — same approach as the help screens above, no LOCI
-dependency) instead of V1's tape load, and overlays
-`MSG_SPLASH_PRESSKEY` ("Press any key to start") the same way, at the
-same row. The image's own rows 24-25 already contain V1's
-"IDreamtIn8Bits.com / Written in 2022 by Xander Mol" credit text baked
-in; row 26 is blank in the image, reserved for the "press key" overlay.
-**An earlier draft of Phase 9** kept the pre-existing programmatic
-two-line splash (`MSG_SPLASH_TITLE`/`MSG_SPLASH_BUILD_FMT`, now removed)
-and used `OSEforLOCI-Title.bin` for the Information menu's Version popup
-instead — reverted per explicit instruction: the title image belongs on
-the boot splash (matching V1), and the Version popup should instead be
-identical to `locifilemanager-v2`'s own layout (see "Information menu
-(Phase 9c)" below).
+key. OSE overlays `MSG_SPLASH_PRESSKEY` ("Press any key to start") the
+same way, at the same row. The image's own rows 24-25 already contain
+V1's "IDreamtIn8Bits.com / Written in 2022 by Xander Mol" credit text
+baked in; row 26 is blank in the image, reserved for the "press key"
+overlay. **An earlier draft of Phase 9** kept the pre-existing
+programmatic two-line splash (`MSG_SPLASH_TITLE`/`MSG_SPLASH_BUILD_FMT`,
+now removed) and used the title image for the Information menu's Version
+popup instead — reverted per explicit instruction: the title image
+belongs on the boot splash (matching V1), and the Version popup should
+instead be identical to `locifilemanager-v2`'s own layout (see
+"Information menu (Phase 9c)" below).
 
 ### Information menu (Phase 9c)
 
@@ -974,12 +960,12 @@ permanent stubs since Phase 2.
   `menu_winsave(0, VIEWPORT_HEIGHT+1, 1)`/`menu_winrestore()` (main-RAM,
   not `locifilemanager-v2`'s overlay-RAM `menu_popup_open`/`close()`)
   save/restore the whole screen around both pages.
-  **An earlier draft of this popup** used OSE's own
-  `OSEforLOCI-Title.bin` image (a full 40x27 image) as a dedicated first
-  page instead of the `idi8b_logo`, with the version/credits text on its
-  own separate second page (3 pages total) — reverted per explicit
-  instruction to match `locifilemanager-v2` exactly; `OSEforLOCI-Title.bin`
-  moved to the boot splash instead (see "Boot splash" below).
+  **An earlier draft of this popup** used OSE's own title-screen image
+  (now `assets/OSETSC.BIN`, see "Boot splash" below) as a dedicated
+  first page instead of the `idi8b_logo`, with the version/credits text
+  on its own separate second page (3 pages total) — reverted per
+  explicit instruction to match `locifilemanager-v2` exactly; that image
+  moved to the boot splash instead.
 - **`info_exit()`**: V1 (CC65) just returns control to the OS-level tape
   loader; OSE's bare-metal Oscar64 runtime replaced that loader entirely at
   boot (see "Memory Layout" below), so there's nothing to "return" to. The
@@ -1476,6 +1462,76 @@ mirror-y) were recomputed from `'@'`'s actual ROM bitmap (`1c 22 2a 2e
 trusting any derived value. Full suite: 179/179 unchanged in count,
 all updated to pass under the new behavior.
 
+### Title/help screens reverted to runtime LOCI loads
+
+Phase 9b/9c `#embed`'d the boot splash's title image and the 4
+`FUNCT+8` help screens into the binary (LZO-compressed) purely to keep
+them usable with no LOCI device attached — see "Help system (Phase
+9b)" above for that history. That tradeoff stopped paying for itself
+once LOCI became **mandatory** to even boot at all (the canvas itself
+moved into LOCI-backed overlay RAM, see "Canvas storage is overlay RAM,
+LOCI is required") — there's no longer a "no LOCI" case these 5
+screens needed to survive. Reverted to runtime LOCI loads, regaining
+the ~2.2KB of binary size (and the larger code/data/bss headroom) the
+embedding cost, and — the user's actual motivation for reopening this —
+making the title image and help screens **editable directly in OSE
+itself** (dog-fooding: OSE can load/save its own bare 1080-byte screen
+format via File > Load/Save Screen, and these 5 assets are now in
+exactly that format).
+
+- **Renamed to match V1's own filenames exactly**: `assets/
+  OSEforLOCI-Title.bin` → `assets/OSETSC.BIN`; `assets/
+  OSEforLOCI-Help{1..4}.bin` → `assets/OSEHS{1..4}.BIN` (V1's
+  `helpscreen_load()`, local reference at
+  `/home/xahmol/git/OricScreenEditor/src/main.c`, tape-loads
+  `"OSEHS%u.BIN"`/`"OSETSC.BIN"` — these were always V1's real
+  filenames, just hidden behind the asset-folder rename this project
+  used while the data was `#embed`'d).
+- **`src/main.c`**: the `#embed lzo`'d `title_screen[]` array and `<oscar.h>`
+  include are gone; the splash block now does
+  `loci_open("OSETSC.BIN", O_RDONLY)` + `loci_read(fd, TEXTVRAM,
+  VIEWPORT_HEIGHT*SCREEN_COLS)` + `loci_close(fd)`, guarded by `fd >= 0`.
+- **`src/help.c`**: same change, `help_show()` builds `"OSEHS%u.BIN"` via
+  `sprintf()` (needs `<stdio.h>`, newly included) and loads it the same
+  way. The 4 `#embed lzo`'d arrays and `<oscar.h>` include are gone.
+- **Graceful degradation, not an error popup**: if `loci_open()` returns
+  negative (file missing/unreadable), both call sites simply skip
+  drawing the image — `key_read()` still waits for a key, the rest of
+  the boot/help flow proceeds normally. This mirrors V1's own
+  `helpscreen_load()`, whose `"Insert application disk."` fallback
+  popup is commented out in V1's actual source (not a feature this port
+  needed to invent from scratch).
+- **`Makefile`**: the 5 filenames were removed from `ALLSRCS` (the
+  `#embed` dependency-tracking list — no longer compiled in, so no
+  longer a rebuild trigger) and added to the `usb` target's `cp` list
+  alongside the existing `PETSCII*.BIN` demo project files, so a fresh
+  USB-stick distribution carries them at the LOCI root like every other
+  asset this project ships outside the binary.
+- **Test impact, deliberately small**: `help_show()`/`main()`'s
+  graceful-skip behavior means *every* existing Phosphoric test still
+  passes under plain `--loci` with no backing file at all (the image
+  just doesn't draw, but every test that only sends a dismiss keypress
+  and moves on doesn't care). Only the two tests that actually assert on
+  the rendered text — `test_boot.sh` (splash) and `test_help_funct8.sh`
+  (help) — needed `--loci-flash "$SANDBOX"` instead of plain `--loci`,
+  with `tests/fixtures/OSETSC.BIN`/`OSEHS{1..4}.BIN` (copied into
+  `tests/sandbox/` by the existing `sandbox-reset`, alongside the freshly
+  built `.tap`) as the backing files. No other test script needed any
+  change. This was confirmed by running the full suite once *before*
+  adding the fixtures/flash-mode switch: exactly those two scripts
+  failed (on the missing splash/help text), everything else (179
+  total) still passed unchanged.
+- **FR build unaffected**: these 5 screens are plain screencode dumps
+  with no embedded language-dependent text handling either before or
+  after this change — `make LANG=FR` loads the identical English-only
+  asset files (a pre-existing limitation, not introduced here).
+- **Out of scope, confirmed deliberately**: the Information menu's
+  `idi8b_logo[]` (520-byte logo artwork) and QR code in `src/info.c`
+  stay `#embed`'d as plain static arrays — small, and not part of this
+  reversal's "make it editable in OSE" motivation (neither is a
+  1080-byte screen dump OSE's own Save/Load Screen format could load
+  back anyway).
+
 ## Code Style
 
 Every C function definition (including `static` helpers) gets a
@@ -1763,8 +1819,9 @@ src/
                   read, replaces cwin_getch() everywhere (see "IJK
                   joystick input (Phase 9a)")
   help.c/h        FUNCT+8 help screens (Main/Character editor/Select-
-                  Move-Line-Box/Write), #embed'd + LZO-compressed (see
-                  "Help system (Phase 9b)")
+                  Move-Line-Box/Write), loaded from LOCI at runtime as
+                  OSEHS1-4.BIN (see "Help system (Phase 9b)"/"Title/help
+                  screens reverted to runtime LOCI loads")
   info.c/h        Information menu actions: Version (3-page popup w/
                   title image + credits + QR code) and Exit (RESET
                   vector) (see "Information menu (Phase 9c)")

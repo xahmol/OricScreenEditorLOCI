@@ -62,10 +62,14 @@ check_not_found() {
     fi
 }
 
+# --loci-flash "$SANDBOX" (not plain --loci): help_show() (src/help.c)
+# loads OSEHS<n>.BIN from LOCI at runtime, and this script asserts on the
+# actual help text, so it needs a real backing file -- tests/fixtures/
+# carries OSEHS1-4.BIN, copied into tests/sandbox/ by sandbox-reset.
 run_capture() {
     local cycles="$1" typekeys="$2" dump="$3"
     "$PHOS" -r "$ATMOSROM" \
-        -t "$SANDBOX/$TAPFILE" -f --loci \
+        -t "$SANDBOX/$TAPFILE" -f --loci-flash "$SANDBOX" \
         --headless -c "$cycles" \
         --type-keys "8000000: $typekeys" \
         --dump-ram-at "$cycles:$dump" >/dev/null 2>&1

@@ -256,7 +256,8 @@ src/
                   dirty-rect ring buffer (§6.16)
   input.c/h       key_read(): universal keyboard+IJK-joystick blocking
                   read, replaces cwin_getch() everywhere (§6.17)
-  help.c/h        FUNCT+8 help screens, #embed'd + LZO-compressed (§6.18)
+  help.c/h        FUNCT+8 help screens, loaded from LOCI at runtime as
+                  OSEHS1-4.BIN (§6.19)
   info.c/h        Information menu actions: Version (3-page popup) and
                   Exit (RESET vector) (§6.19)
   findreplace.c/h Unified Find/Replace popup ('f'): screencode/ink/paper
@@ -603,11 +604,14 @@ info.c
  └─ charwin.h  (windows, cursor, text input)
       └─ keyboard.h (raw key scan/decode)
  └─ oric.h     (hardware register layout, screen/attr/charset-bank constants)
-
-help.c, info.c
- └─ oscar.h (Oscar64 stdlib: oscar_expand_lzo(), decompresses #embed lzo
-            data straight into $BB80 screen RAM)
 ```
+
+`help.c`/`main.c` used to depend on `oscar.h` (`oscar_expand_lzo()`) while
+the title/help screens were `#embed`'d; both now load those screens from
+LOCI at runtime instead (`loci_open`/`loci_read`/`loci_close`, see §6.19/
+§6.19a and CLAUDE.md "Title/help screens reverted to runtime LOCI
+loads"), so neither includes `oscar.h` any more. Nothing else in `src/`
+depends on it.
 
 `charwin.h`, `keyboard.h`, `menu.h`, `menudata.h`, `canvas.h`, `statusbar.h`,
 `editor.h`, `charsetedit.h`, `charsetswap.h` and `charset.h` each carry a
@@ -1187,14 +1191,21 @@ norepeat=1)` — V1 itself has no joystick code at all.
 ### 6.19 Help screens (`src/help.c`, `FUNCT+8`, Phase 9b)
 
 `help_show(screennumber)` (1=Main, 2=Character editor, 3=Select/Move/
-Line-Box, 4=Write) blits one of 4 `#embed`'d, LZO-compressed 1080-byte
-screen dumps (`assets/OSEforLOCI-Help{1..4}.bin`) straight into `$BB80`
-via `oscar_expand_lzo()`, bracketed by `charsetswap_enter()`/`exit()` (so
-the dump's own text renders with ROM glyphs regardless of user charset
-edits) and a `key_read()` wait; `canvas_blit()` + `statusbar_draw()`
-restore the real canvas afterward. Ported from V1's
-`helpscreen_load(screennumber)`, but compile-time-embedded instead of
-tape-loaded — works with no LOCI device. Wired into `editor.c` (Main,
+Line-Box, 4=Write) loads one of 4 raw 1080-byte screen dumps from LOCI
+at runtime (`loci_open("OSEHS<n>.BIN", O_RDONLY)` +
+`loci_read(fd, TEXTVRAM, 1080)` + `loci_close(fd)`) straight into
+`$BB80`, bracketed by `charsetswap_enter()`/`exit()` (so the dump's own
+text renders with ROM glyphs regardless of user charset edits) and a
+`key_read()` wait; `canvas_blit()` + `statusbar_draw()` restore the
+real canvas afterward. A missing/unreadable file (`fd < 0`) is skipped
+silently — no popup, `key_read()` still waits — matching V1's own
+commented-out fallback. Ported from V1's `helpscreen_load
+(screennumber)`, same filenames (`OSEHS<n>.BIN`) and tape-load-at-
+runtime shape, just `loci_*` instead of a BASIC `!LOAD`. **Reverted
+from a compile-time `#embed`** (see CLAUDE.md "Title/help screens
+reverted to runtime LOCI loads" for the full history/rationale) once
+LOCI became mandatory to boot at all, removing the embedding's
+no-LOCI-fallback justification. Wired into `editor.c` (Main,
 unconditional), `charsetedit.c` (also redraws the popup's own chrome
 afterward), `select.c`'s shared `rect_select()` (guarded to only fire
 before the rect starts growing, V1's exact guard), `move.c`
@@ -1203,15 +1214,17 @@ popups (no V1 precedent).
 
 ### 6.19a Boot splash (`src/main.c`, revised after Phase 9c)
 
-The splash is V1's actual title screen image (`assets/
-OSEforLOCI-Title.bin`, carried over from V1), `#embed lzo` + `oscar_
-expand_lzo()`'d straight into `$BB80` (same approach as §6.19's help
-screens) instead of V1's tape-loaded `OSETSC.BIN`. `MSG_SPLASH_PRESSKEY`
-is overlaid at row 26 (blank in the image), matching V1's own "Press
-key." overlay at the same row; the image's rows 24-25 already contain
-V1's baked-in "IDreamtIn8Bits.com / Written in 2022 by Xander Mol" credit
-text. The version/build-number text V1 never showed on its title screen
-(only in its own `versioninfo()`) was dropped from the splash here too —
+The splash is V1's actual title screen image, loaded from LOCI at
+runtime as `OSETSC.BIN` (`assets/OSETSC.BIN`, same `loci_open`/
+`loci_read`/`loci_close` mechanism and graceful-skip-on-missing-file
+behavior as §6.19's help screens, same reversal history) straight into
+`$BB80` — matching V1's own tape-loaded `OSETSC.BIN` exactly, filename
+included. `MSG_SPLASH_PRESSKEY` is overlaid at row 26 (blank in the
+image), matching V1's own "Press key." overlay at the same row; the
+image's rows 24-25 already contain V1's baked-in "IDreamtIn8Bits.com /
+Written in 2022 by Xander Mol" credit text. The version/build-number
+text V1 never showed on its title screen (only in its own
+`versioninfo()`) was dropped from the splash here too —
 see §6.20.
 
 ### 6.20 Information menu (`src/info.c`, Phase 9c)
