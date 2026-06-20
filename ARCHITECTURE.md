@@ -419,7 +419,8 @@ void canvas_fill(uint8_t value);
 uint8_t canvas_get(uint16_t x, uint16_t y);
 void canvas_put(uint16_t x, uint16_t y, uint8_t value);
 void canvas_blit(void);
-void canvas_cell_invert(uint16_t x, uint16_t y);
+void canvas_cursor_show(uint16_t x, uint16_t y);
+void canvas_cursor_hide(uint16_t x, uint16_t y);
 uint8_t canvas_resize(uint16_t neww, uint16_t newh);
 void cursor_move_scroll(int8_t dx, int8_t dy);
 ```
@@ -443,7 +444,14 @@ reallocating the logical size (the physical region is always
 `CANVAS_MAX_SIZE` bytes).`canvas_rowbuf[]` stays in main RAM (a small
 staging buffer for row reflow, not the canvas itself), sized for the
 widest possible row at the new `CANVAS_MAX_SIZE` (`10240/27 ≈ 379` →
-384, up from 320).
+384, up from 320). `canvas_cursor_show(x, y)`/`canvas_cursor_hide(x, y)`
+(viewport coordinates) replaced the old `canvas_cell_invert()` XOR-toggle
+-- `show` draws `app.plotscreencode ^ 0x80` (matching V1's `plotmove()`/
+`plotvisible()`, which write `plotscreencode+128` -- the same operation
+on an unsigned byte), `hide` restores the real `canvas_get()` content.
+See CLAUDE.md "Cursor preview now shows app.plotscreencode" for why the
+old toggle was wrong (it XORed whatever was already on screen, not a
+preview of what would be plotted).
 
 `canvas_rowbuf[]` (widest possible row) is `canvas_resize()`'s row-reflow
 scratch buffer, made non-`static` in Phase 8 so `select.c`'s cut/copy
@@ -639,17 +647,17 @@ the second time.
 ```c
 app.cursor_x = app.cursor_y = 0;
 app.xoffset = app.yoffset = 0;
-app.plotscreencode = 'A'; app.plotaltchar = 0;
+app.plotscreencode = '@'; app.plotaltchar = 0;
 app.plotink = A_FWWHITE; app.plotpaper = A_FWBLACK;
 app.plotblink = 0; app.plotdouble = 0; app.visualmap = 0;
 app.favourites[0..9] = '!';
 app.mode = MODE_MAIN; app.showstatusbar = 1;
 
-canvas_blit(); statusbar_draw(); canvas_cell_invert(cursor); // show cursor
+canvas_blit(); statusbar_draw(); canvas_cursor_show(cursor); // show cursor
 
 for (;;) {
     c = cwin_getch();
-    canvas_cell_invert(cursor);              // hide cursor
+    canvas_cursor_hide(cursor);              // hide cursor
     switch (c) {
         case KEY_UP/DOWN/LEFT/RIGHT: cursor_move_scroll(dx, dy)  (Phase 5, §4.3)
         case KEY_SPACE: canvas_put(cursor, app.plotscreencode); canvas_blit();
@@ -676,7 +684,7 @@ for (;;) {
         case 'y':       redo_perform();      // redo last undone edit (Phase 8, §6.16)
     }
     statusbar_draw();
-    canvas_cell_invert(cursor);              // show cursor at new pos
+    canvas_cursor_show(cursor);              // show cursor at new pos
 }
 ```
 
@@ -869,14 +877,15 @@ returns 0.
 **Simplified vs V1**: rather than tracking which rectangle edge is
 "trailing" the origin and redrawing only the moved edge each keypress, this
 port always recomputes the rectangle fresh as
-`[min(origin,cursor)..max(origin,cursor)]`, and redraws by XOR-toggling
-(`canvas_cell_invert()`) the old perimeter off then the new perimeter on —
-cells in both are toggled twice (no-op, stay highlighted), cells only in
-the old one are un-highlighted, cells only in the new one are highlighted.
-Produces the same visual result without porting V1's four-way trailing-edge
-comparison. When the viewport auto-scrolls mid-grow, `canvas_blit()` (called
-by `cursor_move_scroll()`) already clears the stale highlight, so only the
-new perimeter needs drawing that step.
+`[min(origin,cursor)..max(origin,cursor)]`, and redraws by clearing
+(`rect_perimeter_clear()`, restoring real content) the old perimeter then
+setting (`rect_perimeter_set()`, drawing the `app.plotscreencode` preview)
+the new one — same visual result as V1's own `plotvisible(row, col,
+setorrestore)`, which already takes an explicit set/restore flag rather
+than toggling, without porting V1's four-way trailing-edge comparison.
+When the viewport auto-scrolls mid-grow, `canvas_blit()` (called by
+`cursor_move_scroll()`) already clears the stale preview, so only the new
+perimeter needs drawing that step.
 
 ### 6.10 Line/Box mode (`linebox_run()`, `src/select.c`, entered via `l`)
 
@@ -888,8 +897,8 @@ rectangle with `app.plotscreencode` via a `canvas_put()` loop, then
 rectangle toggles a file-scope `select_hollow` flag (`rect_select()`,
 `src/select.c`). If set on accept, `linebox_run()` plots only the
 rectangle's border via the new `rect_perimeter_plot()` (same
-border-walk math as the existing `rect_perimeter_toggle()` cursor
-highlight, but `canvas_put()` instead of `canvas_cell_invert()`)
+border-walk math as the existing `rect_perimeter_set()` cursor
+preview, but `canvas_put()` instead of `canvas_cursor_show()`)
 instead of filling the interior. Default (no `o` press) is unchanged.
 
 **Ellipse/circle (new, no V1/VDCSE2 precedent)**: pressing `c` toggles a

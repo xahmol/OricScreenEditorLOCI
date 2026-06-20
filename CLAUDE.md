@@ -1388,6 +1388,94 @@ interaction or keystroke, so it carries zero cycle-budget or
 Phosphoric RAM dumps that both hints render correctly in the
 statusbar's Mode field during the relevant wait.
 
+### Cursor preview now shows app.plotscreencode (matches V1), not a XOR-toggle
+
+User bug report: the cursor "does not show an inverse plotchar as
+intended, it just shows an inverse space" — i.e. an empty cell under
+the cursor displayed as `CH_INVSPACE`-style inverted blank, not an
+inverted preview of the character that would actually be plotted.
+Root cause: `canvas_cell_invert()` (`src/canvas.c`) XORed whatever
+byte was already at that screen cell with `0x80` — correct only by
+accident when the cell already held `app.plotscreencode` (e.g.
+right after plotting it), wrong everywhere else. V1's actual
+mechanism (`plotmove()`/`plotvisible()`, local reference at
+`/home/xahmol/git/OricScreenEditor/src/main.c`) never XORs existing
+content at all: it always writes `app.plotscreencode+128` to show the
+cursor, and restores the real `PEEK()`'d byte to hide it — `+128` and
+`^0x80` are the same operation on an unsigned byte, just expressed
+differently.
+
+**Fix**: `canvas_cell_invert()` replaced by two functions matching
+V1's pair exactly — `canvas_cursor_show(x, y)` (writes
+`app.plotscreencode ^ 0x80` at viewport position `(x, y)`) and
+`canvas_cursor_hide(x, y)` (restores `canvas_get(x+xoffset,
+y+yoffset)`, i.e. the real content). Every prior `canvas_cell_invert()`
+call site became a `show`/`hide` pair:
+
+- **`src/editor.c`'s Main-mode loop**: the 3 existing show/hide/show
+  call sites around the key switch, unchanged in structure.
+- **`src/select.c`'s `rect_select()` perimeter highlight**: this was
+  the trickiest call site, since toggling doesn't make sense once
+  "on"/"off" aren't inverses of each other any more. `rect_perimeter_
+  toggle()`/`rect_toggle_if_visible()` split into
+  `rect_perimeter_set()`/`rect_show_if_visible()` (draws the preview)
+  and `rect_perimeter_clear()`/`rect_hide_if_visible()` (restores real
+  content) — the grow loop now explicitly clears the old perimeter
+  then sets the new one, instead of toggling both (see "Shared
+  rectangle-grower" above, whose own toggle-based redraw rationale is
+  updated to match). This is also a closer match to V1's own
+  `plotvisible(row, col, setorrestore)`, which already took an
+  explicit set/restore flag rather than toggling.
+- **`src/select.c`'s Select-mode cut/copy destination cursor**: same
+  show/hide pair swap, 4 call sites.
+- **`src/write.c`'s Write mode**: a genuine **parity fix, not just a
+  rename** — Write mode had no cursor preview at all before this (no
+  `canvas_cell_invert()` call sites existed there), unlike V1's
+  `writemode()`, which calls `plotmove()` for every cursor move *and*
+  after every plot/clear action (so the cursor always shows the next
+  character to type, advancing). Added `canvas_cursor_show()` right
+  after entering the mode and again after each iteration's
+  `canvas_blit()` (which already redraws real content first, so the
+  preview drawn after it is never clobbered) — no explicit `hide()` is
+  needed here since `canvas_blit()` already overwrites the whole
+  viewport every iteration regardless.
+- **Main-mode Try mode (`t`) is unaffected** — its own preview write
+  (`*cell = app.plotscreencode;`, no `^0x80`) is intentionally
+  different (a plain, non-inverted preview, matching V1's own
+  `plot_try()` exactly) and was never routed through
+  `canvas_cell_invert()`.
+- **Move mode is unaffected** — V1's `movemode()` shows no cursor
+  preview during its shift loop either (only `PEEK()`s the real content
+  once at entry and draws `plotscreencode+128` once at exit), and OSE's
+  `move_run()` already matched that (no `canvas_cell_invert()` call
+  sites there to begin with).
+
+**Bundled fix, same bug report**: the user also asked to start the
+program with `'@'` as the default `app.plotscreencode`, instead of
+`'A'` — `editor_run()`'s initialiser changed from `0x41` to `0x40`
+accordingly (this is a user preference, not a V1-matching change — V1
+itself starts at `'!'`, `0x21`).
+
+**Test impact**: changing the default plotscreencode broke a large
+number of hardcoded byte/string assertions across nearly every
+existing Phosphoric test script (anything that checks the default
+plotted character, the cursor-preview byte, or the character editor's
+opening glyph) — not because the fix was wrong, but because those
+assertions encoded the *old*, buggy XOR-toggle behavior and the old
+`'A'` default as ground truth. Updated test-by-test, reading each
+script's actual key sequence rather than blindly search-replacing
+`41`→`40` (several scripts, e.g. `test_palette.sh`'s cursor-wrap
+scenario, land on a *different* final character once the starting
+position changes, not just an offset of the same character — its
+LEFT,LEFT wrap from the new `(rowsel=3, colsel=0)` start lands on `'>'`
+(`0x3e`) instead of the old `'?'` (`0x3f`), requiring the expected
+byte and label to be recomputed, not just renumbered).
+`test_charsetedit.sh`'s glyph-bitmap assertions (invert/mirror-x/
+mirror-y) were recomputed from `'@'`'s actual ROM bitmap (`1c 22 2a 2e
+2c 20 1e 00`), verified directly via a Phosphoric byte dump before
+trusting any derived value. Full suite: 179/179 unchanged in count,
+all updated to pass under the new behavior.
+
 ## Code Style
 
 Every C function definition (including `static` helpers) gets a

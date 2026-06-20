@@ -136,7 +136,7 @@ run_capture 11680000 '\p1c\p1\r\p1\n' "$DUMP4"
 echo ""
 echo "ENTER commits ink=0/paper=0 to app.plotink/plotpaper"
 check_not_found "popup closed" "Select ink and paper colour" "$DUMP4"
-check_found "statusbar shows I0P0" "Main      XY 0, 0C41A S20I0P0S" "$DUMP4"
+check_found "statusbar shows I0P0" "Main      XY 0, 0C40@ S20I0P0S" "$DUMP4"
 
 # --- Scenario 5: ESC leaves plotink/plotpaper unchanged ---------------------
 DUMP5="$OUT/capture_cp_esc.bin"
@@ -144,7 +144,7 @@ run_capture 11680000 '\p1c\p1\r\p1\e' "$DUMP5"
 echo ""
 echo "ESC leaves app.plotink/plotpaper unchanged (7/0)"
 check_not_found "popup closed" "Select ink and paper colour" "$DUMP5"
-check_found "statusbar shows I7P0" "Main      XY 0, 0C41A S20I7P0S" "$DUMP5"
+check_found "statusbar shows I7P0" "Main      XY 0, 0C40@ S20I7P0S" "$DUMP5"
 
 echo ""
 echo "==========================================================="

@@ -10,7 +10,7 @@
 # the new glyph data survives to the end of the run.
 #
 # Pressing 'e' from main mode opens the character editor popup
-# (src/charsetedit.c, Phase 3b) on the current plot screencode ('A' = 0x41,
+# (src/charsetedit.c, Phase 3b) on the current plot screencode ('@' = 0x40,
 # standard charset). 'i' XORs the 8 glyph bytes with 0x3F (inverts all 6
 # pixel bits) directly in charset RAM and redraws the grid; ESC commits and
 # closes the popup with no residue.
@@ -33,8 +33,8 @@ BEFORE_CYCLES=9000000
 # AFTER: 3 \p1-prefixed actions (e, i, ESC) -- 8,080,000 + 3*1,100,000 + 300,000
 AFTER_CYCLES=11680000
 
-# charset_address(0x41, 0) = CHARSET_STD + 0x41*8 = 0xB608 (see src/charsetedit.c)
-ADDR_LEN="0xB608:8"
+# charset_address(0x40, 0) = CHARSET_STD + 0x40*8 = 0xB600 (see src/charsetedit.c)
+ADDR_LEN="0xB600:8"
 
 BEFORE_DUMP="$OUT/capture_charset_before.bin"
 AFTER_DUMP="$OUT/capture_charset_after.bin"
@@ -71,8 +71,8 @@ else
     after=$(python3 "$SCREEN" "$AFTER_DUMP" --bytes "$ADDR_LEN")
 
     echo ""
-    echo "  'A' glyph before charsetedit:        $before"
-    echo "  'A' glyph after  e,i,ESC charsetedit: $after"
+    echo "  '@' glyph before charsetedit:        $before"
+    echo "  '@' glyph after  e,i,ESC charsetedit: $after"
 
     # Sanity: charset RAM is pre-populated by the ROM at boot (non-zero glyph).
     if [ "$before" != "00 00 00 00 00 00 00 00" ]; then

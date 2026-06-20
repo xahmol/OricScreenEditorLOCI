@@ -80,19 +80,19 @@ if [ ! -x "$PHOS" ]; then
     exit 0
 fi
 
-# --- Scenario 1: copy 'A' from col0 to col3, source unchanged ------------
+# --- Scenario 1: copy '@' from col0 to col3, source unchanged ------------
 DUMP1="$OUT/capture_cutcopy_copy.bin"
 run_capture 17200000 '\p1 \p1s\p1\n\p1c\p1\r\p1\r\p1\r\p1\n' "$DUMP1"
 echo ""
-echo "SPACE plots 'A', s,ENTER,c,RIGHTx3,ENTER copies it to col3"
-check_bytes "col0 still 'A' (41), col3 now 'A' under cursor (c1)" "0xBB80:4" "41 20 20 c1" "$DUMP1"
+echo "SPACE plots '@', s,ENTER,c,RIGHTx3,ENTER copies it to col3"
+check_bytes "col0 still '@' (40), col3 now '@' under cursor (c0)" "0xBB80:4" "40 20 20 c0" "$DUMP1"
 
-# --- Scenario 2: cut 'A' from col0 to col3, source blanked ----------------
+# --- Scenario 2: cut '@' from col0 to col3, source blanked ----------------
 DUMP2="$OUT/capture_cutcopy_cut.bin"
 run_capture 17200000 '\p1 \p1s\p1\n\p1x\p1\r\p1\r\p1\r\p1\n' "$DUMP2"
 echo ""
-echo "SPACE plots 'A', s,ENTER,x,RIGHTx3,ENTER cuts it to col3"
-check_bytes "col0 now blank (20), col3 has the moved 'A' under cursor (c1)" "0xBB80:4" "20 20 20 c1" "$DUMP2"
+echo "SPACE plots '@', s,ENTER,x,RIGHTx3,ENTER cuts it to col3"
+check_bytes "col0 now blank (20), col3 has the moved '@' under cursor (c0)" "0xBB80:4" "20 20 20 c0" "$DUMP2"
 
 # --- Scenario 3: destination doesn't fit -----------------------------------
 DOWNS38=""
@@ -107,8 +107,8 @@ check_found "MSG_SELECT_NOFIT shown" "Selection does not fit" "$DUMP3"
 DUMP4="$OUT/capture_cutcopy_esc.bin"
 run_capture 17200000 '\p1 \p1s\p1\n\p1c\p1\r\p1\r\p1\r\p1\e' "$DUMP4"
 echo ""
-echo "SPACE plots 'A', s,ENTER,c,RIGHTx3,ESC cancels"
-check_bytes "col0 still 'A' (41), col3 still blank under cursor (a0)" "0xBB80:4" "41 20 20 a0" "$DUMP4"
+echo "SPACE plots '@', s,ENTER,c,RIGHTx3,ESC cancels"
+check_bytes "col0 still '@' (40), col3 still blank under cursor (c0)" "0xBB80:4" "40 20 20 c0" "$DUMP4"
 check_found "back in Main mode" "Main      XY 3, 0" "$DUMP4"
 
 echo ""

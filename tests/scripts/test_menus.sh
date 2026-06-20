@@ -96,7 +96,7 @@ run_capture 12700000 '\p1\f1\p1\n\p1\e\p1\e' "$DUMP3"
 echo ""
 echo "ESC (pulldown) + ESC (bar) closes with no residue"
 check_not_found "bar gone"       "Screen" "$DUMP3"
-check_found     "statusbar intact" "Main      XY 0, 0C41A S20I7P0S" "$DUMP3"
+check_found     "statusbar intact" "Main      XY 0, 0C40@ S20I7P0S" "$DUMP3"
 
 # --- Scenario 4: Information > Version, page 1 (logo + version/credits) ----
 # (File's items were wired to real LOCI dispatch as of Phase 6 -- src/fileio.c
@@ -128,16 +128,16 @@ echo ""
 echo "Page 2 (QR) dismissed, ESC-ESC closes with no residue"
 check_not_found "QR title gone"     "Scan QR code for source:" "$DUMP6"
 check_not_found "bar gone"          "Screen"                   "$DUMP6"
-check_found     "statusbar intact"  "Main      XY 0, 0C41A S20I7P0S" "$DUMP6"
+check_found     "statusbar intact"  "Main      XY 0, 0C40@ S20I7P0S" "$DUMP6"
 
 # --- Scenario 7: Fill dispatch ----------------------------------------------
 DUMP6="$OUT/capture_menu_fill.bin"
 run_capture 16500000 '\p1\f1\p1\n\p1\d\p1\d\p1\d\p1\n\p1\e' "$DUMP6"
 echo ""
 echo "Screen > Fill fills the canvas with the current char"
-check_found "row 0 filled with A"  "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA" "$DUMP6"
-check_found "row 26 filled with A" "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA" "$DUMP6"
-check_found "statusbar intact"     "Main      XY 0, 0C41A S41I7P0S" "$DUMP6"
+check_found "row 0 filled with @"  "@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@" "$DUMP6"
+check_found "row 26 filled with @" "@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@" "$DUMP6"
+check_found "statusbar intact"     "Main      XY 0, 0C40@ S40I7P0S" "$DUMP6"
 
 echo ""
 echo "==========================================================="

@@ -69,12 +69,12 @@ if [ ! -x "$PHOS" ]; then
     exit 0
 fi
 
-# --- Scenario 1: 't' then SPACE commits 'A' (0x41) at the cursor ----------
+# --- Scenario 1: 't' then SPACE commits '@' (0x40) at the cursor ----------
 DUMP1="$OUT/capture_try_commit.bin"
 run_capture 12500000 '\p1t\p1 ' "$DUMP1"
 echo ""
-echo "'t' then SPACE commits the previewed 'A' at (0,0)"
-check_bytes "cell (0,0) = c1 (committed 'A', cursor-inverted)" "0xBB80:1" "c1" "$DUMP1"
+echo "'t' then SPACE commits the previewed '@' at (0,0)"
+check_bytes "cell (0,0) = c0 (committed '@', cursor-preview)" "0xBB80:1" "c0" "$DUMP1"
 check_found "back in Main mode" "Main      XY 0, 0" "$DUMP1"
 
 # --- Scenario 2: 't' then any other key (ESC) cancels, no change ----------
@@ -82,14 +82,14 @@ DUMP2="$OUT/capture_try_cancel.bin"
 run_capture 12500000 '\p1t\p1\e' "$DUMP2"
 echo ""
 echo "'t' then ESC cancels -- canvas unchanged (still blank)"
-check_bytes "cell (0,0) = a0 (cursor-inverted blank, unchanged)" "0xBB80:1" "a0" "$DUMP2"
+check_bytes "cell (0,0) = c0 (cursor preview over blank, unchanged)" "0xBB80:1" "c0" "$DUMP2"
 
 # --- Scenario 3: committed Try-mode plot is undoable with 'z' -------------
 DUMP3="$OUT/capture_try_undo.bin"
 run_capture 13500000 '\p1t\p1 \p1z' "$DUMP3"
 echo ""
 echo "'z' after a committed Try-mode plot undoes it"
-check_bytes "cell (0,0) = a0 (undone back to blank)" "0xBB80:1" "a0" "$DUMP3"
+check_bytes "cell (0,0) = c0 (undone back to blank)" "0xBB80:1" "c0" "$DUMP3"
 
 echo ""
 echo "==========================================================="

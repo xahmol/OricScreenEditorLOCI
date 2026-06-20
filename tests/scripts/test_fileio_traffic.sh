@@ -130,14 +130,14 @@ DUMP1="$OUT/capture_fileio_save_screen.bin"
 run_capture 24000000 '\p1 \p1\f1\p1\r\p1\n\p1\n\p1T\p1\n' "$DUMP1"
 echo ""
 echo "File > Save Screen writes a bare screenmap[] dump (no header)"
-check_found "statusbar shows 'A' plotted" "Main      XY 0, 0C41A S41I7P0S" "$DUMP1"
+check_found "statusbar shows '@' plotted" "Main      XY 0, 0C40@ S40I7P0S" "$DUMP1"
 check_file_bytes "t.BIN: size 1080 (40x27, no header)" "$LOCIFLASH/t.BIN" \
     "len(data) == 1080"
-check_file_bytes "t.BIN: 'A' (0x41) at screen offset 0" "$LOCIFLASH/t.BIN" \
-    "data[0] == 0x41"
+check_file_bytes "t.BIN: '@' (0x40) at screen offset 0" "$LOCIFLASH/t.BIN" \
+    "data[0] == 0x40"
 
 # --- Scenario 2: File > Load Screen round-trip ------------------------------
-# Save 'A', ESC, Screen > Clear (confirm cleared, not just stale content --
+# Save '@', ESC, Screen > Clear (confirm cleared, not just stale content --
 # the original version of this scenario had no Clear step and so could
 # never actually distinguish "load worked" from "save never got
 # overwritten"), then File > Load Screen: filepicker selects t.BIN,
@@ -148,7 +148,7 @@ run_capture 35000000 \
     '\p1 \p1\f1\p1\r\p1\n\p1\n\p1T\p1\n\p1\e\p1\f1\p1\n\p1\d\p1\d\p1\n\p1\e\p1\f1\p1\r\p1\n\p1\d\p1\n\p1\n\p1\n\p1\n' "$DUMP2"
 echo ""
 echo "File > Load Screen restores a saved canvas after Screen > Clear"
-check_found "statusbar shows 'A' restored" "Main      XY 0, 0C41A S41I7P0S" "$DUMP2"
+check_found "statusbar shows '@' restored" "Main      XY 0, 0C40@ S40I7P0S" "$DUMP2"
 
 # --- Scenario 3: File > Save Combined ----------------------------------------
 reset_flash
@@ -157,11 +157,11 @@ run_capture 30000000 \
     '\p1 \p1\f1\p1\r\p1\n\p1\d\p1\d\p1\d\p1\d\p1\n\p1C\p1\n' "$DUMP3"
 echo ""
 echo "File > Save Combined writes 768B charset + screenmap[] (no header)"
-check_found "statusbar shows 'A' plotted" "Main      XY 0, 0C41A S41I7P0S" "$DUMP3"
+check_found "statusbar shows '@' plotted" "Main      XY 0, 0C40@ S40I7P0S" "$DUMP3"
 check_file_bytes "c.BIN: size 1848 (768 + 1080, no header)" "$LOCIFLASH/c.BIN" \
     "len(data) == 1848"
-check_file_bytes "c.BIN: 'A' at screen-section offset 768" "$LOCIFLASH/c.BIN" \
-    "data[768] == 0x41"
+check_file_bytes "c.BIN: '@' at screen-section offset 768" "$LOCIFLASH/c.BIN" \
+    "data[768] == 0x40"
 
 # --- Scenario 4: File > Save Project -----------------------------------------
 reset_flash
@@ -170,17 +170,17 @@ run_capture 28000000 \
     '\p1 \p1\f1\p1\r\p1\n\p1\d\p1\d\p1\n\p1P\p1\n' "$DUMP4"
 echo ""
 echo "File > Save Project writes <name>PJ.BIN + <name>SC.BIN"
-check_found "statusbar shows 'A' plotted" "Main      XY 0, 0C41A S41I7P0S" "$DUMP4"
+check_found "statusbar shows '@' plotted" "Main      XY 0, 0C40@ S40I7P0S" "$DUMP4"
 check_file_bytes "pPJ.BIN: size 22 (ProjectHeader)" "$LOCIFLASH/pPJ.BIN" \
     "len(data) == 22"
 check_file_bytes "pPJ.BIN: canvas 40x27, cursor (0,0)" "$LOCIFLASH/pPJ.BIN" \
     "data[2:10] == bytes([40,0,27,0,0,0,0,0])"
-check_file_bytes "pPJ.BIN: plotscreencode is 'A'" "$LOCIFLASH/pPJ.BIN" \
-    "data[14] == 0x41"
+check_file_bytes "pPJ.BIN: plotscreencode is '@'" "$LOCIFLASH/pPJ.BIN" \
+    "data[14] == 0x40"
 check_file_bytes "pPJ.BIN: stdchanged/altchanged both 0" "$LOCIFLASH/pPJ.BIN" \
     "data[20] == 0 and data[21] == 0"
-check_file_bytes "pSC.BIN: size 1080, 'A' at offset 0 (no header)" "$LOCIFLASH/pSC.BIN" \
-    "len(data) == 1080 and data[0] == 0x41"
+check_file_bytes "pSC.BIN: size 1080, '@' at offset 0 (no header)" "$LOCIFLASH/pSC.BIN" \
+    "len(data) == 1080 and data[0] == 0x40"
 [ -f "$LOCIFLASH/pCS.BIN" ] && { echo "  [FAIL] pCS.BIN should not exist (charset unedited)"; fail=$((fail+1)); } \
     || { echo "  [PASS] pCS.BIN correctly absent (charset unedited)"; pass=$((pass+1)); }
 

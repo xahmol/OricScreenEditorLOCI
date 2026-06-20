@@ -89,7 +89,7 @@ check_found "back in Main mode" "Main      XY 2, 2" "$DUMP1"
 DUMP1B="$OUT/capture_select_d.bin"
 run_capture 13980000 '\p1 \p1s\p1\n\p1d' "$DUMP1B"
 echo ""
-echo "SPACE plots 'A', s,ENTER (1x1 rect),d clears it back to space"
+echo "SPACE plots '@', s,ENTER (1x1 rect),d clears it back to space"
 check_found "statusbar S field shows 20 (cleared)" "S20I7" "$DUMP1B"
 
 # --- Scenario 2: 'i' fills the accepted rect with app.plotink (7) ----------

@@ -99,18 +99,36 @@ void canvas_blit(void)
 }
 
 /**
- * Toggle the inverse-video bit (0x80) of a single screen-RAM cell, for
- * cursor highlighting. Operates directly on $BB80, in screen/viewport
+ * Draw the cursor preview at viewport position (x, y): app.plotscreencode
+ * with the inverse-video bit set, overwriting whatever was shown there --
+ * ported from V1's plotmove()/plotvisible() (cputcxy(col, row,
+ * plotscreencode+128); adding 128 to an unsigned byte and XORing 0x80 are
+ * the same operation). Operates directly on $BB80, in screen/viewport
  * coordinates (not canvas coordinates).
  *
  * @param x Screen column (0 .. VIEWPORT_WIDTH-1).
  * @param y Screen row (0 .. VIEWPORT_HEIGHT-1).
  * @return (none)
  */
-void canvas_cell_invert(uint16_t x, uint16_t y)
+void canvas_cursor_show(uint16_t x, uint16_t y)
 {
     uint8_t *cell = (uint8_t *)TEXTVRAM + y * SCREEN_COLS + x;
-    *cell ^= 0x80;
+    *cell = (uint8_t)(app.plotscreencode ^ 0x80);
+}
+
+/**
+ * Restore the real canvas content at viewport position (x, y), undoing a
+ * prior canvas_cursor_show() -- ported from V1's plotmove()/plotvisible()
+ * (cputcxy(col, row, PEEK(screenmap_screenaddr(...)))).
+ *
+ * @param x Screen column (0 .. VIEWPORT_WIDTH-1).
+ * @param y Screen row (0 .. VIEWPORT_HEIGHT-1).
+ * @return (none)
+ */
+void canvas_cursor_hide(uint16_t x, uint16_t y)
+{
+    uint8_t *cell = (uint8_t *)TEXTVRAM + y * SCREEN_COLS + x;
+    *cell = canvas_get((uint16_t)(x + app.xoffset), (uint16_t)(y + app.yoffset));
 }
 
 /**

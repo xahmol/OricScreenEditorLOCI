@@ -88,7 +88,7 @@ else
     echo ""
     echo "Main mode (after dismiss)"
     check_not_found "splash dismissed"     "IDreamtIn8Bits.comWritten in 2022 by" "$MAIN_DUMP"
-    check_found     "statusbar renders"    "Main      XY 0, 0C41A S20I7P0S" "$MAIN_DUMP"
+    check_found     "statusbar renders"    "Main      XY 0, 0C40@ S20I7P0S" "$MAIN_DUMP"
 fi
 
 echo ""

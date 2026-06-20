@@ -11,13 +11,13 @@
 # edge, it scrolls app.xoffset/yoffset instead of refusing to move further,
 # as long as the canvas extends further in that direction.
 #
-# This test: plots 'A' at canvas row 1, resizes the canvas height to 28
+# This test: plots '@' at canvas row 1, resizes the canvas height to 28
 # (Screen > Height, one row taller than the 27-row viewport), then presses
 # DOWN 28 times from row 0. The first 26 presses move the cursor to the
 # last viewport row (26); the 27th press has nowhere left to move the
 # cursor, so it should scroll yoffset 0 -> 1 instead (the only room
 # available, canvas_height - VIEWPORT_HEIGHT = 1); the 28th press should be
-# a no-op (no further room). After scrolling, canvas row 1 (where 'A' was
+# a no-op (no further room). After scrolling, canvas row 1 (where '@' was
 # plotted) becomes visible at screen row 0.
 #
 # --type-keys notes (see CLAUDE.md "Phosphoric testing notes"):
@@ -95,8 +95,8 @@ KEYS="\\p1\\d\\p1 \\p1\\u\\p1\\f1\\p1\\n\\p1\\d\\p1\\n\\p1\\l\\p1\\l\\p12\\p18\\
 DUMP1="$OUT/capture_autoscroll_down.bin"
 run_capture 65000000 "$KEYS" "$DUMP1"
 echo ""
-echo "Resize height 27->28, plot 'A' at row1, DOWN x28 from row0"
-check_bytes "row0 col0 now shows 'A' (yoffset scrolled to 1)" "0xBB80:1" "41" "$DUMP1"
+echo "Resize height 27->28, plot '@' at row1, DOWN x28 from row0"
+check_bytes "row0 col0 now shows '@' (yoffset scrolled to 1)" "0xBB80:1" "40" "$DUMP1"
 check_found "cursor stayed at viewport row26 (XY 0,26)" "XY 0,26" "$DUMP1"
 
 echo ""

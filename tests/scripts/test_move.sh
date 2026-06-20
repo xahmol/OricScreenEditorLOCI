@@ -72,20 +72,20 @@ if [ ! -x "$PHOS" ]; then
     exit 0
 fi
 
-# --- Scenario 1: RIGHT,RIGHT shifts 'A' from col0 to col2, ESC exits -------
+# --- Scenario 1: RIGHT,RIGHT shifts '@' from col0 to col2, ESC exits -------
 DUMP1="$OUT/capture_move_right_esc.bin"
 run_capture 14980000 '\p1 \p1m\p1\r\p1\r\p1\e' "$DUMP1"
 echo ""
-echo "SPACE plots 'A' at (0,0), m,RIGHT,RIGHT,ESC shifts it to col2"
-check_bytes "col0 blank, col1 blank, col2 'A'" "0xBB81:3" "20 41 20" "$DUMP1"
+echo "SPACE plots '@' at (0,0), m,RIGHT,RIGHT,ESC shifts it to col2"
+check_bytes "col0 blank, col1 blank, col2 '@'" "0xBB81:3" "20 40 20" "$DUMP1"
 check_found "back in Main mode (no rollback on ESC)" "Main      XY 0, 0" "$DUMP1"
 
-# --- Scenario 2: DOWN shifts 'A' from row0 to row1, ENTER exits -----------
+# --- Scenario 2: DOWN shifts '@' from row0 to row1, ENTER exits -----------
 DUMP2="$OUT/capture_move_down_enter.bin"
 run_capture 12780000 '\p1 \p1m\p1\d\p1\n' "$DUMP2"
 echo ""
-echo "SPACE plots 'A' at (0,0), m,DOWN,ENTER shifts it to row1"
-check_bytes "row1 col0 = 'A'" "0xBBA8:1" "41" "$DUMP2"
+echo "SPACE plots '@' at (0,0), m,DOWN,ENTER shifts it to row1"
+check_bytes "row1 col0 = '@'" "0xBBA8:1" "40" "$DUMP2"
 check_found "back in Main mode" "Main      XY 0, 0" "$DUMP2"
 
 echo ""

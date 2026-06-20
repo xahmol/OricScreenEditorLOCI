@@ -23,9 +23,9 @@
 # PAL_GRID_X0=5, PAL_GRID_STEP=2 -- grid cell (rowsel, colsel) is 1 byte
 # (the screencode, XOR 0x80 when highlighted -- --bytes dumps raw bytes, so
 # a highlighted cell shows code|0x80) at screen col (2 + 5 + colsel*2), row
-# rowsel. Default app.plotscreencode=0x41 ('A') gives initial cursor
-# (rowsel=3, colsel=1) -- code = 0x20 + 1 + (3-1)*16 = 0x41, highlighted ->
-# 0xc1, addr 0xBC01. Fav row (rowsel=0) cell 0 -> addr 0xBB87. Alt row 0
+# rowsel. Default app.plotscreencode=0x40 ('@') gives initial cursor
+# (rowsel=3, colsel=0) -- code = 0x20 + 0 + (3-1)*16 = 0x40, highlighted ->
+# 0xc0, addr 0xBBFF. Fav row (rowsel=0) cell 0 -> addr 0xBB87. Alt row 0
 # (rowsel=7) cell 0 -> addr 0xBC9F.
 #
 # Required env vars (set by `make test-palette`):
@@ -100,37 +100,38 @@ fi
 DUMP1="$OUT/capture_pal_open.bin"
 run_capture 9480000 '\p1p' "$DUMP1"
 echo ""
-echo "'p' opens palette; Fav/Std/Alt labels and initial cursor on 'A'"
+echo "'p' opens palette; Fav/Std/Alt labels and initial cursor on '@'"
 check_found "Fav: label shown" "Fav:" "$DUMP1"
 check_found "Std: label shown" "Std:" "$DUMP1"
 check_found "Alt: label shown" "Alt:" "$DUMP1"
 check_bytes "Fav[0] default favourite '!' (0x21)" "0xBB87:1" "21" "$DUMP1"
-check_bytes "initial cursor on 'A' (0x41) highlighted -> 0xc1" "0xBC01:1" "c1" "$DUMP1"
+check_bytes "initial cursor on '@' (0x40) highlighted -> 0xc0" "0xBBFF:1" "c0" "$DUMP1"
 check_bytes "Alt row0 col0 identity 0x20 (visualmap off)" "0xBC9F:1" "20" "$DUMP1"
 
-# --- Scenario 2: LEFT, LEFT wraps from ('A' = row3,col1) to row2,col15 ----
-# row3,col0 = '@' (0x40); then wraps to row2,col15 = '?' (0x3f).
+# --- Scenario 2: LEFT, LEFT wraps from ('@' = row3,col0) to row2,col14 ----
+# row3,col0 LEFT wraps immediately (colsel already 0) to row2,col15 = '?'
+# (0x3f); a second LEFT just decrements within row2 to col14 = '>' (0x3e).
 DUMP2="$OUT/capture_pal_left_wrap.bin"
 run_capture 11680000 '\p1p\p1\l\p1\l' "$DUMP2"
 echo ""
-echo "LEFT,LEFT cursor-wraps row3,col1 -> row2,col15"
-check_bytes "cursor now on '?' (0x3f) highlighted -> 0xbf at row2,col15" "0xBBF5:1" "bf" "$DUMP2"
-check_bytes "old position 'A' no longer highlighted (back to 0x41)" "0xBC01:1" "41" "$DUMP2"
+echo "LEFT,LEFT cursor-wraps row3,col0 -> row2,col15 -> row2,col14"
+check_bytes "cursor now on '>' (0x3e) highlighted -> 0xbe at row2,col14" "0xBBF3:1" "be" "$DUMP2"
+check_bytes "old position '@' no longer highlighted (back to 0x40)" "0xBBFF:1" "40" "$DUMP2"
 
 # --- Scenario 3: SPACE selects the highlighted cell into plotscreencode ---
 DUMP3="$OUT/capture_pal_space.bin"
 run_capture 12780000 '\p1p\p1\l\p1\l\p1 ' "$DUMP3"
 echo ""
-echo "SPACE selects '?' (0x3f) into app.plotscreencode"
+echo "SPACE selects '>' (0x3e) into app.plotscreencode"
 check_not_found "popup closed" "Fav:" "$DUMP3"
-check_found "statusbar shows C3F? S20I7P0S" "Main      XY 0, 0C3F? S20I7P0S" "$DUMP3"
+check_found "statusbar shows C3E> S20I7P0S" "Main      XY 0, 0C3E> S20I7P0S" "$DUMP3"
 
 # --- Scenario 4: '0' stores the highlighted cell into favourites[0] ------
 DUMP4="$OUT/capture_pal_store_fav.bin"
 run_capture 12780000 '\p1p\p1\l\p1\l\p10' "$DUMP4"
 echo ""
-echo "'0' stores highlighted '?' (0x3f) into favourites[0]"
-check_bytes "Fav[0] now 0x3f" "0xBB87:1" "3f" "$DUMP4"
+echo "'0' stores highlighted '>' (0x3e) into favourites[0]"
+check_bytes "Fav[0] now 0x3e" "0xBB87:1" "3e" "$DUMP4"
 
 # --- Scenario 5: 'v' toggles visualmap, remapping the Alt section --------
 DUMP5="$OUT/capture_pal_visualmap.bin"
@@ -143,9 +144,9 @@ check_bytes "Alt row0 col0 now visualchar[0]=0x37" "0xBC9F:1" "37" "$DUMP5"
 DUMP6="$OUT/capture_pal_esc.bin"
 run_capture 12780000 '\p1p\p1\l\p1\l\p1\e' "$DUMP6"
 echo ""
-echo "ESC closes popup leaving app.plotscreencode unchanged (0x41)"
+echo "ESC closes popup leaving app.plotscreencode unchanged (0x40)"
 check_not_found "popup closed" "Fav:" "$DUMP6"
-check_found "statusbar shows C41A S20I7P0S" "Main      XY 0, 0C41A S20I7P0S" "$DUMP6"
+check_found "statusbar shows C40@ S20I7P0S" "Main      XY 0, 0C40@ S20I7P0S" "$DUMP6"
 
 echo ""
 echo "==========================================================="

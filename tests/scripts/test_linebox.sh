@@ -76,10 +76,10 @@ fi
 DUMP1="$OUT/capture_linebox_enter.bin"
 run_capture 14980000 '\p1l\p1\d\p1\d\p1\r\p1\r\p1\n' "$DUMP1"
 echo ""
-echo "l,DOWN,DOWN,RIGHT,RIGHT,ENTER fills a 3x3 rect with 'A'"
-check_bytes "row0 cols0-2 = AAA" "0xBB80:3" "41 41 41" "$DUMP1"
-check_bytes "row1 cols0-2 = AAA" "0xBBA8:3" "41 41 41" "$DUMP1"
-check_bytes "row2 cols0-1 = AA"  "0xBBD0:2" "41 41" "$DUMP1"
+echo "l,DOWN,DOWN,RIGHT,RIGHT,ENTER fills a 3x3 rect with '@'"
+check_bytes "row0 cols0-2 = @@@" "0xBB80:3" "40 40 40" "$DUMP1"
+check_bytes "row1 cols0-2 = @@@" "0xBBA8:3" "40 40 40" "$DUMP1"
+check_bytes "row2 cols0-1 = @@"  "0xBBD0:2" "40 40" "$DUMP1"
 check_found "back in Main mode" "Main      XY 2, 2" "$DUMP1"
 
 # --- Scenario 2: ESC cancels, canvas unchanged ------------------------------

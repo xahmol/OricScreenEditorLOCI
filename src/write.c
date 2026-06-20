@@ -104,7 +104,11 @@ static void write_hex_attr(void)
  * write_hex_attr()); DEL clears the cell under the cursor (no advance);
  * CTRL+R toggles a local reverse-video flag; any other printable key
  * plots its screencode (+0x80 if reverse-video is on) and advances
- * right. FUNCT+6 toggles the statusbar. ESC exits to Main.
+ * right. FUNCT+6 toggles the statusbar. ESC exits to Main. The cursor
+ * shows a canvas_cursor_show() preview of app.plotscreencode at all
+ * times (canvas_blit() each iteration already redraws the just-plotted
+ * real content first, see V1's plotmove(), which this matches) -- a
+ * parity fix, this had no on-screen indication at all before.
  *
  * @return (none)
  */
@@ -114,6 +118,7 @@ void write_run(void)
 
     app.mode = MODE_WRITE;
     statusbar_draw();
+    canvas_cursor_show(app.cursor_x, app.cursor_y);
 
     for (;;)
     {
@@ -210,6 +215,7 @@ void write_run(void)
         }
 
         canvas_blit();
+        canvas_cursor_show(app.cursor_x, app.cursor_y);
         statusbar_draw();
     }
 

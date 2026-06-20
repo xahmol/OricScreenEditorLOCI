@@ -80,7 +80,7 @@ DUMP1="$OUT/capture_writehex_cancel.bin"
 run_capture 18000000 '\p1w\p1\f4\p1\e\p1\e' "$DUMP1"
 echo ""
 echo "ESC at the target prompt cancels, no plot, back in Main"
-check_bytes "cell (0,0) unchanged (a0 = cursor-inverted blank)" "0xBB80:1" "a0" "$DUMP1"
+check_bytes "cell (0,0) unchanged (c0 = cursor preview over blank)" "0xBB80:1" "c0" "$DUMP1"
 check_found "back in Main mode at col0" "Main      XY 0, 0" "$DUMP1"
 
 # --- Scenario 2: target=Ink, value=5 -> attribute byte 0x05 ----------------

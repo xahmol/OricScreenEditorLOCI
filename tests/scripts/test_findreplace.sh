@@ -78,39 +78,39 @@ DUMP1="$OUT/capture_fr_cancel.bin"
 run_capture 11400000 '\p1f\p1\e' "$DUMP1"
 echo ""
 echo "ESC at the target prompt cancels with no residue"
-check_found "back in Main, popup closed" "Main      XY 0, 0C41A S20I7P0S" "$DUMP1"
+check_found "back in Main, popup closed" "Main      XY 0, 0C40@ S20I7P0S" "$DUMP1"
 
 # --- Scenario 2: find-only jumps the cursor to the next match -------------
-# Plot 'A' (screencode $41) at (0,0), move right 5 cols, then Find/Replace:
-# target=Code, find=41 (hex), ESC at the replace step (find-only) -- cursor
-# should jump back to (0,0) where the 'A' is.
+# Plot '@' (screencode $40, the default) at (0,0), move right 5 cols, then
+# Find/Replace: target=Code, find=40 (hex), ESC at the replace step
+# (find-only) -- cursor should jump back to (0,0) where the '@' is.
 DUMP2="$OUT/capture_fr_findonly.bin"
 run_capture 25000000 \
-    '\p1 \p1\r\p1\r\p1\r\p1\r\p1\r\p1f\p11\p1\l\p1\l\p14\p11\p1\n\p1\e' \
+    '\p1 \p1\r\p1\r\p1\r\p1\r\p1\r\p1f\p11\p1\l\p1\l\p14\p10\p1\n\p1\e' \
     "$DUMP2"
 echo ""
-echo "Find-only: cursor jumps from (5,0) back to (0,0) where 'A' is"
-check_found "cursor at (0,0)" "Main      XY 0, 0C41A S41I7P0S" "$DUMP2"
+echo "Find-only: cursor jumps from (5,0) back to (0,0) where '@' is"
+check_found "cursor at (0,0)" "Main      XY 0, 0C40@ S40I7P0S" "$DUMP2"
 
 # --- Scenario 3: replace-all rewrites every match --------------------------
-# Plot 'A' at (0,0), Find/Replace: target=Code, find=41, replace=42 ('B'),
+# Plot '@' at (0,0), Find/Replace: target=Code, find=40, replace=42 ('B'),
 # ENTER confirms -- the cell becomes 'B'.
 DUMP3="$OUT/capture_fr_replaceall.bin"
 run_capture 24500000 \
-    '\p1 \p1f\p11\p1\l\p1\l\p14\p11\p1\n\p1\l\p1\l\p14\p12\p1\n' \
+    '\p1 \p1f\p11\p1\l\p1\l\p14\p10\p1\n\p1\l\p1\l\p14\p12\p1\n' \
     "$DUMP3"
 echo ""
-echo "Replace-all: 'A' (\$41) becomes 'B' (\$42) at (0,0)"
-check_found "statusbar shows S42" "Main      XY 0, 0C41A S42I7P0S" "$DUMP3"
+echo "Replace-all: '@' (\$40) becomes 'B' (\$42) at (0,0)"
+check_found "statusbar shows S42" "Main      XY 0, 0C40@ S42I7P0S" "$DUMP3"
 
 # --- Scenario 4: 'z' undoes the replace-all ---------------------------------
 DUMP4="$OUT/capture_fr_undo.bin"
 run_capture 25700000 \
-    '\p1 \p1f\p11\p1\l\p1\l\p14\p11\p1\n\p1\l\p1\l\p14\p12\p1\n\p1z' \
+    '\p1 \p1f\p11\p1\l\p1\l\p14\p10\p1\n\p1\l\p1\l\p14\p12\p1\n\p1z' \
     "$DUMP4"
 echo ""
-echo "'z' after replace-all restores the original 'A' (\$41)"
-check_found "statusbar shows S41" "Main      XY 0, 0C41A S41I7P0S" "$DUMP4"
+echo "'z' after replace-all restores the original '@' (\$40)"
+check_found "statusbar shows S40" "Main      XY 0, 0C40@ S40I7P0S" "$DUMP4"
 
 # --- Scenario 5: ink-attribute recolor (target 2=Ink) -----------------------
 # 'i' plots the default plotink (7) at (0,0) and moves down a row. Find/

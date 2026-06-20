@@ -96,7 +96,7 @@ run_capture 12000000 '\p1\f8\p1\e' "$DUMP1"
 echo ""
 echo "Main mode FUNCT+8 then ESC dismisses Help1.bin, no residue"
 check_not_found "help text gone"   "Oric Screen Editor: Help" "$DUMP1"
-check_found     "statusbar intact" "Main      XY 0, 0C41A S20I7P0S" "$DUMP1"
+check_found     "statusbar intact" "Main      XY 0, 0C40@ S20I7P0S" "$DUMP1"
 
 # --- Scenario 2: Character editor FUNCT+8 then ESC, popup still open ------
 DUMP2="$OUT/capture_help_charedit.bin"
@@ -104,7 +104,7 @@ run_capture 16000000 '\p1e\p1\f8\p1\e' "$DUMP2"
 echo ""
 echo "Character editor FUNCT+8 then ESC dismisses help, popup redrawn intact"
 check_not_found "help text gone"     "Oric Screen Editor: Help" "$DUMP2"
-check_found     "popup still open"   "Code:\$41"                "$DUMP2"
+check_found     "popup still open"   "Code:\$40"                "$DUMP2"
 check_found     "grid redrawn"       "Set:Std"                  "$DUMP2"
 
 # --- Scenario 3: a further ESC then closes the character editor as normal -
@@ -113,7 +113,7 @@ run_capture 18000000 '\p1e\p1\f8\p1\e\p1\e' "$DUMP3"
 echo ""
 echo "A further ESC after dismissing help closes the character editor"
 check_not_found "popup gone"       "Code:\$"                  "$DUMP3"
-check_found     "statusbar intact" "Main      XY 0, 0C41A S20I7P0S" "$DUMP3"
+check_found     "statusbar intact" "Main      XY 0, 0C40@ S20I7P0S" "$DUMP3"
 
 echo ""
 echo "==========================================================="

@@ -48,7 +48,8 @@ void editor_run(void)
     app.cursor_y = 0;
     app.xoffset = 0;
     app.yoffset = 0;
-    app.plotscreencode = 0x41; // 'A'
+    app.plotscreencode = 0x40; // '@' -- user-requested startup default
+                                // (V1 itself starts at 33, '!')
     app.plotaltchar = 0;
     app.plotink = A_FWWHITE;
     app.plotpaper = A_FWBLACK;
@@ -65,13 +66,13 @@ void editor_run(void)
 
     canvas_blit();
     statusbar_draw();
-    canvas_cell_invert(app.cursor_x, app.cursor_y); // show cursor
+    canvas_cursor_show(app.cursor_x, app.cursor_y); // show cursor
 
     while (1)
     {
         uint8_t c = key_read();
 
-        canvas_cell_invert(app.cursor_x, app.cursor_y); // hide cursor
+        canvas_cursor_hide(app.cursor_x, app.cursor_y); // hide cursor
 
         switch (c)
         {
@@ -316,6 +317,6 @@ void editor_run(void)
         }
 
         statusbar_draw();
-        canvas_cell_invert(app.cursor_x, app.cursor_y); // show cursor at new pos
+        canvas_cursor_show(app.cursor_x, app.cursor_y); // show cursor at new pos
     }
 }

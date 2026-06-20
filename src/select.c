@@ -4,18 +4,17 @@
 // Adapted from V1's lineandbox()/selectmode() (local reference at
 // /home/xahmol/git/OricScreenEditor/src/main.c). V1 grows the rect by
 // tracking which edge is "trailing" the fixed origin and redrawing only
-// the single edge line that moved each keypress (plotvisible()). This port
-// instead always recomputes the rect as
-// [min(origin,cursor) .. max(origin,cursor)] from scratch on every
-// keypress, and redraws by XOR-toggling (canvas_cell_invert()) the OLD
-// perimeter off then the NEW perimeter on: cells in both perimeters are
-// toggled twice (net no-op, stay highlighted), cells only in the old one
-// are toggled once (un-highlighted), cells only in the new one are toggled
-// once (highlighted) -- so the result is identical to V1's edge-tracking
-// without needing to port its four-way trailing-edge comparison logic.
-// When app.xoffset/yoffset change mid-grow (cursor_move_scroll() auto-
+// the single edge line that moved each keypress (plotvisible() -- which
+// draws app.plotscreencode^0x80 as a preview, not a XOR-toggle of
+// whatever's already there). This port instead always recomputes the
+// rect as [min(origin,cursor) .. max(origin,cursor)] from scratch on
+// every keypress, and redraws by clearing (restoring real content on)
+// the OLD perimeter then setting (drawing the plotscreencode preview on)
+// the NEW perimeter -- same visual result as V1's edge-tracking without
+// needing to port its four-way trailing-edge comparison logic. When
+// app.xoffset/yoffset change mid-grow (cursor_move_scroll() auto-
 // scrolled, see src/canvas.c), that call already canvas_blit()s, which
-// clears all stale highlight bytes -- so only the new perimeter needs
+// clears all stale preview bytes -- so only the new perimeter needs
 // drawing in that case, not an erase pass.
 
 #include <string.h>
@@ -53,7 +52,7 @@ static uint8_t select_hollow;
 static uint8_t select_ellipse;
 
 /**
- * XOR-toggle (canvas_cell_invert()) every cell of one canvas cell that is
+ * Draw the cursor preview (canvas_cursor_show()) on one canvas cell that is
  * currently within the viewport (app.xoffset/yoffset), converting from
  * canvas-absolute to viewport-relative coordinates. No-op if the cell is
  * scrolled out of view.
@@ -62,18 +61,33 @@ static uint8_t select_ellipse;
  * @param cy Canvas-absolute row.
  * @return (none)
  */
-static void rect_toggle_if_visible(uint16_t cx, uint16_t cy)
+static void rect_show_if_visible(uint16_t cx, uint16_t cy)
 {
     if (cx < app.xoffset || cx >= (uint16_t)(app.xoffset + VIEWPORT_WIDTH)) return;
     if (cy < app.yoffset || cy >= (uint16_t)(app.yoffset + VIEWPORT_HEIGHT)) return;
-    canvas_cell_invert((uint16_t)(cx - app.xoffset), (uint16_t)(cy - app.yoffset));
+    canvas_cursor_show((uint16_t)(cx - app.xoffset), (uint16_t)(cy - app.yoffset));
 }
 
 /**
- * XOR-toggle the perimeter (border only, not the fill) of the rectangle
- * [sx..ex] x [sy..ey] (inclusive, canvas-absolute coordinates), clipped to
- * the current viewport. A single-cell rectangle (sx==ex && sy==ey) toggles
- * just that one cell.
+ * Restore real content (canvas_cursor_hide()) on one canvas cell that is
+ * currently within the viewport -- the inverse of rect_show_if_visible().
+ *
+ * @param cx Canvas-absolute column.
+ * @param cy Canvas-absolute row.
+ * @return (none)
+ */
+static void rect_hide_if_visible(uint16_t cx, uint16_t cy)
+{
+    if (cx < app.xoffset || cx >= (uint16_t)(app.xoffset + VIEWPORT_WIDTH)) return;
+    if (cy < app.yoffset || cy >= (uint16_t)(app.yoffset + VIEWPORT_HEIGHT)) return;
+    canvas_cursor_hide((uint16_t)(cx - app.xoffset), (uint16_t)(cy - app.yoffset));
+}
+
+/**
+ * Draw the cursor preview along the perimeter (border only, not the fill)
+ * of the rectangle [sx..ex] x [sy..ey] (inclusive, canvas-absolute
+ * coordinates), clipped to the current viewport. A single-cell rectangle
+ * (sx==ex && sy==ey) shows just that one cell.
  *
  * @param sx Left column.
  * @param sy Top row.
@@ -81,28 +95,54 @@ static void rect_toggle_if_visible(uint16_t cx, uint16_t cy)
  * @param ey Bottom row.
  * @return (none)
  */
-static void rect_perimeter_toggle(uint16_t sx, uint16_t sy, uint16_t ex, uint16_t ey)
+static void rect_perimeter_set(uint16_t sx, uint16_t sy, uint16_t ex, uint16_t ey)
 {
     uint16_t x, y;
 
     for (x = sx; x <= ex; x++)
     {
-        rect_toggle_if_visible(x, sy);
-        if (ey != sy) rect_toggle_if_visible(x, ey);
+        rect_show_if_visible(x, sy);
+        if (ey != sy) rect_show_if_visible(x, ey);
     }
     for (y = (uint16_t)(sy + 1); y < ey; y++)
     {
-        rect_toggle_if_visible(sx, y);
-        if (ex != sx) rect_toggle_if_visible(ex, y);
+        rect_show_if_visible(sx, y);
+        if (ex != sx) rect_show_if_visible(ex, y);
+    }
+}
+
+/**
+ * Restore real content along the perimeter of the rectangle [sx..ex] x
+ * [sy..ey] -- the inverse of rect_perimeter_set(), same cell walk.
+ *
+ * @param sx Left column.
+ * @param sy Top row.
+ * @param ex Right column.
+ * @param ey Bottom row.
+ * @return (none)
+ */
+static void rect_perimeter_clear(uint16_t sx, uint16_t sy, uint16_t ex, uint16_t ey)
+{
+    uint16_t x, y;
+
+    for (x = sx; x <= ex; x++)
+    {
+        rect_hide_if_visible(x, sy);
+        if (ey != sy) rect_hide_if_visible(x, ey);
+    }
+    for (y = (uint16_t)(sy + 1); y < ey; y++)
+    {
+        rect_hide_if_visible(sx, y);
+        if (ex != sx) rect_hide_if_visible(ex, y);
     }
 }
 
 /**
  * Plot value along just the perimeter (border, not the fill) of the
  * rectangle [sx..ex] x [sy..ey] (inclusive, canvas-absolute coordinates)
- * -- same walk as rect_perimeter_toggle(), but canvas_put() instead of
- * canvas_cell_invert(), and unconditional rather than viewport-clipped
- * (this writes to the canvas model itself, not a transient highlight).
+ * -- same walk as rect_perimeter_set(), but canvas_put() instead of
+ * canvas_cursor_show(), and unconditional rather than viewport-clipped
+ * (this writes to the canvas model itself, not a transient preview).
  * Used by linebox_run() for the hollow-box ('o' toggle) case.
  *
  * @param sx    Left column.
@@ -238,7 +278,8 @@ static void ellipse_outline(uint16_t sx, uint16_t sy, uint16_t ex, uint16_t ey, 
 /**
  * Grow a rectangle from the cursor's current position using cursor keys
  * (cursor_move_scroll() handles auto-scroll on oversized canvases, see
- * src/canvas.c), with a live perimeter highlight. ENTER accepts (populating
+ * src/canvas.c), with a live perimeter preview of app.plotscreencode
+ * (canvas_cursor_show(), matching V1's plotvisible()). ENTER accepts (populating
  * select_startx/starty/endx/endy/width/height) and returns 1; ESC cancels
  * and returns 0. FUNCT+6 toggles the statusbar without affecting the rect.
  * 'o' toggles select_hollow and 'c' toggles select_ellipse (both
@@ -271,7 +312,7 @@ uint8_t rect_select(uint8_t draworselect)
 
     if (draworselect) statusbar_set_override(MSG_LINEBOX_MODE_HINT);
 
-    rect_perimeter_toggle(orgx, orgy, orgx, orgy);
+    rect_perimeter_set(orgx, orgy, orgx, orgy);
     statusbar_draw();
 
     for (;;)
@@ -295,7 +336,7 @@ uint8_t rect_select(uint8_t draworselect)
             if (curx == orgx && cury == orgy)
             {
                 help_show(3);
-                rect_perimeter_toggle(orgx, orgy, orgx, orgy);
+                rect_perimeter_set(orgx, orgy, orgx, orgy);
                 statusbar_draw();
             }
             continue;
@@ -330,13 +371,13 @@ uint8_t rect_select(uint8_t draworselect)
         if (app.xoffset != prev_xoffset || app.yoffset != prev_yoffset)
         {
             // cursor_move_scroll() already canvas_blit()'d, clearing the old
-            // highlight -- only the new perimeter needs drawing.
-            rect_perimeter_toggle(select_startx, select_starty, select_endx, select_endy);
+            // preview -- only the new perimeter needs drawing.
+            rect_perimeter_set(select_startx, select_starty, select_endx, select_endy);
         }
         else
         {
-            rect_perimeter_toggle(prev_startx, prev_starty, prev_endx, prev_endy);
-            rect_perimeter_toggle(select_startx, select_starty, select_endx, select_endy);
+            rect_perimeter_clear(prev_startx, prev_starty, prev_endx, prev_endy);
+            rect_perimeter_set(select_startx, select_starty, select_endx, select_endy);
         }
 
         prev_xoffset = app.xoffset;
@@ -486,13 +527,13 @@ void select_run(void)
         uint8_t movekey;
         uint16_t destx, desty;
 
-        canvas_cell_invert(app.cursor_x, app.cursor_y); // show dest cursor
+        canvas_cursor_show(app.cursor_x, app.cursor_y); // show dest cursor
 
         do
         {
             movekey = key_read();
 
-            canvas_cell_invert(app.cursor_x, app.cursor_y); // hide
+            canvas_cursor_hide(app.cursor_x, app.cursor_y); // hide
 
             switch (movekey)
             {
@@ -505,10 +546,10 @@ void select_run(void)
             }
 
             statusbar_draw();
-            canvas_cell_invert(app.cursor_x, app.cursor_y); // show at new pos
+            canvas_cursor_show(app.cursor_x, app.cursor_y); // show at new pos
         } while (movekey != KEY_ENTER && movekey != KEY_ESC);
 
-        canvas_cell_invert(app.cursor_x, app.cursor_y); // hide before popup/paste
+        canvas_cursor_hide(app.cursor_x, app.cursor_y); // hide before popup/paste
 
         app.mode = MODE_MAIN;
 
