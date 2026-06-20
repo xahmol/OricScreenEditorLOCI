@@ -90,6 +90,15 @@
 // ── Select mode cut/copy (src/select.c) ─────────────────────────────────────
 #define MSG_SELECT_NOFIT  "Selection hors limites."
 
+// ── Indice action mode Selection (src/select.c, select_run()) ───────────────
+// Touches identiques en FR (raccourcis clavier inchanges) -- voir
+// strings_en.h pour le mecanisme (statusbar_set_override()).
+#define MSG_SELECT_ACTION_HINT  "x/c/d/ipm?"
+
+// ── Indice mode Ligne/Boite (src/select.c, rect_select()) ───────────────────
+// "Bte" = abreviation de "Boite", deja utilisee par MSG_MODE_LINEBOX.
+#define MSG_LINEBOX_MODE_HINT  "o:Bte c:El"
+
 // ── Resize dialog (src/menudata.c, resize_dialog()) ──────────────────────────
 #define MSG_RESIZE_TITLE_WIDTH    "Redimensionner largeur"
 #define MSG_RESIZE_TITLE_HEIGHT   "Redimensionner hauteur"

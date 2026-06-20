@@ -224,7 +224,11 @@ src/
   canvas.c/h      Flat 40x27 screenmap[] buffer + raw $BB80 blit (bypasses charwin),
                   canvas_resize() (up to CANVAS_MAX_SIZE)
   statusbar.c/h   Row-27 statusbar (OricCharWin, Mode/XY/C/S/I/P readout +
-                  A/D/B attribute flags, see §6.2/§6.7/§6.8)
+                  A/D/B attribute flags, see §6.2/§6.7/§6.8);
+                  statusbar_set_override()/clear_override() let a mode
+                  temporarily replace the Mode field with a key-hint
+                  string (see §6.9/§6.11, ported from V1's
+                  programmode-overwrite trick)
   editor.c/h      Main-mode loop: cursor move (auto-scroll via
                   canvas.c's cursor_move_scroll(), §6.2), +/- screencode
                   select, SPACE/DEL plot, ,/.;/' ink/paper cycling, b/d/a/r
@@ -904,6 +908,13 @@ a square bounding box renders as a flattened ellipse, not a circle —
 deliberately not corrected for, same treatment as Box mode's bounding
 box.
 
+**Discoverability**: for the entire grow loop, the statusbar's Mode
+field is overridden (`statusbar_set_override(MSG_LINEBOX_MODE_HINT)`,
+`src/statusbar.c`) to show `"o:Box c:El"`, naming the two toggles above
+— cleared again before returning to Main. Ported from V1's own
+mechanism for the same problem (see §6.11's "Discoverability" below),
+not a popup.
+
 ### 6.11 Select mode (`select_run()`, `src/select.c`, entered via `s`)
 
 Calls `rect_select(0)` (`app.mode = MODE_SELECT`); if cancelled, returns
@@ -914,6 +925,13 @@ with `16+app.plotpaper`, `m` fills with the modifier-attribute byte for
 `A_ALT`(9)/.../`A_BLINK2HALT`(15) in `oric.h`: base 8, bit0=altchar,
 bit1=double, bit2=blink). `FUNCT+6` toggles the statusbar. ESC at either
 stage leaves the canvas unchanged.
+
+**Discoverability**: while waiting for the action key, the statusbar's
+Mode field is overridden to `MSG_SELECT_ACTION_HINT` (`"x/c/d/ipm?"`,
+`statusbar_set_override()`/`clear_override()`, `src/statusbar.c`) —
+the exact same string V1's `selectmode()` writes into `programmode`
+for the same purpose, just via an override instead of overwriting the
+mode name directly.
 
 V1's cut/copy (`x`/`c`) are **deferred to Phase 8** (overlay-RAM
 clipboard) — V1 uses a screen-RAM scratch buffer OSE has no safe equivalent

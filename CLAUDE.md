@@ -1335,6 +1335,59 @@ scenario in `test_help_funct8.sh` now sends an explicit second key to
 dismiss it, and a new scenario asserts the open-and-stays-open behavior
 directly as a regression test for the fix itself.
 
+### Secondary-option statusbar hints (matches V1's mechanism)
+
+User bug report: Line/Box mode's `o`/`c` toggles and Select mode's
+`d/i/p/m/x/c` action choice gave no on-screen indication that secondary
+options existed at all — both are genuinely silent waits for a
+keypress, undiscoverable without already knowing the key bindings from
+the README. The first fix attempt added a dedicated dismissable popup
+(`rect_select_linebox_hint()`) shown once on entering Line/Box mode —
+**reverted** after the user pointed out V1 already solves exactly this
+problem, in the statusbar: V1's `lineandbox()`/`selectmode()`
+(`/home/xahmol/git/OricScreenEditor/src/main.c`) overwrite
+`programmode` itself with a literal key-hint string (e.g.
+`strcpy(programmode,"x/c/d/ipm?");`) for the duration of the secondary
+prompt, instead of a separate popup. That approach is strictly better
+here too: no extra blocking interaction (so no `--type-keys` sequence
+in any pre-existing test needed an extra dismiss keypress — the popup
+attempt had broken `test_linebox.sh`/`test_hollowbox.sh`/
+`test_ellipse.sh` this way before being reverted), and the hint stays
+visible for the whole duration of the wait, not just a one-time
+flash.
+
+**Implementation**: `src/statusbar.c` gained a module-static
+`mode_override` (`const char *`, default `nullptr`) and two new
+functions, `statusbar_set_override(text)`/`statusbar_clear_override()`
+(declared in `statusbar.h`). `statusbar_draw()`'s Mode field now reads
+`mode_override ? mode_override : mode_name(app.mode)` — an override
+must fit the existing `STATUSBAR_MODE_WIDTH` (10 chars) budget, same
+as every `MSG_MODE_*` string already does.
+
+- **`src/select.c`'s `rect_select()`**: sets `MSG_LINEBOX_MODE_HINT`
+  (`"o:Box c:El"`, EN; `"o:Bte c:El"`, FR — `c`/`o` are new-to-this-port
+  features with no V1 wording to match, unlike the Select case below)
+  right after entering Line/Box mode, for the entire grow loop;
+  cleared right before the final `statusbar_draw()` that restores
+  `MODE_MAIN`. No override is set for Select mode's own `rect_select(0)`
+  call (the rect-grow phase shows the normal "Select" mode name, same
+  as before — only the *secondary action prompt* afterward needs a
+  hint).
+- **`src/select.c`'s `select_run()`**: sets `MSG_SELECT_ACTION_HINT`
+  (`"x/c/d/ipm?"`, identical in EN/FR — these are literal key letters,
+  not translatable text, same precedent as `MSG_COLOURPICKER_RESULT`)
+  right before the existing silent do-while action-key loop; cleared
+  immediately after the loop exits, before branching on which key was
+  pressed. The loop itself is otherwise completely unchanged (same
+  keys, same `FUNCT+6` statusbar toggle) — this was a pure
+  discoverability fix, no behavioural change.
+
+No new test coverage needed: the mechanism adds no new blocking
+interaction or keystroke, so it carries zero cycle-budget or
+`--type-keys` impact on any existing test. Verified visually via
+Phosphoric RAM dumps that both hints render correctly in the
+statusbar's Mode field during the relevant wait.
+
 ## Code Style
 
 Every C function definition (including `static` helpers) gets a

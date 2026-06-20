@@ -697,7 +697,8 @@ ellipse/cercle inscrite dans le même rectangle englobant. Combinez avec
 une ellipse pleine. Notez que les cellules de caractères faisant 6x8
 pixels (non carrées), un rectangle carré s'affichera comme une ellipse
 aplatie, pas un cercle parfait -- élargissez le rectangle si vous
-souhaitez un résultat plus rond.
+souhaitez un résultat plus rond. Pour rappel, le champ mode de la barre
+d'état affiche `o:Bte c:El` pendant cette étape.
 
 Acceptez avec **RETURN**, annulez avec **ESC**. Les deux quittent ce mode et reviennent au mode principal.
 

@@ -21,7 +21,6 @@
 #include <string.h>
 #include "oric.h"
 #include "keyboard.h"
-#include "charwin.h"
 #include "appstate.h"
 #include "canvas.h"
 #include "statusbar.h"
@@ -246,7 +245,12 @@ static void ellipse_outline(uint16_t sx, uint16_t sy, uint16_t ex, uint16_t ey, 
  * Line/Box-only; linebox_run() reads them after this returns -- Select
  * mode never does). Sets app.mode to MODE_LINEBOX or MODE_SELECT for
  * the duration (per draworselect) and restores MODE_MAIN before
- * returning.
+ * returning. Line/Box mode also overrides the statusbar's Mode field
+ * with MSG_LINEBOX_MODE_HINT for the duration of the grow loop, naming
+ * the 'o'/'c' toggles -- ported from V1's lineandbox()/selectmode(),
+ * which show available secondary keys the same way (by overwriting
+ * programmode itself); see select_run() below for the Select-mode
+ * equivalent.
  *
  * @param draworselect 1 for Line/Box mode, 0 for Select mode (only affects
  *                      app.mode/the statusbar's Mode field while running).
@@ -264,6 +268,8 @@ uint8_t rect_select(uint8_t draworselect)
     app.mode = draworselect ? MODE_LINEBOX : MODE_SELECT;
     select_hollow = 0;
     select_ellipse = 0;
+
+    if (draworselect) statusbar_set_override(MSG_LINEBOX_MODE_HINT);
 
     rect_perimeter_toggle(orgx, orgy, orgx, orgy);
     statusbar_draw();
@@ -345,6 +351,7 @@ uint8_t rect_select(uint8_t draworselect)
 
     canvas_blit();
     app.mode = MODE_MAIN;
+    if (draworselect) statusbar_clear_override();
     statusbar_draw();
 
     if (key != KEY_ENTER) return 0;
@@ -461,6 +468,7 @@ void select_run(void)
     if (!rect_select(0)) return;
 
     app.mode = MODE_SELECT;
+    statusbar_set_override(MSG_SELECT_ACTION_HINT);
     statusbar_draw();
 
     do
@@ -470,6 +478,8 @@ void select_run(void)
         if (key == KEY_F6) statusbar_show((uint8_t)!app.showstatusbar);
     } while (key != 'd' && key != 'i' && key != 'p' && key != 'm'
           && key != 'x' && key != 'c' && key != KEY_ESC);
+
+    statusbar_clear_override();
 
     if (key == 'x' || key == 'c')
     {

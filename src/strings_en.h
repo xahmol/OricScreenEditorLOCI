@@ -86,6 +86,18 @@
 // ── Select mode cut/copy (src/select.c) ─────────────────────────────────────
 #define MSG_SELECT_NOFIT  "Selection does not fit."
 
+// ── Select mode action hint (src/select.c, select_run()) ─────────────────────
+// Shown in the statusbar's Mode field (statusbar_set_override(), 10-char
+// budget) while select_run() waits for the action key -- same mechanism as
+// V1's selectmode(), which overwrites programmode with this exact string.
+#define MSG_SELECT_ACTION_HINT  "x/c/d/ipm?"
+
+// ── Line/Box mode hint (src/select.c, rect_select()) ─────────────────────────
+// Same statusbar-override mechanism as MSG_SELECT_ACTION_HINT above, shown
+// for the duration of the rect-grow loop ('o'/'c' have no V1 precedent --
+// new features in this port -- so there's no V1 wording to match here).
+#define MSG_LINEBOX_MODE_HINT  "o:Box c:El"
+
 // ── Resize dialog (src/menudata.c, resize_dialog()) ──────────────────────────
 #define MSG_RESIZE_TITLE_WIDTH    "Resize canvas width"
 #define MSG_RESIZE_TITLE_HEIGHT   "Resize canvas height"

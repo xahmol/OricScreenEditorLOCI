@@ -681,7 +681,8 @@ the same bounding box. Combine with **O** for a hollow ellipse outline,
 or leave **O** off for a filled ellipse. Note that since character cells
 are 6x8 pixels (not square), a square bounding box renders as a
 flattened ellipse, not a perfect circle -- widen the box if you want a
-rounder result.
+rounder result. As a reminder, the statusbar's mode field shows
+`o:Box c:El` for the duration of this step.
 
 Accept with **RETURN**, cancel with **ESC**. Both will leave this mode and return to main mode.
 
