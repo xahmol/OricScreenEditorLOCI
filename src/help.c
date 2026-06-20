@@ -10,7 +10,7 @@
 // from screenmap[]/AppState instead of a manual save buffer.
 //
 // Runtime LOCI load is a deliberate reversal of an earlier #embed-at-
-// compile-time approach (Phase 9b/9c) -- see src/main.c's header comment
+// compile-time approach -- see src/main.c's header comment
 // for the full rationale (frees ~5.4KB of code/data/bss, makes these
 // screens editable in OSE itself). A missing/unreadable file degrades
 // gracefully (skips the screen, key_read() still waits so the popup

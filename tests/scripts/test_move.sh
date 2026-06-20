@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # tests/scripts/test_move.sh
 #
-# Phase 5d -- Move mode smoke test (the `make test-move` target).
+# Move mode smoke test (the `make test-move` target).
 #
 # Fast-loads the freshly built oseloci.tap under Atmos BASIC 1.1 in
 # Phosphoric and verifies Move mode (src/move.c, entered via 'm'): cursor

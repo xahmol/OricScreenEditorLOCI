@@ -9,7 +9,7 @@
 // into a linked list stored in XRAM (RAM *on the LOCI device itself*,
 // include/loci.h's xram_peek/poke/memcpy_to/memcpy_from -- a completely
 // different resource from the Oric-side bank-switched overlay RAM that
-// Phase 8 is about, so this has no Phase 8 dependency), simplified for
+// canvas undo/redo is about, so this has no dependency on that work), simplified for
 // OSE's single-pane, single-select, no-sort, dir-vs-file-only use case
 // (no multi-type classification, no select bit -- see PickerMeta below
 // vs. locifilemanager-v2's DirMeta).
@@ -175,7 +175,8 @@ static void picker_build_list(const char *path, uint8_t filter)
  *
  * @param w     Popup window.
  * @param title Title row text.
- * @param path  Current directory path (Phase 7c: always "/" for now).
+ * @param path  Current directory path (app.homedir-relative; see
+ *              filepicker_run()'s `root` handling).
  * @return (none)
  */
 static void picker_draw_header(OricCharWin *w, const char *title, const char *path)
@@ -438,7 +439,7 @@ uint8_t filepicker_run(const char *title, uint8_t filter)
 
             // Strip the matched suffix so the base name fileio.c's
             // sprintf(path, "%s<suffix>", app.filename)-style composition
-            // expects (Phase 6, unchanged) is what's left, then prepend
+            // expects (see "LOCI file I/O" in CLAUDE.md, unchanged) is what's left, then prepend
             // the current subdirectory relative to root (if any -- sitting
             // at root itself contributes nothing) so app.filename
             // resolves back to this file regardless of where it was

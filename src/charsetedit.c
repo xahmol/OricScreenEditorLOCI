@@ -2,9 +2,9 @@
 //
 // Entered via 'e' from main mode (src/editor.c). Edits the 6x8-pixel glyph
 // for app.plotscreencode/app.plotaltchar directly in live charset RAM
-// (Strategy A, confirmed by the Phase 3a spike -- both CHARSET_STD and
+// (Strategy A, confirmed by an early spike -- both CHARSET_STD and
 // CHARSET_ALT banks can be edited in place with no shadow buffer; see
-// CLAUDE.md "Character editor (Phase 3)"). ESC commits the current
+// CLAUDE.md "Character editor"). ESC commits the current
 // screencode/charset back to app.plotscreencode/app.plotaltchar.
 //
 // Layout: narrow sidebar popup (cols 27-39, rows 0-14) so the user's canvas
@@ -195,7 +195,7 @@ static void ce_draw_favourites(void)
 /**
  * Draw the 6x8 pixel grid for the glyph being edited, using the 4-state
  * pixel/cursor rendering (CH_SPACE / CE_PIXEL_CHAR / their inverse-video
- * variants) -- see CLAUDE.md "Character editor (Phase 3)".
+ * variants) -- see CLAUDE.md "Character editor".
  *
  * @return (none)
  */

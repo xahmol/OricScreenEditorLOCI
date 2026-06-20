@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # tests/scripts/test_charsetedit.sh
 #
-# Phase 3b -- character editor smoke test (the `make test-charsetedit`
+# Character editor smoke test (the `make test-charsetedit`
 # target).
 #
 # Fast-loads the freshly built oseloci.tap under Atmos BASIC 1.1 in

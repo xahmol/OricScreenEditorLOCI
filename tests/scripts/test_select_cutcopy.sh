@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # tests/scripts/test_select_cutcopy.sh
 #
-# Phase 8c -- Select mode cut/copy smoke test (the `make test-select-cutcopy`
+# Select mode cut/copy smoke test (the `make test-select-cutcopy`
 # target).
 #
 # Fast-loads the freshly built oseloci.tap under Atmos BASIC 1.1 in
@@ -14,9 +14,10 @@
 #     canvas unchanged
 #   - ESC at the destination-picking step cancels cleanly, canvas unchanged
 #
-# This is fully testable headless (unlike most of Phase 6-8's LOCI/overlay-
-# RAM features): cut/copy only needs canvas_rowbuf[] (main RAM), no LOCI
-# device at all -- see CLAUDE.md "Select mode cut/copy (Phase 8)".
+# This is fully testable headless (unlike most of the LOCI/overlay-RAM
+# features elsewhere in this project): cut/copy only needs
+# canvas_rowbuf[] (main RAM), no LOCI device at all -- see CLAUDE.md
+# "Select mode" -> "Cut/copy".
 #
 # --type-keys notes (see CLAUDE.md "Phosphoric testing notes"):
 #   \p1 = pause 1s (releases all keys). A \p1 MUST precede every distinct

@@ -1,8 +1,7 @@
 // main.c - OricScreenEditorLOCI entry point
 //
-// Phase 1: splash screen, canvas + statusbar init, main-mode editor loop.
-// Phase 9 (revised after Phase 9c shipped): the splash is V1's actual
-// title screen image, matching V1's own boot sequence (local reference at
+// Entry point: splash screen, canvas + statusbar init, main-mode editor loop.
+// The splash is V1's actual title screen image, matching V1's own boot sequence (local reference at
 // /home/xahmol/git/OricScreenEditor/src/main.c: loads "OSETSC.BIN" into
 // SCREENMEMORY, overlays "Press key." at row 26, waits for a key). The
 // image's own rows 24-25 already contain V1's "IDreamtIn8Bits.com /
@@ -11,7 +10,7 @@
 //
 // Loaded from LOCI at runtime (assets/OSETSC.BIN, distributed via `make
 // usb` to the LOCI device's root, see Makefile) -- a deliberate reversal
-// of the earlier #embed-at-compile-time approach (Phase 9b/9c), which
+// of an earlier #embed-at-compile-time approach, which
 // cost ~5.4KB of the $0580-$B200 code/data/bss region purely to keep
 // these 5 screens (this title image + the 4 help screens, see
 // src/help.c) usable with no LOCI device attached. Now that LOCI is

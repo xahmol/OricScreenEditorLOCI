@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # tests/scripts/test_select.sh
 #
-# Phase 5c -- Select mode smoke test (the `make test-select` target).
+# Select mode smoke test (the `make test-select` target).
 #
 # Fast-loads the freshly built oseloci.tap under Atmos BASIC 1.1 in
 # Phosphoric, enters Select mode via 's' from Main mode, grows a 3x3
@@ -12,8 +12,7 @@
 #     ink/paper/modifier-attribute)
 #   - ESC at the action prompt leaves the canvas unchanged
 #
-# Cut/copy ('x'/'c') are exercised separately, in test_select_cutcopy.sh
-# (Phase 8).
+# Cut/copy ('x'/'c') are exercised separately, in test_select_cutcopy.sh.
 #
 # --type-keys notes (see CLAUDE.md "Phosphoric testing notes"):
 #   \p1 = pause 1s (releases all keys). A \p1 MUST precede every distinct

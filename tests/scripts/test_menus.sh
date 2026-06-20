@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # tests/scripts/test_menus.sh
 #
-# Phase 2 -- menu bar smoke test (the `make test-menus` target).
+# Menu bar smoke test (the `make test-menus` target).
 #
 # Fast-loads the freshly built oseloci.tap under Atmos BASIC 1.1 in
 # Phosphoric, uses --type-keys to drive the menu bar via FUNCT+1, and
@@ -99,8 +99,8 @@ check_not_found "bar gone"       "Screen" "$DUMP3"
 check_found     "statusbar intact" "Main      XY 0, 0C40@ S20I7P0S" "$DUMP3"
 
 # --- Scenario 4: Information > Version, page 1 (logo + version/credits) ----
-# (File's items were wired to real LOCI dispatch as of Phase 6 -- src/fileio.c
-# -- and Information's Version/Exit were wired up in Phase 9c -- src/info.c,
+# (File's items were wired to real LOCI dispatch -- src/fileio.c
+# -- and Information's Version/Exit were wired up later -- src/info.c,
 # matching locifilemanager-v2's versioninfo() layout exactly: page 1 is the
 # idi8b logo plus version/credits text sharing one screen, page 2 is the QR
 # code -- so this scenario, which used to land on a permanent stub, now

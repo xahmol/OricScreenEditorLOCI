@@ -11,7 +11,7 @@
 // keypress (each shift is immediately "real", canvas_blit() just shows it)
 // -- there is no separate scratch copy, so unlike V1, ESC here does NOT
 // roll back shifts already applied during this Move session. This is a
-// deliberate simplification (flagged in the Phase 5 plan), not a bug: V1's
+// deliberate simplification (flagged in the original plan for this mode), not a bug: V1's
 // own ESC-cancel only worked by accident of not having committed yet
 // either, for the exact same single-buffer reason.
 //

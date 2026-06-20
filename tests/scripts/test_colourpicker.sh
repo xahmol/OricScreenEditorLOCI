@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # tests/scripts/test_colourpicker.sh
 #
-# Phase 4c -- colour picker smoke test (the `make test-colourpicker` target).
+# Colour picker smoke test (the `make test-colourpicker` target).
 #
 # Fast-loads the freshly built oseloci.tap under Atmos BASIC 1.1 in
 # Phosphoric, enters the colour picker via 'c' from main mode, and exercises

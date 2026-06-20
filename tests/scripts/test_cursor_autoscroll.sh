@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 # tests/scripts/test_cursor_autoscroll.sh
 #
-# Phase 5a -- cursor auto-scroll smoke test (the `make test-cursor-autoscroll`
+# Cursor auto-scroll smoke test (the `make test-cursor-autoscroll`
 # target).
 #
-# Before Phase 5, OSE's main-mode cursor movement clamped to the 40x27
+# Originally, OSE's main-mode cursor movement clamped to the 40x27
 # viewport with no way to reach canvas cells beyond it -- a real gap, since
-# Screen > Height/Width (Phase 2) already lets the canvas grow past the
+# Screen > Height/Width already lets the canvas grow past the
 # viewport. cursor_move_scroll() (src/canvas.c) fixes this: at a viewport
 # edge, it scrolls app.xoffset/yoffset instead of refusing to move further,
 # as long as the canvas extends further in that direction.

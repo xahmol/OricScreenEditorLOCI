@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # tests/scripts/test_boot.sh
 #
-# Phase 1 -- boot smoke test (the `make test-boot` / `make test` target).
+# Boot smoke test (the `make test-boot` / `make test` target).
 #
 # Fast-loads the freshly built oseloci.tap under Atmos BASIC 1.1 in
 # Phosphoric and decodes the $BB80 screen-text dump to assert:

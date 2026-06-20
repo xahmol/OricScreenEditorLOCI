@@ -17,7 +17,7 @@
 
 // Run the character editor (entered via 'e' from main mode). Edits the 6x8
 // glyph for app.plotscreencode/app.plotaltchar directly in live charset RAM
-// (Strategy A -- see CLAUDE.md "Character editor (Phase 3)"); ESC commits the
+// (Strategy A -- see CLAUDE.md "Character editor"); ESC commits the
 // current screencode/charset back to app.plotscreencode/app.plotaltchar.
 void charsetedit_run(void);
 

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # tests/scripts/test_linebox.sh
 #
-# Phase 5b -- Line/Box mode smoke test (the `make test-linebox` target).
+# Line/Box mode smoke test (the `make test-linebox` target).
 #
 # Fast-loads the freshly built oseloci.tap under Atmos BASIC 1.1 in
 # Phosphoric, enters Line/Box mode via 'l' from Main mode, grows a 3x3

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # tests/scripts/test_palette.sh
 #
-# Phase 4c -- palette smoke test (the `make test-palette` target).
+# Palette smoke test (the `make test-palette` target).
 #
 # Fast-loads the freshly built oseloci.tap under Atmos BASIC 1.1 in
 # Phosphoric, enters the palette popup via 'p' from main mode, and exercises

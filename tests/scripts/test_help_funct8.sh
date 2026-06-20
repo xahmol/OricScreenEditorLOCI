@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # tests/scripts/test_help_funct8.sh
 #
-# Phase 9d -- FUNCT+8 help screens smoke test (the `make test-help-funct8`
+# FUNCT+8 help screens smoke test (the `make test-help-funct8`
 # target).
 #
 # Fast-loads the freshly built oseloci.tap under Atmos BASIC 1.1 in

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # tests/scripts/test_writemode.sh
 #
-# Phase 5e -- Write mode smoke test (the `make test-writemode` target).
+# Write mode smoke test (the `make test-writemode` target).
 #
 # Fast-loads the freshly built oseloci.tap under Atmos BASIC 1.1 in
 # Phosphoric and verifies Write mode (src/write.c, entered via 'w'):
@@ -20,7 +20,7 @@
 # in-place-clear). Phosphoric's --type-keys has no CTRL-modifier escape
 # (only Shift, via uppercase letters) and DEL (0x7F) is unmapped in its
 # char_map (see CLAUDE.md "Phosphoric testing notes") -- both are covered
-# by the manual Oricutron/Phosphoric walkthrough in the Phase 5 plan
+# by the manual Oricutron/Phosphoric walkthrough in the original plan for this mode
 # instead, and by code review (the bit-packing/cycling logic is identical
 # to the already-tested Main-mode ','/'.'/';'/'\''/'b'/'d'/'a' handlers in
 # src/editor.c; DEL reuses the already-tested cursor_move_scroll()).

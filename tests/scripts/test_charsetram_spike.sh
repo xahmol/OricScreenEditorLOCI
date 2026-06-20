@@ -1,16 +1,16 @@
 #!/usr/bin/env bash
 # tests/scripts/test_charsetram_spike.sh
 #
-# Phase 3a -- charset-RAM edit-in-place regression (the `make
+# Charset-RAM edit-in-place regression (the `make
 # test-charsetram-spike` / `make test` target).
 #
-# Confirms the core Phase 3 assumption: the live, ULA-rendered charset RAM
+# Confirms the core character-editor assumption: the live, ULA-rendered charset RAM
 # at $B400-$BBFF (include/oric.h CHARSET_STD/CHARSET_ALT) can be edited
 # directly by the running program -- no linker/heap/stack collision, and
 # the new glyph data survives to the end of the run.
 #
 # Pressing 'e' from main mode opens the character editor popup
-# (src/charsetedit.c, Phase 3b) on the current plot screencode ('@' = 0x40,
+# (src/charsetedit.c) on the current plot screencode ('@' = 0x40,
 # standard charset). 'i' XORs the 8 glyph bytes with 0x3F (inverts all 6
 # pixel bits) directly in charset RAM and redraws the grid; ESC commits and
 # closes the popup with no residue.

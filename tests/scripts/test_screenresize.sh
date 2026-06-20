@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # tests/scripts/test_screenresize.sh
 #
-# Phase 2 -- Screen > Width resize test (the `make test-screenresize` target).
+# Screen > Width resize test (the `make test-screenresize` target).
 #
 # Fast-loads the freshly built oseloci.tap under Atmos BASIC 1.1 in
 # Phosphoric, drives the Screen > Width resize dialog via --type-keys, and
@@ -89,7 +89,7 @@ echo "Width 40 -> 60 (grow, applies immediately)"
 check_not_found "bar gone" "Screen File  Charset  Information" "$DUMP1"
 
 # Reopen the Screen pulldown (FUNCT+1, ENTER) to confirm canvas_width was
-# actually applied -- the statusbar no longer shows canvas size (Phase 4
+# actually applied -- the statusbar no longer shows canvas size (the statusbar redesign
 # repurposed the "S" field for the screencode under the cursor), so
 # pulldown_titles[0][0] ("Width:  NN", via update_size_titles()) is now the
 # only on-screen signal for the resized width.
