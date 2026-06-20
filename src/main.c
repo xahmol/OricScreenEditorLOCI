@@ -45,6 +45,7 @@
 #include "ijk.h"
 #include "input.h"
 #include "loci.h"
+#include "homedir.h"
 
 AppState app;
 
@@ -73,9 +74,13 @@ int main(void)
         return 0;
     }
     enable_overlay_ram();
+    homedir_init();
 
     {
-        int16_t fd = loci_open("OSETSC.BIN", O_RDONLY);
+        char    path[HOMEDIR_MAXLEN + 16];
+        int16_t fd;
+        homedir_join(path, "OSETSC.BIN");
+        fd = loci_open(path, O_RDONLY);
         if (fd >= 0)
         {
             loci_read(fd, (void *)TEXTVRAM, VIEWPORT_HEIGHT * SCREEN_COLS);

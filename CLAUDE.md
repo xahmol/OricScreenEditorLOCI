@@ -746,6 +746,84 @@ Save — browsing to pick a name to overwrite isn't the same UX problem).
   specifically still isn't covered by an automated test, only the
   top-level single-pane listing/selection path.
 
+### Homedir-relative LOCI paths (post-launch fix)
+
+User report (2026-06-20, real hardware): the boot splash (`OSETSC.BIN`)
+and `FUNCT+8` help screens (`OSEHS<n>.BIN`) never loaded on a real LOCI
+device, even with the files confirmed present on the LOCI's own storage
+media (in this case, a folder the user navigates to and runs the `.tap`
+from, e.g. `idi8b/OSEforLOCI/`) — despite working fine in Phosphoric.
+Root cause: every LOCI path this codebase ever opened (`src/main.c`'s
+splash, `src/help.c`'s help screens, every File/Charset menu action in
+`src/fileio.c`) was a **bare relative filename**, trusting LOCI's
+"current directory" was already correct at the call site. Phosphoric
+apparently treats a freshly booted device's CWD as wherever the `.tap`
+was fast-loaded from, masking the bug; real LOCI hardware does not
+reliably hold that invariant for every way a `.tap` can be launched.
+
+**Fix, ported from the archived `nonworkingcc65` branch** (per explicit
+instruction — that branch's `src/main.c` already solved this exact
+problem for the CC65 V1 port attempt, via `getcwd_loci()` capturing a
+`homedir` once at boot and prefixing it onto every asset path by hand):
+`src/homedir.c/h` (new) wraps `include/loci.c`'s pre-existing
+`loci_getcwd()` (copied from locifilemanager-v2, never called from any
+`src/` file before this fix) into `homedir_init()` (captures
+`app.homedir`, called once from `main()` right after `enable_overlay_
+ram()`, before the splash load) and two join helpers:
+`homedir_join(out, name)` (prefixes `app.homedir` + `/` onto `name`) and
+`homedir_join_suffix(out, suffix)` (the `fileio.c`-specific shorthand for
+`homedir_join(out, app.filename)` + `strcat(out, suffix)`, e.g.
+`suffix=".BIN"` or `"PJ.BIN"`). `app.homedir` (`src/appstate.h`,
+`HOMEDIR_MAXLEN=64`) is a new `AppState` field, populated once and never
+touched again.
+
+- **Every LOCI path in the codebase now goes through one of these**:
+  `src/main.c`'s splash load, `src/help.c`'s `OSEHS%u.BIN` load, and
+  every `loci_open()`/`file_save()`/`file_load()`/`file_exists()` call
+  site in `src/fileio.c` (Save/Load Screen/Combined/Project, Charset
+  Load/Save Standard/Alternate/Combined — 19 call sites total).
+  `src/filepicker.c`'s directory browser now starts at `app.homedir`
+  instead of the LOCI device's true root `"/"`, and its "are we back at
+  the root" / "strip the prefix when storing `app.filename`" logic is
+  rebased onto the same root accordingly — otherwise `app.filename`
+  (picker-derived) and the homedir-prefixed paths `fileio.c` builds from
+  it would disagree about what "relative" means.
+- **`app.homedir` can legitimately come back empty**: `LOCI_OP_GETCWD`
+  errors out if no drive is considered "mounted/booted from" by the LOCI
+  ROM's own bookkeeping — confirmed happening under Phosphoric's
+  `--loci-flash` test mode, which bypasses the normal mount-tracking
+  system entirely for its simplified host-filesystem-backed file ops.
+  `homedir_join()` treats an empty `app.homedir` as a no-op prefix
+  (`out == name`, this codebase's exact pre-fix behaviour); `filepicker_
+  run()` falls back to `"/"` for its initial browse root and its
+  root-relative comparisons in this case (a local `root` variable, not
+  `app.homedir` itself, so `app.homedir` stays untouched for
+  `homedir_join()`'s purposes elsewhere). Both fallbacks were needed to
+  keep `test_fileio_traffic.sh` passing after this fix landed — without
+  them, the picker tried to `opendir("")`, got an empty listing, and
+  every Load-action scenario in that test silently no-op'd.
+- **Static-stack budget warning**: an earlier version of this fix gave
+  every `fileio.c` function its own ~120-byte local `fullpath` buffer
+  (`HOMEDIR_MAXLEN + FILEIO_PATH_MAXLEN + 1`) alongside the pre-existing
+  smaller `path` buffer — Oscar64 rejected the build with `error 3034:
+  Static stack usage exceeds stack segment`. Fixed by (a) building
+  directly into one buffer via `homedir_join_suffix()` instead of
+  sprintf-ing a small buffer then joining into a second one, and (b)
+  making that one remaining buffer (`fullpath`, `src/fileio.c`)
+  **module-static, not a per-function local** — none of these functions
+  are reentrant or recursive (each runs to completion synchronously from
+  one key/menu choice), so a single shared buffer costs nothing on the
+  stack. `src/main.c`/`src/help.c`'s much smaller (~80-byte) local path
+  buffers for the splash/help loads didn't need this treatment.
+- **Not yet covered by an automated regression test**: Phosphoric's
+  plain `--loci` mode (used by every test except `test-fileio-traffic`)
+  doesn't emulate a real boot-image path either way, so there's no
+  headless way to assert `app.homedir` actually gets a *non-empty*,
+  *correct* value the way real hardware now does — only that the
+  empty-homedir fallback path still works (which the existing
+  `test_fileio_traffic.sh` run now exercises, see above). Real hardware
+  remains the authoritative check for the actual fix's premise.
+
 ### Canvas undo/redo (Phase 8)
 
 `src/undo.c/h`, `z`/`y` in Main mode. Genuinely new functionality — V1 has
@@ -1836,6 +1914,9 @@ src/
   filepicker.c/h  XRAM-backed LOCI directory browser, replaces the
                   filename prompt for every Load action (see "File picker
                   (Phase 7)")
+  homedir.c/h     Captures LOCI's boot-time CWD into app.homedir once at
+                  startup; every LOCI path elsewhere is resolved relative
+                  to it (see "Homedir-relative LOCI paths")
   undo.c/h        Canvas-edit undo/redo ('z'/'y'), overlay-RAM-backed
                   dirty-rect ring buffer (see "Canvas undo/redo
                   (Phase 8)")

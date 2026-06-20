@@ -19,11 +19,13 @@
 
 #include <stdio.h>
 #include "oric.h"
+#include "appstate.h"
 #include "charsetswap.h"
 #include "canvas.h"
 #include "statusbar.h"
 #include "input.h"
 #include "loci.h"
+#include "homedir.h"
 #include "help.h"
 
 /**
@@ -36,12 +38,14 @@
  */
 void help_show(uint8_t screennumber)
 {
-    char path[12];
+    char name[12];
+    char path[HOMEDIR_MAXLEN + 16];
     int16_t fd;
 
     if (screennumber < 1 || screennumber > 4) return;
 
-    sprintf(path, "OSEHS%u.BIN", screennumber);
+    sprintf(name, "OSEHS%u.BIN", screennumber);
+    homedir_join(path, name);
 
     charsetswap_enter();
 

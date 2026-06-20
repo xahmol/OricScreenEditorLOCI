@@ -310,8 +310,20 @@ uint8_t filepicker_run(const char *title, uint8_t filter)
     PickerMeta  meta;
     char        path[PICKER_PATH_MAXLEN];
     uint8_t     key;
+    // app.homedir (the directory oseloci.tap was booted from, see
+    // src/homedir.c) is empty when LOCI can't report a CWD (e.g. no
+    // drive considered "mounted/booted from" -- confirmed happening
+    // under Phosphoric's --loci-flash test mode); root falls back to
+    // the LOCI device's true root "/" in that case, matching this
+    // function's pre-homedir behaviour exactly.
+    const char *root = app.homedir[0] ? app.homedir : "/";
 
-    strcpy(path, "/");
+    // Start browsing at root -- every path this codebase opens elsewhere
+    // (src/fileio.c, src/main.c, src/help.c) is resolved relative to
+    // app.homedir (or "/" in the empty-homedir fallback case, since
+    // homedir_join() is then a no-op prefix too), so app.filename (set
+    // below on selection) must be relative to the same base.
+    strcpy(path, root);
 
     menu_winsave(PICKER_WIN_SY, PICKER_WIN_WY, 1);
 
@@ -343,7 +355,12 @@ uint8_t filepicker_run(const char *title, uint8_t filter)
 
         if (key == KEY_LEFT)
         {
-            if (strcmp(path, "/") != 0)
+            // Floored at root -- not necessarily the LOCI device's true
+            // root if app.homedir is non-empty -- since every other LOCI
+            // path in this codebase assumes app.filename never needs to
+            // express a path *above* app.homedir (see homedir_join(),
+            // src/homedir.c).
+            if (strcmp(path, root) != 0)
             {
                 picker_path_ascend(path);
                 if (!picker_reload(&win, title, path, filter))
@@ -399,27 +416,33 @@ uint8_t filepicker_run(const char *title, uint8_t filter)
             // Strip the matched suffix so the base name fileio.c's
             // sprintf(path, "%s<suffix>", app.filename)-style composition
             // expects (Phase 6, unchanged) is what's left, then prepend
-            // the current subdirectory (if any -- "/" itself contributes
-            // nothing) so app.filename resolves back to this file
-            // regardless of where it was found.
+            // the current subdirectory relative to root (if any -- sitting
+            // at root itself contributes nothing) so app.filename
+            // resolves back to this file regardless of where it was
+            // found -- homedir_join() (src/homedir.c) is what turns this
+            // back into a full LOCI path at the actual loci_open()/
+            // file_save()/file_load() call site.
             suffix  = (filter == PICKER_FILTER_PROJECT) ? "PJ.BIN" : ".BIN";
             suflen  = (uint8_t)strlen(suffix);
             baselen = (uint8_t)(meta.length - suflen);
             if (baselen > 63) baselen = 63;
             name[baselen] = '\0';
 
-            if (strcmp(path, "/") == 0)
+            if (strcmp(path, root) == 0)
             {
                 strncpy(app.filename, name, FILENAME_MAXLEN);
                 app.filename[FILENAME_MAXLEN] = '\0';
             }
             else
             {
-                // path is "/DIR1/DIR2" -- drop the leading '/' so the
-                // result is "DIR1/DIR2/name", a relative path LOCI
-                // resolves the same way loci_open() resolves any other
-                // relative path used elsewhere in this codebase.
-                strncpy(app.filename, path + 1, FILENAME_MAXLEN);
+                // path is "<root>/DIR1/DIR2" -- drop the root prefix (and
+                // any leading '/' left over) so the result is
+                // "DIR1/DIR2/name", a relative-to-homedir path
+                // homedir_join() resolves the same way it resolves any
+                // other relative path used elsewhere in this codebase.
+                const char *rel = path + strlen(root);
+                if (*rel == '/') rel++;
+                strncpy(app.filename, rel, FILENAME_MAXLEN);
                 app.filename[FILENAME_MAXLEN] = '\0';
                 strncat(app.filename, "/", FILENAME_MAXLEN - strlen(app.filename));
                 strncat(app.filename, name, FILENAME_MAXLEN - strlen(app.filename));

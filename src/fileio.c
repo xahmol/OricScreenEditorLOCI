@@ -28,6 +28,7 @@
 #include "strings.h"
 #include "loci.h"
 #include "filepicker.h"
+#include "homedir.h"
 #include "fileio.h"
 
 // Magic number identifying an OSE Project file (ProjectHeader.magic) --
@@ -39,6 +40,18 @@
 
 // app.filename + the longest suffix ("CA.BIN") + NUL.
 #define FILEIO_PATH_MAXLEN (FILENAME_MAXLEN + 7)
+
+// FILEIO_PATH_MAXLEN's result, homedir_join()-ed onto app.homedir, plus a
+// separator -- the buffer every actual loci_open()/file_save()/
+// file_load()/file_exists() call site uses (see homedir.h "Homedir-
+// relative LOCI paths"). Module-static, not a per-function local: at
+// ~120 bytes, a local of this size in every one of fileio.c's File/
+// Charset menu action functions blew Oscar64's static stack budget
+// (error 3034) -- none of these functions are reentrant or recursive
+// (each runs to completion, synchronously, from one key/menu choice),
+// so a single shared buffer is safe and costs nothing on the stack.
+#define FILEIO_FULLPATH_MAXLEN (HOMEDIR_MAXLEN + FILEIO_PATH_MAXLEN + 1)
+static char fullpath[FILEIO_FULLPATH_MAXLEN];
 
 /**
  * Parse a NUL-terminated decimal digit string into a uint16_t. Stops at
@@ -85,7 +98,7 @@ static uint8_t fileio_get_dimensions(const char *title, uint16_t *outw, uint16_t
 
     menu_winsave(5, 12, 1);
     cwin_init(&win, 5, 5, 35, 12, A_FWBLACK, A_BGWHITE);
-    cwin_clear(&win);
+    cwin_clear_full(&win);
 
     cwin_putat_string(&win, 2, 1, title);
     cwin_putat_string(&win, 2, 3, MSG_FILEIO_PROMPT_WIDTH);
@@ -141,7 +154,7 @@ uint8_t fileio_get_filename(const char *title)
 
     menu_winsave(8, 7, 1);
     cwin_init(&win, 5, 8, 30, 7, A_FWBLACK, A_BGWHITE);
-    cwin_clear(&win);
+    cwin_clear_full(&win);
 
     cwin_putat_string(&win, 2, 1, title);
     cwin_putat_string(&win, 2, 3, MSG_FILE_PROMPT_FILENAME);
@@ -162,15 +175,14 @@ uint8_t fileio_get_filename(const char *title)
  */
 void fileio_save_screen(void)
 {
-    char    path[FILEIO_PATH_MAXLEN];
     int16_t fd;
 
     if (!loci_check_present()) return;
     if (!fileio_get_filename(MSG_FILE_SAVE_SCREEN)) return;
 
-    sprintf(path, "%s.BIN", app.filename);
+    homedir_join_suffix(fullpath, ".BIN");
 
-    fd = loci_open(path, O_WRONLY | O_CREAT | O_TRUNC);
+    fd = loci_open(fullpath, O_WRONLY | O_CREAT | O_TRUNC);
     if (fd < 0)
     {
         menu_messagepopup(MSG_FILE_INVALID_FORMAT);
@@ -193,7 +205,6 @@ void fileio_save_screen(void)
  */
 void fileio_load_screen(void)
 {
-    char     path[FILEIO_PATH_MAXLEN];
     int16_t  fd;
     uint16_t neww, newh;
 
@@ -206,9 +217,9 @@ void fileio_load_screen(void)
         return;
     }
 
-    sprintf(path, "%s.BIN", app.filename);
+    homedir_join_suffix(fullpath, ".BIN");
 
-    fd = loci_open(path, O_RDONLY);
+    fd = loci_open(fullpath, O_RDONLY);
     if (fd < 0)
     {
         menu_messagepopup(MSG_FILE_NOT_FOUND);
@@ -237,15 +248,14 @@ void fileio_load_screen(void)
  */
 void fileio_save_combined(void)
 {
-    char    path[FILEIO_PATH_MAXLEN];
     int16_t fd;
 
     if (!loci_check_present()) return;
     if (!fileio_get_filename(MSG_FILE_SAVE_COMBINED)) return;
 
-    sprintf(path, "%s.BIN", app.filename);
+    homedir_join_suffix(fullpath, ".BIN");
 
-    fd = loci_open(path, O_WRONLY | O_CREAT | O_TRUNC);
+    fd = loci_open(fullpath, O_WRONLY | O_CREAT | O_TRUNC);
     if (fd < 0)
     {
         menu_messagepopup(MSG_FILE_INVALID_FORMAT);
@@ -267,7 +277,6 @@ void fileio_save_combined(void)
  */
 void fileio_load_combined(void)
 {
-    char     path[FILEIO_PATH_MAXLEN];
     int16_t  fd;
     uint16_t neww, newh;
 
@@ -280,9 +289,9 @@ void fileio_load_combined(void)
         return;
     }
 
-    sprintf(path, "%s.BIN", app.filename);
+    homedir_join_suffix(fullpath, ".BIN");
 
-    fd = loci_open(path, O_RDONLY);
+    fd = loci_open(fullpath, O_RDONLY);
     if (fd < 0)
     {
         menu_messagepopup(MSG_FILE_NOT_FOUND);
@@ -331,7 +340,6 @@ typedef struct {
  */
 void fileio_save_project(void)
 {
-    char          path[FILEIO_PATH_MAXLEN];
     ProjectHeader proj;
     int16_t       fd;
 
@@ -354,15 +362,15 @@ void fileio_save_project(void)
     proj.stdchanged      = app.stdchanged;
     proj.altchanged      = app.altchanged;
 
-    sprintf(path, "%sPJ.BIN", app.filename);
-    if (file_save(path, &proj, sizeof(proj)) < 0)
+    homedir_join_suffix(fullpath, "PJ.BIN");
+    if (file_save(fullpath, &proj, sizeof(proj)) < 0)
     {
         menu_messagepopup(MSG_FILE_INVALID_FORMAT);
         return;
     }
 
-    sprintf(path, "%sSC.BIN", app.filename);
-    fd = loci_open(path, O_WRONLY | O_CREAT | O_TRUNC);
+    homedir_join_suffix(fullpath, "SC.BIN");
+    fd = loci_open(fullpath, O_WRONLY | O_CREAT | O_TRUNC);
     if (fd < 0)
     {
         menu_messagepopup(MSG_FILE_INVALID_FORMAT);
@@ -373,13 +381,13 @@ void fileio_save_project(void)
 
     if (app.stdchanged)
     {
-        sprintf(path, "%sCS.BIN", app.filename);
-        file_save(path, (const void *)(CHARSET_STD + CHARSET_GLYPH_AREA_OFFSET), charset_area_size(CHARSET_STD));
+        homedir_join_suffix(fullpath, "CS.BIN");
+        file_save(fullpath, (const void *)(CHARSET_STD + CHARSET_GLYPH_AREA_OFFSET), charset_area_size(CHARSET_STD));
     }
     if (app.altchanged)
     {
-        sprintf(path, "%sCA.BIN", app.filename);
-        file_save(path, (const void *)(CHARSET_ALT + CHARSET_GLYPH_AREA_OFFSET), charset_area_size(CHARSET_ALT));
+        homedir_join_suffix(fullpath, "CA.BIN");
+        file_save(fullpath, (const void *)(CHARSET_ALT + CHARSET_GLYPH_AREA_OFFSET), charset_area_size(CHARSET_ALT));
     }
 }
 
@@ -445,15 +453,14 @@ static void fileio_parse_v1_project(const uint8_t *raw, ProjectHeader *proj)
  */
 void fileio_load_project(void)
 {
-    char          path[FILEIO_PATH_MAXLEN];
     ProjectHeader proj;
     int16_t       fd;
 
     if (!loci_check_present()) return;
     if (!filepicker_run(MSG_FILE_LOAD_PROJECT, PICKER_FILTER_PROJECT)) return;
 
-    sprintf(path, "%sPJ.BIN", app.filename);
-    if (file_load(path, &proj, sizeof(proj)) < 0)
+    homedir_join_suffix(fullpath, "PJ.BIN");
+    if (file_load(fullpath, &proj, sizeof(proj)) < 0)
     {
         menu_messagepopup(MSG_FILE_INVALID_FORMAT);
         return;
@@ -461,7 +468,7 @@ void fileio_load_project(void)
     if (proj.magic != FILEIO_MAGIC)
     {
         uint8_t v1buf[19];
-        if (file_load(path, v1buf, sizeof(v1buf)) < (int16_t)sizeof(v1buf))
+        if (file_load(fullpath, v1buf, sizeof(v1buf)) < (int16_t)sizeof(v1buf))
         {
             menu_messagepopup(MSG_FILE_INVALID_FORMAT);
             return;
@@ -475,8 +482,8 @@ void fileio_load_project(void)
         return;
     }
 
-    sprintf(path, "%sSC.BIN", app.filename);
-    fd = loci_open(path, O_RDONLY);
+    homedir_join_suffix(fullpath, "SC.BIN");
+    fd = loci_open(fullpath, O_RDONLY);
     if (fd < 0)
     {
         menu_messagepopup(MSG_FILE_NOT_FOUND);
@@ -496,16 +503,16 @@ void fileio_load_project(void)
     app.plotblink      = proj.plotblink;
     app.plotdouble     = proj.plotdouble;
 
-    sprintf(path, "%sCS.BIN", app.filename);
-    if (file_exists(path))
+    homedir_join_suffix(fullpath, "CS.BIN");
+    if (file_exists(fullpath))
     {
-        file_load(path, (void *)(CHARSET_STD + CHARSET_GLYPH_AREA_OFFSET), charset_area_size(CHARSET_STD));
+        file_load(fullpath, (void *)(CHARSET_STD + CHARSET_GLYPH_AREA_OFFSET), charset_area_size(CHARSET_STD));
         app.stdchanged = 1;
     }
-    sprintf(path, "%sCA.BIN", app.filename);
-    if (file_exists(path))
+    homedir_join_suffix(fullpath, "CA.BIN");
+    if (file_exists(fullpath))
     {
-        file_load(path, (void *)(CHARSET_ALT + CHARSET_GLYPH_AREA_OFFSET), charset_area_size(CHARSET_ALT));
+        file_load(fullpath, (void *)(CHARSET_ALT + CHARSET_GLYPH_AREA_OFFSET), charset_area_size(CHARSET_ALT));
         app.altchanged = 1;
     }
 
@@ -556,15 +563,14 @@ static const char *fileio_charset_title(uint8_t altorstd, uint8_t save, uint16_t
  */
 void fileio_load_charset(uint8_t altorstd)
 {
-    char     path[FILEIO_PATH_MAXLEN];
     uint16_t base;
     const char *title = fileio_charset_title(altorstd, 0, &base);
 
     if (!loci_check_present()) return;
     if (!filepicker_run(title, PICKER_FILTER_PLAIN)) return;
 
-    sprintf(path, "%s.BIN", app.filename);
-    if (file_load(path, (void *)(base + CHARSET_GLYPH_AREA_OFFSET), charset_area_size(base)) < 0)
+    homedir_join_suffix(fullpath, ".BIN");
+    if (file_load(fullpath, (void *)(base + CHARSET_GLYPH_AREA_OFFSET), charset_area_size(base)) < 0)
     {
         menu_messagepopup(MSG_FILE_NOT_FOUND);
         return;
@@ -598,14 +604,13 @@ void fileio_load_charset(uint8_t altorstd)
  */
 void fileio_save_charset(uint8_t altorstd)
 {
-    char     path[FILEIO_PATH_MAXLEN];
     uint16_t base;
     const char *title = fileio_charset_title(altorstd, 1, &base);
 
     if (!loci_check_present()) return;
     if (!fileio_get_filename(title)) return;
 
-    sprintf(path, "%s.BIN", app.filename);
-    if (file_save(path, (const void *)(base + CHARSET_GLYPH_AREA_OFFSET), charset_area_size(base)) < 0)
+    homedir_join_suffix(fullpath, ".BIN");
+    if (file_save(fullpath, (const void *)(base + CHARSET_GLYPH_AREA_OFFSET), charset_area_size(base)) < 0)
         menu_messagepopup(MSG_FILE_INVALID_FORMAT);
 }

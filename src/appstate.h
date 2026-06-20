@@ -27,6 +27,14 @@
 // plus a subdirectory-prefixed name from src/filepicker.c's browser.
 #define FILENAME_MAXLEN 48
 
+// LOCI's boot-time current working directory (the directory oseloci.tap
+// was actually loaded from, per loci_getcwd() -- src/homedir.c), captured
+// once at startup. Every LOCI file path in this codebase is built
+// relative to this captured directory (homedir_join()) rather than
+// relying on LOCI's CWD still being correct at the time of a later file
+// operation -- see CLAUDE.md "Homedir-relative LOCI paths".
+#define HOMEDIR_MAXLEN 64
+
 typedef enum {
     MODE_MAIN = 0,
     MODE_WRITE,
@@ -55,6 +63,7 @@ typedef struct {
     uint8_t    stdchanged;      // 0/1, CHARSET_STD edited this session (charsetedit.c)
     uint8_t    altchanged;      // 0/1, CHARSET_ALT edited this session (charsetedit.c)
     char       filename[FILENAME_MAXLEN + 1]; // LOCI base filename (src/fileio.c)
+    char       homedir[HOMEDIR_MAXLEN + 1]; // LOCI boot directory (src/homedir.c)
 } AppState;
 
 extern AppState app;
