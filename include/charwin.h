@@ -61,6 +61,13 @@ void cwin_init(OricCharWin *w,
 // content cols with space (0x20). Reset cursor to (0,0).
 void cwin_clear(OricCharWin *w);
 
+// Like cwin_clear(), but also blanks columns 2..(sx-1) -- the gap between
+// the attribute bytes and a window whose sx > 2 -- instead of leaving it
+// as stale background content. OricScreenEditorLOCI addition (not in
+// locifilemanager-v2's original charwin.c); see charwin.c for when to use
+// this instead of cwin_clear().
+void cwin_clear_full(OricCharWin *w);
+
 // Write ch at window-relative (x, y). No cursor update.
 void cwin_putat_char(OricCharWin *w, uint8_t x, uint8_t y, uint8_t ch);
 

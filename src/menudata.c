@@ -106,7 +106,7 @@ static void resize_dialog(uint8_t is_height)
 
     menu_winsave(5, 12, 1);
     cwin_init(&win, 5, 5, 35, 12, A_FWBLACK, A_BGWHITE);
-    cwin_clear(&win);
+    cwin_clear_full(&win);
 
     cwin_putat_string(&win, 2, 1, is_height ? MSG_RESIZE_TITLE_HEIGHT : MSG_RESIZE_TITLE_WIDTH);
     cwin_putat_string(&win, 2, 3, is_height ? MSG_RESIZE_PROMPT_HEIGHT : MSG_RESIZE_PROMPT_WIDTH);
@@ -160,7 +160,7 @@ void goto_dialog(void)
 
     menu_winsave(5, 12, 1);
     cwin_init(&win, 5, 5, 35, 12, A_FWBLACK, A_BGWHITE);
-    cwin_clear(&win);
+    cwin_clear_full(&win);
 
     cwin_putat_string(&win, 2, 1, MSG_GOTO_TITLE);
     cwin_putat_string(&win, 2, 3, MSG_GOTO_PROMPT_X);

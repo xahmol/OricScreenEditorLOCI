@@ -63,7 +63,7 @@ static void write_hex_attr(void)
 
     menu_winsave(5, 8, 1);
     cwin_init(&win, 5, 5, 30, 8, A_FWBLACK, A_BGWHITE);
-    cwin_clear(&win);
+    cwin_clear_full(&win);
 
     cwin_putat_string(&win, 2, 1, MSG_WRITE_HEX_TITLE);
     cwin_putat_string(&win, 2, 3, MSG_WRITE_HEX_PROMPT);

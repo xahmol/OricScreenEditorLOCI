@@ -136,6 +136,40 @@ void cwin_clear(OricCharWin *w)
 }
 
 /**
+ * Like cwin_clear(), but also blanks the gap columns 2..(w->sx-1) when
+ * w->sx > 2, instead of leaving them as whatever content was on screen
+ * before the window opened. OricScreenEditorLOCI addition, not present
+ * in locifilemanager-v2's original charwin.c: cwin_clear()'s narrow
+ * clear (content only from w->sx onward) is the *correct* behaviour for
+ * a deliberately narrow sidebar popup that wants the rest of the canvas
+ * to stay visible underneath (src/charsetedit.c's CE_WIN_SX=27 is the
+ * only window in this codebase that wants that) -- but every other
+ * popup with sx > 2 (the various sx=5 dialogs: resize, goto, find/
+ * replace, file save/load filename prompts, write-mode hex-attribute
+ * entry) wants a fully opaque popup with no background bleeding through
+ * on the left, which cwin_clear() alone doesn't provide. Use this
+ * instead of cwin_clear() for any new sx > 2 popup that should be fully
+ * opaque; keep using cwin_clear() for anything that should stay a
+ * narrow, see-through sidebar.
+ *
+ * @param w Window to clear.
+ * @return (none)
+ */
+void cwin_clear_full(OricCharWin *w)
+{
+    for (uint8_t y = 0; y < w->wy; y++)
+    {
+        uint8_t  row  = w->sy + y;
+        uint8_t *base = (uint8_t *)row_base[row];
+        row_setattr(row, w->ink, w->paper);
+        for (uint8_t x = 2; x < w->sx + w->wx; x++)
+            base[x] = 0x20;   // space character
+    }
+    w->cx = 0;
+    w->cy = 0;
+}
+
+/**
  * Write a single character at window-relative (x, y) without affecting the
  * cursor.
  *

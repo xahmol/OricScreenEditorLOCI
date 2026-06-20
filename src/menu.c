@@ -152,9 +152,13 @@ void menu_winrestore(void)
 }
 
 /**
- * Draw a white-paper popup background for rows ypos..ypos+height-1. Paper
- * (A_BGWHITE) at col 5, ink (A_FWBLACK=0x00) at col 6, spaces at cols 7-39.
- * Cols 0-4 retain existing content (part of the saved background).
+ * Draw a white-paper popup background for rows ypos..ypos+height-1: ink
+ * (A_FWBLACK=0x00) at col 0, paper (A_BGWHITE) at col 1 (the same
+ * col0/col1 attribute-byte convention include/charwin.c's row_setattr()
+ * uses), spaces at cols 2-39. Previously left cols 0-4 untouched
+ * ("part of the saved background") -- fixed (user-reported, 2026-06-20):
+ * that left whatever canvas content was underneath visibly bleeding
+ * through to the left of the popup text instead of a clean white box.
  *
  * @param ypos   First screen row to paint.
  * @param height Number of rows to paint.
@@ -165,9 +169,9 @@ void menu_wininit(uint8_t ypos, uint8_t height)
     for (uint8_t y = 0; y < height; y++)
     {
         uint8_t *row = MENU_ROW(ypos + y);
-        row[5] = A_BGWHITE;
-        row[6] = A_FWBLACK;   // 0x00 -- must write directly (not in string literal)
-        for (uint8_t x = 7; x < SCREEN_COLS; x++)
+        row[0] = A_FWBLACK;   // 0x00 -- must write directly (not in string literal)
+        row[1] = A_BGWHITE;
+        for (uint8_t x = 2; x < SCREEN_COLS; x++)
             row[x] = CH_SPACE;
     }
 }
@@ -327,6 +331,28 @@ uint8_t menu_pulldown(uint8_t xpos, uint8_t ypos,
     }
 
     menu_winsave(ypos, height, 1);
+
+    // Blank every covered row in full (col 0/1 = ink/paper attribute
+    // bytes, matching include/charwin.c's row_setattr() convention; cols
+    // 2-39 = spaces) before drawing items -- without this, only the
+    // narrow strip menu_draw_item() itself writes (xpos-1 onward, up to
+    // the item's own padded width + endcolor) is ever touched, leaving
+    // whatever was on screen before showing through to the left of
+    // xpos-1 and to the right past the drawn item (user-reported,
+    // 2026-06-20: background canvas content visibly bleeding through
+    // every pulldown, not just Are-you-sure/message popups, which had
+    // their own separate fix in menu_wininit()).
+    {
+        uint8_t blankink = topmenu ? A_FWWHITE : A_FWBLACK;
+        for (uint8_t y = 0; y < height; y++)
+        {
+            uint8_t *row = MENU_ROW(ypos + y);
+            row[0] = blankink;
+            row[1] = endcolor;
+            for (uint8_t x = 2; x < SCREEN_COLS; x++)
+                row[x] = CH_SPACE;
+        }
+    }
 
     // Draw all items (unselected)
     for (uint8_t y = 0; y < height; y++)

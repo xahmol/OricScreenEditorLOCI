@@ -113,7 +113,7 @@ void findreplace_run(void)
 
     menu_winsave(5, 14, 1);
     cwin_init(&win, 5, 5, 35, 14, A_FWBLACK, A_BGWHITE);
-    cwin_clear(&win);
+    cwin_clear_full(&win);
 
     cwin_putat_string(&win, 2, 1, MSG_FR_TITLE);
     cwin_putat_string(&win, 2, 3, MSG_FR_TARGET_PROMPT);

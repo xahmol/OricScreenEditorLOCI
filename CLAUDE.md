@@ -2063,6 +2063,55 @@ Yes/No confirm dialog, `PULLDOWN_MAXOPTIONS=6`) → popup dialogs.
   *current* (already-grown) size triggers `menu_areyousure()` (Yes applies,
   No leaves the size unchanged).
 
+### Popup background bleed-through fix (post-launch)
+
+User report (2026-06-20): popups left background canvas content visibly
+showing through on the left edge instead of being fully cleared. Two
+separate root causes, both about a "gap" between the col0/col1 attribute
+bytes (`include/charwin.c`'s `row_setattr()` convention) and where a
+popup's own content actually started — neither gap was ever blanked,
+just left as whatever was on screen when the popup opened.
+
+1. **`cwin_init()`-based popups with `sx > 2`**: `cwin_clear()` only
+   fills from `w->sx` onward, by design — exactly right for
+   `charsetedit.c`'s `CE_WIN_SX=27` sidebar (canvas cols 0-26 *should*
+   stay visible underneath, see "Character editor"), but wrong for every
+   other `sx=5` dialog (`resize_dialog()`/`goto_dialog()`
+   (`src/menudata.c`), `fileio_get_dimensions()`/`fileio_get_filename()`
+   (`src/fileio.c`), `findreplace_run()`, `write_hex_attr()`
+   (`src/write.c`)), which want a fully opaque box with no see-through
+   gap at cols 2-4. Fixed by adding `cwin_clear_full()`
+   (`include/charwin.c/h`, new — not in locifilemanager-v2's original
+   library) alongside the existing `cwin_clear()`: same row_setattr()
+   col0/1 write, but fills from column 2 (not `w->sx`) through
+   `w->sx+w->wx-1`. The 6 call sites above now call `cwin_clear_full()`;
+   `charsetedit_run()`'s two `cwin_clear()` calls are untouched.
+2. **`src/menu.c`'s pulldowns and `menu_wininit()`-based popups**: a
+   pulldown's `menu_draw_item()` only ever wrote the narrow strip
+   `xpos-1` onward up to the item's own padded width + `endcolor` byte —
+   never the rest of its covered rows — so *every* pulldown (not just
+   the popups in (1)) left stale content to the left of `xpos-1` and to
+   the right past the drawn item, all the way to column 39. Fixed by
+   having `menu_pulldown()` blank every covered row in full (col0=ink,
+   col1=`endcolor`, cols 2-39=spaces — `A_FWWHITE`/`A_BGBLACK` for
+   top-menu pulldowns, `A_FWBLACK`/`A_BGWHITE` for nested ones, matching
+   `menu_draw_item()`'s own `endcolor` convention) right after
+   `menu_winsave()`, before any item is drawn. Separately,
+   `menu_wininit()` (the Are-you-sure/message-popup background, used by
+   `menu_areyousure()`/`menu_messagepopup()`) previously left columns
+   0-4 untouched entirely ("part of the saved background", per its own
+   now-corrected doc comment) — fixed the same way, col0/1 attribute
+   bytes + spaces from column 2, instead of starting its paper/ink pair
+   at columns 5/6.
+
+Verified via Phosphoric `--screenshot-at` PNG captures, before and
+after, for both a top-menu pulldown (Screen) and an Are-you-sure popup
+(Charset > Reset Std->ROM's confirm) — both now render as clean,
+fully-opaque boxes with no background bleed. No existing test asserted
+on the gap columns' bytes (they were never part of any byte-level
+check), so the full 179/179 suite stayed green with no test changes
+needed — this fix only touches bytes no test was checking before.
+
 ## Phosphoric Testing Notes
 
 Beyond `tests/scripts/test_boot.sh`'s pattern (see that file), Phase 2 added
