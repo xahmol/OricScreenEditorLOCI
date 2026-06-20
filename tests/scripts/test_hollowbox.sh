@@ -1,14 +1,17 @@
 #!/usr/bin/env bash
 # tests/scripts/test_hollowbox.sh
 #
-# Hollow-box toggle in Line/Box mode ('o' during rect-grow, src/select.c
-# rect_select()/linebox_run()) regression test (the `make
-# test-hollowbox` target).
+# Hollow-box toggle in Line/Box mode ('o' at the post-confirm shape
+# prompt, src/select.c rect_select()/linebox_run()) regression test (the
+# `make test-hollowbox` target).
 #
-# Grows the same 3x3 rectangle from (0,0) as test_linebox.sh, but
-# presses 'o' once before ENTER to select a hollow (border-only) box.
-# Default (no 'o' press) behaviour is covered by test_linebox.sh and is
-# unaffected by this feature.
+# Grows the same 3x3 rectangle from (0,0) as test_linebox.sh, confirms it
+# with ENTER, then presses 'o' once at the shape prompt to select a
+# hollow (border-only) box before the final ENTER. Default (no 'o'
+# press) behaviour is covered by test_linebox.sh and is unaffected by
+# this feature. 'o' moved from "live during rect-grow" to "only at the
+# post-confirm shape prompt" 2026-06-20 -- see "Line/Box secondary-hint
+# timing" in CLAUDE.md.
 #
 # --type-keys notes (see CLAUDE.md "Phosphoric testing notes"):
 #   \p1 = pause 1s (releases all keys). A \p1 MUST precede every distinct
@@ -71,19 +74,20 @@ if [ ! -x "$PHOS" ]; then
     exit 0
 fi
 
-# --- Scenario 1: 'o' then ENTER plots only the 3x3 rect's border ----------
+# --- Scenario 1: ENTER (confirm rect), o, ENTER (shape) plots a hollow border
 DUMP1="$OUT/capture_hollowbox_enter.bin"
-run_capture 16300000 '\p1l\p1\d\p1\d\p1\r\p1\r\p1o\p1\n' "$DUMP1"
+run_capture 17300000 '\p1l\p1\d\p1\d\p1\r\p1\r\p1\n\p1o\p1\n' "$DUMP1"
 echo ""
-echo "l,DOWN,DOWN,RIGHT,RIGHT,o,ENTER plots a hollow 3x3 border"
+echo "l,DOWN,DOWN,RIGHT,RIGHT,ENTER,o,ENTER plots a hollow 3x3 border"
 check_bytes "row0 cols0-2 = @@@ (top border)"    "0xBB80:3" "40 40 40" "$DUMP1"
 check_bytes "row1 cols0-2 = @,blank,@ (sides)"   "0xBBA8:3" "40 20 40" "$DUMP1"
 check_bytes "row2 cols0-2 = @,@,cursor-@ (bottom border, cursor on last cell)" "0xBBD0:3" "40 40 c0" "$DUMP1"
 check_found "back in Main mode" "Main      XY 2, 2" "$DUMP1"
 
-# --- Scenario 2: toggling 'o' twice returns to the default filled box -----
+# --- Scenario 2: toggling 'o' twice (at the shape prompt) returns to the --
+# default filled box
 DUMP2="$OUT/capture_hollowbox_toggleback.bin"
-run_capture 17300000 '\p1l\p1\d\p1\d\p1\r\p1\r\p1o\p1o\p1\n' "$DUMP2"
+run_capture 18400000 '\p1l\p1\d\p1\d\p1\r\p1\r\p1\n\p1o\p1o\p1\n' "$DUMP2"
 echo ""
 echo "'o' pressed twice toggles back to filled (default) behaviour"
 check_bytes "row1 cols0-2 = @@@ (filled, no hole)" "0xBBA8:3" "40 40 40" "$DUMP2"

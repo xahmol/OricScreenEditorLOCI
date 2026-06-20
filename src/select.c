@@ -36,19 +36,18 @@
 static uint16_t select_startx, select_starty, select_endx, select_endy;
 static uint16_t select_width, select_height;
 
-// Line/Box-only: toggled by 'o' during rect_select()'s grow loop (no-op
-// for Select mode, which never reads it), read by linebox_run() after
-// rect_select() returns to decide fill-vs-outline. A file-scope static
-// rather than a rect_select() parameter/return value, same convention as
-// select_startx/etc. above -- avoids changing rect_select()'s signature
-// for something only one of its two callers cares about.
+// Line/Box-only: reset to 0 by rect_select() (shared start point with
+// Select mode, which never reads it), toggled by 'o' in linebox_run()'s
+// own post-ENTER shape prompt (not during rect_select()'s grow loop --
+// see linebox_run()'s header comment) to decide fill-vs-outline. A
+// file-scope static rather than a parameter/return value, same
+// convention as select_startx/etc. above.
 static uint8_t select_hollow;
 
 // Line/Box-only, same convention as select_hollow above: toggled by 'c'
-// during rect_select()'s grow loop, read by linebox_run() after it
-// returns to decide rectangle-vs-ellipse. Independent of select_hollow --
-// the two combine for a 4-way dispatch (filled/hollow box, filled/hollow
-// ellipse).
+// in linebox_run()'s post-ENTER shape prompt to decide
+// rectangle-vs-ellipse. Independent of select_hollow -- the two combine
+// for a 4-way dispatch (filled/hollow box, filled/hollow ellipse).
 static uint8_t select_ellipse;
 
 /**
@@ -282,16 +281,19 @@ static void ellipse_outline(uint16_t sx, uint16_t sy, uint16_t ex, uint16_t ey, 
  * (canvas_cursor_show(), matching V1's plotvisible()). ENTER accepts (populating
  * select_startx/starty/endx/endy/width/height) and returns 1; ESC cancels
  * and returns 0. FUNCT+6 toggles the statusbar without affecting the rect.
- * 'o' toggles select_hollow and 'c' toggles select_ellipse (both
- * Line/Box-only; linebox_run() reads them after this returns -- Select
- * mode never does). Sets app.mode to MODE_LINEBOX or MODE_SELECT for
- * the duration (per draworselect) and restores MODE_MAIN before
- * returning. Line/Box mode also overrides the statusbar's Mode field
- * with MSG_LINEBOX_MODE_HINT for the duration of the grow loop, naming
- * the 'o'/'c' toggles -- ported from V1's lineandbox()/selectmode(),
- * which show available secondary keys the same way (by overwriting
- * programmode itself); see select_run() below for the Select-mode
- * equivalent.
+ * Sets app.mode to MODE_LINEBOX or MODE_SELECT for the duration (per
+ * draworselect) and restores MODE_MAIN before returning.
+ *
+ * select_hollow/select_ellipse are reset to 0 here (shared start point for
+ * both callers) but are no longer toggled during this grow loop -- per
+ * user request 2026-06-20, linebox_run()'s own secondary prompt (shown
+ * only *after* this function returns 1) is where 'o'/'c' are read, the
+ * same "rect first, choice second" shape select_run()'s own
+ * MSG_SELECT_ACTION_HINT prompt already uses. An earlier version of this
+ * function read 'o'/'c' live during the grow loop and showed
+ * MSG_LINEBOX_MODE_HINT for its entire duration -- both removed, since
+ * showing/accepting a "what shape" choice before the region is even
+ * selected was the bug being fixed.
  *
  * @param draworselect 1 for Line/Box mode, 0 for Select mode (only affects
  *                      app.mode/the statusbar's Mode field while running).
@@ -309,8 +311,6 @@ uint8_t rect_select(uint8_t draworselect)
     app.mode = draworselect ? MODE_LINEBOX : MODE_SELECT;
     select_hollow = 0;
     select_ellipse = 0;
-
-    if (draworselect) statusbar_set_override(MSG_LINEBOX_MODE_HINT);
 
     rect_perimeter_set(orgx, orgy, orgx, orgy);
     statusbar_draw();
@@ -339,21 +339,6 @@ uint8_t rect_select(uint8_t draworselect)
                 rect_perimeter_set(orgx, orgy, orgx, orgy);
                 statusbar_draw();
             }
-            continue;
-
-        // Hollow-box toggle: Line/Box-only (linebox_run() reads
-        // select_hollow after this returns; Select mode never does, so
-        // toggling it during select_run()'s rect-grow is harmless).
-        case 'o':
-            select_hollow = !select_hollow;
-            continue;
-
-        // Ellipse/circle toggle: same Line/Box-only convention as 'o'
-        // above, independent of select_hollow -- the two combine for a
-        // 4-way dispatch in linebox_run() (filled/hollow box, filled/
-        // hollow ellipse).
-        case 'c':
-            select_ellipse = !select_ellipse;
             continue;
 
         default:
@@ -392,7 +377,6 @@ uint8_t rect_select(uint8_t draworselect)
 
     canvas_blit();
     app.mode = MODE_MAIN;
-    if (draworselect) statusbar_clear_override();
     statusbar_draw();
 
     if (key != KEY_ENTER) return 0;
@@ -404,20 +388,54 @@ uint8_t rect_select(uint8_t draworselect)
 
 /**
  * Line/Box mode, entered via 'l' from Main mode. Grows a rectangle
- * (rect_select(1)) and, if accepted, plots app.plotscreencode according
- * to the 'o' (hollow) and 'c' (ellipse) toggles pressed during the grow
- * (rect_select()): filled box (default, neither toggle), hollow box
- * ('o' only, rect_perimeter_plot()), filled ellipse ('c' only,
- * ellipse_fill()), or hollow ellipse (both, ellipse_outline()). ESC
- * leaves the canvas unchanged.
+ * (rect_select(1)); if accepted, prompts for the shape (MSG_LINEBOX_
+ * MODE_HINT, same statusbar-override mechanism as select_run()'s own
+ * MSG_SELECT_ACTION_HINT): 'o' toggles hollow/filled, 'c' toggles
+ * box/ellipse (both repeatable, independent of each other), ENTER plots
+ * app.plotscreencode with whatever combination is currently toggled --
+ * filled box (default, neither toggle), hollow box ('o' only,
+ * rect_perimeter_plot()), filled ellipse ('c' only, ellipse_fill()), or
+ * hollow ellipse (both, ellipse_outline()). ESC at this prompt (or at
+ * the rect-grow stage) leaves the canvas unchanged.
+ *
+ * Per user request 2026-06-20: this prompt -- and the 'o'/'c' keys --
+ * used to be live during rect_select()'s grow loop, before the region
+ * was even selected. Moved here, after rect_select() returns 1, so the
+ * shape choice only becomes available once the rectangle is confirmed --
+ * the same "rect first, choice second" shape select_run()'s own
+ * action-key prompt already uses.
  *
  * @return (none)
  */
 void linebox_run(void)
 {
     uint16_t x, y;
+    uint8_t key;
 
     if (!rect_select(1)) return;
+
+    app.mode = MODE_LINEBOX;
+    statusbar_set_override(MSG_LINEBOX_MODE_HINT);
+    statusbar_draw();
+
+    do
+    {
+        key = key_read();
+
+        switch (key)
+        {
+        case 'o': select_hollow  = !select_hollow;  break;
+        case 'c': select_ellipse = !select_ellipse; break;
+        case KEY_F6: statusbar_show((uint8_t)!app.showstatusbar); break;
+        default: break;
+        }
+    } while (key != KEY_ENTER && key != KEY_ESC);
+
+    statusbar_clear_override();
+    app.mode = MODE_MAIN;
+    statusbar_draw();
+
+    if (key == KEY_ESC) return;
 
     undo_snapshot(select_startx, select_starty, select_width, select_height);
 

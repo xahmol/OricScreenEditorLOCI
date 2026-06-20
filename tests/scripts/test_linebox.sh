@@ -7,8 +7,12 @@
 # Phosphoric, enters Line/Box mode via 'l' from Main mode, grows a 3x3
 # rectangle from the origin cell (0,0) using DOWN,DOWN,RIGHT,RIGHT, and
 # verifies (src/select.c rect_select()/linebox_run()):
-#   - ENTER fills the rectangle with app.plotscreencode and returns to Main
-#   - ESC cancels, leaving the canvas unchanged
+#   - ENTER confirms the rect, then a second ENTER (at the post-confirm
+#     shape prompt, see "Line/Box secondary-hint timing" in CLAUDE.md)
+#     fills the rectangle with app.plotscreencode and returns to Main
+#   - ESC at the rect-grow stage cancels, leaving the canvas unchanged
+#   - ESC at the shape prompt (after the rect is confirmed) also cancels,
+#     leaving the canvas unchanged
 #
 # --type-keys notes (see CLAUDE.md "Phosphoric testing notes"):
 #   \p1 = pause 1s (releases all keys). A \p1 MUST precede every distinct
@@ -72,23 +76,34 @@ if [ ! -x "$PHOS" ]; then
     exit 0
 fi
 
-# --- Scenario 1: ENTER fills the 3x3 rect with plotscreencode 'A' ----------
+# --- Scenario 1: ENTER (confirm rect) + ENTER (shape prompt) fills the 3x3 rect
 DUMP1="$OUT/capture_linebox_enter.bin"
-run_capture 14980000 '\p1l\p1\d\p1\d\p1\r\p1\r\p1\n' "$DUMP1"
+run_capture 16200000 '\p1l\p1\d\p1\d\p1\r\p1\r\p1\n\p1\n' "$DUMP1"
 echo ""
-echo "l,DOWN,DOWN,RIGHT,RIGHT,ENTER fills a 3x3 rect with '@'"
+echo "l,DOWN,DOWN,RIGHT,RIGHT,ENTER,ENTER fills a 3x3 rect with '@'"
 check_bytes "row0 cols0-2 = @@@" "0xBB80:3" "40 40 40" "$DUMP1"
 check_bytes "row1 cols0-2 = @@@" "0xBBA8:3" "40 40 40" "$DUMP1"
 check_bytes "row2 cols0-1 = @@"  "0xBBD0:2" "40 40" "$DUMP1"
 check_found "back in Main mode" "Main      XY 2, 2" "$DUMP1"
 
-# --- Scenario 2: ESC cancels, canvas unchanged ------------------------------
+# --- Scenario 2: ESC at the rect-grow stage cancels, canvas unchanged ------
 DUMP2="$OUT/capture_linebox_esc.bin"
 run_capture 14980000 '\p1l\p1\d\p1\d\p1\r\p1\r\p1\e' "$DUMP2"
 echo ""
 echo "l,DOWN,DOWN,RIGHT,RIGHT,ESC leaves canvas unchanged"
 check_bytes "row0 cols0-2 still blank" "0xBB80:3" "20 20 20" "$DUMP2"
 check_found "back in Main mode" "Main      XY 2, 2" "$DUMP2"
+
+# --- Scenario 3: ESC at the shape prompt (after rect confirmed) also -------
+# cancels, canvas unchanged -- regression test for the secondary-hint
+# timing fix (the shape prompt, and its 'o'/'c' keys, now only exist
+# after this first ENTER; ESC here must still leave the canvas untouched).
+DUMP3="$OUT/capture_linebox_shapeesc.bin"
+run_capture 16200000 '\p1l\p1\d\p1\d\p1\r\p1\r\p1\n\p1\e' "$DUMP3"
+echo ""
+echo "l,DOWN,DOWN,RIGHT,RIGHT,ENTER,ESC (at shape prompt) leaves canvas unchanged"
+check_bytes "row0 cols0-2 still blank" "0xBB80:3" "20 20 20" "$DUMP3"
+check_found "back in Main mode" "Main      XY 2, 2" "$DUMP3"
 
 echo ""
 echo "==========================================================="

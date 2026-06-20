@@ -1,9 +1,11 @@
 #!/usr/bin/env bash
 # tests/scripts/test_ellipse.sh
 #
-# Ellipse/circle toggle in Line/Box mode ('c' during rect-grow,
-# src/select.c rect_select()/linebox_run()) regression test (the `make
-# test-ellipse` target).
+# Ellipse/circle toggle in Line/Box mode ('c' at the post-confirm shape
+# prompt, src/select.c rect_select()/linebox_run()) regression test (the
+# `make test-ellipse` target). 'c' moved from "live during rect-grow" to
+# "only at the post-confirm shape prompt" 2026-06-20 -- see "Line/Box
+# secondary-hint timing" in CLAUDE.md.
 #
 # Grows a 5x5 bounding box from (0,0) (DOWN x4, RIGHT x4) -- small
 # enough to verify the ellipse_inside() membership test by hand against
@@ -70,7 +72,7 @@ run_capture() {
         --dump-ram-at "$cycles:$dump" >/dev/null 2>&1
 }
 
-GROW='\p1l\p1\d\p1\d\p1\d\p1\d\p1\r\p1\r\p1\r\p1\r'
+GROW='\p1l\p1\d\p1\d\p1\d\p1\d\p1\r\p1\r\p1\r\p1\r\p1\n'
 
 echo "==========================================================="
 echo "  OricScreenEditorLOCI -- ellipse/circle toggle test"
@@ -81,11 +83,11 @@ if [ ! -x "$PHOS" ]; then
     exit 0
 fi
 
-# --- Scenario 1: 'c' then ENTER fills the 5x5 box as a diamond ellipse -----
+# --- Scenario 1: ENTER (confirm rect), c, ENTER fills a diamond ellipse ---
 DUMP1="$OUT/capture_ellipse_fill.bin"
-run_capture 21000000 "$GROW"'\p1c\p1\n' "$DUMP1"
+run_capture 22100000 "$GROW"'\p1c\p1\n' "$DUMP1"
 echo ""
-echo "5x5 grow, c, ENTER plots a filled ellipse (diamond pattern)"
+echo "5x5 grow, ENTER, c, ENTER plots a filled ellipse (diamond pattern)"
 check_bytes "row0 = . . @ . ." "0xBB80:5" "20 20 40 20 20" "$DUMP1"
 check_bytes "row1 = . @ @ @ ." "0xBBA8:5" "20 40 40 40 20" "$DUMP1"
 check_bytes "row2 = @ @ @ @ @" "0xBBD0:5" "40 40 40 40 40" "$DUMP1"
@@ -93,11 +95,11 @@ check_bytes "row3 = . @ @ @ ." "0xBBF8:5" "20 40 40 40 20" "$DUMP1"
 check_bytes "row4 col4 = c0 (cursor preview, outside ellipse)" "0xBC24:1" "c0" "$DUMP1"
 check_found "back in Main mode at (4,4)" "Main      XY 4, 4" "$DUMP1"
 
-# --- Scenario 2: 'c' then 'o' then ENTER plots only the 8-cell outline ----
+# --- Scenario 2: ENTER (confirm rect), c, o, ENTER plots the 8-cell outline
 DUMP2="$OUT/capture_ellipse_hollow.bin"
-run_capture 22500000 "$GROW"'\p1c\p1o\p1\n' "$DUMP2"
+run_capture 23600000 "$GROW"'\p1c\p1o\p1\n' "$DUMP2"
 echo ""
-echo "5x5 grow, c, o, ENTER plots only the ellipse outline (hollow)"
+echo "5x5 grow, ENTER, c, o, ENTER plots only the ellipse outline (hollow)"
 check_bytes "row0 = . . @ . ." "0xBB80:5" "20 20 40 20 20" "$DUMP2"
 check_bytes "row1 = . @ . @ ." "0xBBA8:5" "20 40 20 40 20" "$DUMP2"
 check_bytes "row2 = @ . . . @" "0xBBD0:5" "40 20 20 20 40" "$DUMP2"
@@ -105,7 +107,7 @@ check_bytes "row3 = . @ . @ ." "0xBBF8:5" "20 40 20 40 20" "$DUMP2"
 
 # --- Scenario 3: 'c' pressed twice toggles back to a filled box -----------
 DUMP3="$OUT/capture_ellipse_toggleback.bin"
-run_capture 23600000 "$GROW"'\p1c\p1c\p1\n' "$DUMP3"
+run_capture 24700000 "$GROW"'\p1c\p1c\p1\n' "$DUMP3"
 echo ""
 echo "'c' pressed twice toggles back to filled box (default, unchanged)"
 check_bytes "row0 = @@@@@ (filled box, no ellipse)" "0xBB80:5" "40 40 40 40 40" "$DUMP3"

@@ -1554,15 +1554,16 @@ functions, `statusbar_set_override(text)`/`statusbar_clear_override()`
 must fit the existing `STATUSBAR_MODE_WIDTH` (10 chars) budget, same
 as every `MSG_MODE_*` string already does.
 
-- **`src/select.c`'s `rect_select()`**: sets `MSG_LINEBOX_MODE_HINT`
+- **`src/select.c`'s `linebox_run()`** (moved here from `rect_select()`,
+  see "Line/Box secondary-hint timing" below): sets `MSG_LINEBOX_MODE_HINT`
   (`"o:Box c:El"`, EN; `"o:Bte c:El"`, FR — `c`/`o` are new-to-this-port
   features with no V1 wording to match, unlike the Select case below)
-  right after entering Line/Box mode, for the entire grow loop;
-  cleared right before the final `statusbar_draw()` that restores
-  `MODE_MAIN`. No override is set for Select mode's own `rect_select(0)`
-  call (the rect-grow phase shows the normal "Select" mode name, same
-  as before — only the *secondary action prompt* afterward needs a
-  hint).
+  only *after* `rect_select(1)` returns 1 (the rectangle is confirmed),
+  for the duration of the post-confirm shape prompt; cleared right
+  before the `statusbar_draw()` that restores `MODE_MAIN`. The rect-grow
+  phase itself (in `rect_select()`) shows the plain "Line/Box" mode name
+  for both Line/Box and Select mode — no override is set there at all
+  any more.
 - **`src/select.c`'s `select_run()`**: sets `MSG_SELECT_ACTION_HINT`
   (`"x/c/d/ipm?"`, identical in EN/FR — these are literal key letters,
   not translatable text, same precedent as `MSG_COLOURPICKER_RESULT`)
@@ -1577,6 +1578,52 @@ interaction or keystroke, so it carries zero cycle-budget or
 `--type-keys` impact on any existing test. Verified visually via
 Phosphoric RAM dumps that both hints render correctly in the
 statusbar's Mode field during the relevant wait.
+
+### Line/Box secondary-hint timing (post-launch fix)
+
+User report (2026-06-20): Line/Box mode's `o`/`c` toggles (and
+`MSG_LINEBOX_MODE_HINT`, above) were live during `rect_select()`'s
+*grow* loop — before the rectangle was even selected — which the user
+considered premature; they should only become available once the
+rectangle is confirmed. Checked V1's `lineandbox()` first per the
+project's "use V1 as the literal reference" convention, but V1 has no
+hollow/ellipse concept at all (genuinely new to this port, see "Ellipse/
+circle drawing in Line/Box mode" above) — so there's no V1 sequencing to
+port here; the redesign instead follows the *shape* of V1's own
+`selectmode()`'s secondary action-prompt (already correctly timed,
+already ported as `select_run()`), which V1 — and this codebase — only
+shows *after* `rect_select()`'s own ENTER confirms the rectangle.
+
+**Fix**: `rect_select()` no longer reads `'o'`/`'c'` in its grow loop and
+no longer sets `MSG_LINEBOX_MODE_HINT` at all (it still resets
+`select_hollow`/`select_ellipse` to 0 at the start, a shared reset point
+for both its callers) — the grow loop now shows the plain "Line/Box"
+mode name throughout, identical to Select mode's own grow phase.
+`linebox_run()` gained its own do-while loop, run only after
+`rect_select(1)` returns 1: sets `app.mode = MODE_LINEBOX` again (`rect_
+select()` already reset it to `MODE_MAIN` on return, same re-entry
+pattern `select_run()` already uses for its own action prompt) and
+`statusbar_set_override(MSG_LINEBOX_MODE_HINT)`, then loops reading
+keys — `'o'`/`'c'` toggle `select_hollow`/`select_ellipse` and *continue*
+the loop (repeatable, independent of each other, no execution yet),
+`FUNCT+6` toggles the statusbar, and the loop exits only on `ENTER`
+(execute with whatever combination is currently toggled) or `ESC`
+(cancel, canvas left unchanged — covered by a new regression scenario,
+since this is a genuinely new way to back out that didn't exist before).
+No live visual feedback for the toggles during this prompt (matching the
+already-established precedent that the grow loop's own perimeter
+highlight never differed by shape either — the choice only manifests
+once finally drawn, on `ENTER`).
+
+**Test updates**: `test_linebox.sh`'s accept scenario needs a second
+`ENTER` now (rect confirm + shape-prompt confirm); a new scenario
+verifies `ESC` at the shape prompt also leaves the canvas untouched.
+`test_hollowbox.sh`/`test_ellipse.sh` had their `'o'`/`'c'` keystrokes
+moved from before the first `ENTER` to after it (immediately followed by
+the shape-prompt's own `ENTER`). All cycle budgets bumped accordingly.
+Verified visually too: a Phosphoric screenshot mid-grow shows the plain
+"Line/Box" statusbar Mode field; a second screenshot right after the
+first `ENTER` shows `"o:Box c:El"` only then. Suite: 180/180 -> 182/182.
 
 ### Cursor preview now shows app.plotscreencode (matches V1), not a XOR-toggle
 
@@ -1798,7 +1845,7 @@ make test         # full automated Phosphoric test suite (test-boot, test-menus,
                   # path) and test-fileio-traffic (uses --loci-flash DIR
                   # instead, a real host filesystem directory for
                   # byte-level LOCI file I/O assertions).
-                  # Current total: 180/180.
+                  # Current total: 182/182.
 make test-boot    # headless boot smoke test (splash + canvas/statusbar render)
 make test-capture CYCLES=N TYPEKEYS='...'
                   # calibration helper: dumps tests/out/capture.bin + .png
