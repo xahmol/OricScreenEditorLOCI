@@ -202,6 +202,20 @@ void canvas_goto(uint16_t x, uint16_t y)
 }
 
 /**
+ * Pack the current app.plotaltchar/plotdouble/plotblink flags into the
+ * matching modifier-attribute byte (A_STD(8)/A_ALT(9)/.../A_BLINK2HALT(15)
+ * in oric.h: base 8, bit0=altchar, bit1=double, bit2=blink).
+ *
+ * @return The packed modifier-attribute byte, 8-15.
+ */
+uint8_t modifier_attr_byte(void)
+{
+    return (uint8_t)(8 | (app.plotaltchar ? 1 : 0)
+                        | (app.plotdouble  ? 2 : 0)
+                        | (app.plotblink   ? 4 : 0));
+}
+
+/**
  * Resize the canvas to neww x newh cells, reflowing existing rows in place
  * via canvas_rowbuf[] when the width changes. Growing height just blanks the
  * new rows (row stride doesn't change); shrinking height needs no data

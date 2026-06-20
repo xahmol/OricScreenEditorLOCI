@@ -44,6 +44,15 @@ void cursor_move_scroll(int8_t dx, int8_t dy);
 // 'h' (jump to origin) case.
 void canvas_goto(uint16_t x, uint16_t y);
 
+// The modifier-attribute byte (A_STD(8)/A_ALT(9)/.../A_BLINK2HALT(15)
+// bit-packing, see oric.h) for the current app.plotaltchar/plotdouble/
+// plotblink: base 8, bit0=altchar, bit1=double, bit2=blink. Shared
+// helper for what used to be three identical inline expressions
+// (src/editor.c's 'u' key, src/select.c's Select-mode 'm' fill,
+// src/write.c's FUNCT+3) -- consolidated here since canvas.h is already
+// included by all three.
+uint8_t modifier_attr_byte(void);
+
 #pragma compile("canvas.c")
 
 #endif // CANVAS_H

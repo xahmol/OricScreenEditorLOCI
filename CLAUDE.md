@@ -587,6 +587,15 @@ of copying the bug. `i`/`o`/`u` plot `plotink`/`16+plotpaper`/the
 modifier-attribute byte at the cursor and move down one row (auto-scrolling
 if needed). `r` toggles reverse-video on `plotscreencode` (XOR 0x80).
 
+**`modifier_attr_byte()` helper (post-launch deduplication)**: the
+modifier-attribute bit-packing this `u` case plots
+(`8 | (plotaltchar?1:0) | (plotdouble?2:0) | (plotblink?4:0)`) used to
+be written out identically in three places — here, Select mode's `m`
+fill (below), and Write mode's `FUNCT+3` — found during a code-quality
+pass (2026-06-20). Consolidated into `modifier_attr_byte()`
+(`src/canvas.c/h`, since `canvas.h` was already included by all three
+call sites) with no behaviour change; all three now just call it.
+
 ### Main-mode attribute-selection keys and statusbar redesign
 
 `src/appstate.h` gained five `AppState` fields: `plotink`/`plotpaper` (0-7,
@@ -1607,6 +1616,16 @@ touched again.
   empty-homedir fallback path still works (which the existing
   `test_fileio_traffic.sh` run now exercises, see above). Real hardware
   remains the authoritative check for the actual fix's premise.
+- **Zero-margin buffer fit, found and padded (post-launch code-quality
+  fix)**: a 2026-06-20 audit found `FILEIO_FULLPATH_MAXLEN` fit its own
+  worst-case content (`HOMEDIR_MAXLEN`(64) + 1 separator +
+  `FILENAME_MAXLEN`(48) + the longest suffix (6, e.g. `"PJ.BIN"`) + NUL =
+  120, exactly what the formula evaluated to) with **zero spare bytes**
+  — correct as written, but a landmine if any of those constants ever
+  grew without re-deriving the formula by hand. Added 4 bytes of
+  deliberate slack (`+ 4` in the `#define`) plus a comment spelling out
+  the exact arithmetic, so the margin is visible next time someone
+  touches a related constant.
 
 
 ## Boot, Help & Information

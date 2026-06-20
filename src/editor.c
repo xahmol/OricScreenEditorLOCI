@@ -250,9 +250,7 @@ void editor_run(void)
         case 'u':
             undo_snapshot(app.cursor_x + app.xoffset, app.cursor_y + app.yoffset, 1, 1);
             canvas_put(app.cursor_x + app.xoffset, app.cursor_y + app.yoffset,
-                       (uint8_t)(8 | (app.plotaltchar ? 1 : 0)
-                                   | (app.plotdouble  ? 2 : 0)
-                                   | (app.plotblink   ? 4 : 0)));
+                       modifier_attr_byte());
             cursor_move_scroll(0, 1);
             canvas_blit();
             break;

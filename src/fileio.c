@@ -50,7 +50,20 @@
 // (error 3034) -- none of these functions are reentrant or recursive
 // (each runs to completion, synchronously, from one key/menu choice),
 // so a single shared buffer is safe and costs nothing on the stack.
-#define FILEIO_FULLPATH_MAXLEN (HOMEDIR_MAXLEN + FILEIO_PATH_MAXLEN + 1)
+//
+// Exact worst-case content length homedir_join_suffix() can write:
+// HOMEDIR_MAXLEN (64, app.homedir's longest content) + 1 (the '/'
+// separator homedir_join() inserts) + FILENAME_MAXLEN (48, app.filename's
+// longest content) + 6 (the longest suffix, "PJ.BIN"/"SC.BIN"/etc) + 1
+// (NUL) = 120 -- which is exactly what `HOMEDIR_MAXLEN +
+// FILEIO_PATH_MAXLEN + 1` below evaluates to (FILEIO_PATH_MAXLEN already
+// bundles FILENAME_MAXLEN + the longest suffix + NUL). That means this
+// buffer fits its worst case with *zero* spare bytes -- correct as of
+// 2026-06-20, but fragile: if HOMEDIR_MAXLEN/FILENAME_MAXLEN/any suffix
+// string ever grows without re-deriving this formula by hand, it would
+// silently start overflowing. The "+ 4" below is deliberate slack
+// against exactly that, not part of the real worst-case math.
+#define FILEIO_FULLPATH_MAXLEN (HOMEDIR_MAXLEN + FILEIO_PATH_MAXLEN + 1 + 4)
 static char fullpath[FILEIO_FULLPATH_MAXLEN];
 
 /**

@@ -608,9 +608,7 @@ void select_run(void)
     case 'p': fillvalue = (uint8_t)(16 + app.plotpaper); break;
     case 'm':
     default:
-        fillvalue = (uint8_t)(8 | (app.plotaltchar ? 1 : 0)
-                                 | (app.plotdouble  ? 2 : 0)
-                                 | (app.plotblink   ? 4 : 0));
+        fillvalue = modifier_attr_byte();
         break;
     }
 
