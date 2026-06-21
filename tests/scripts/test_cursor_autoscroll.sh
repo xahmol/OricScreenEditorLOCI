@@ -11,14 +11,15 @@
 # edge, it scrolls app.xoffset/yoffset instead of refusing to move further,
 # as long as the canvas extends further in that direction.
 #
-# This test: plots '@' at canvas row 1, resizes the canvas height to 28
-# (Screen > Height, one row taller than the 27-row viewport), then presses
-# DOWN 28 times from row 0. The first 26 presses move the cursor to the
-# last viewport row (26); the 27th press has nowhere left to move the
-# cursor, so it should scroll yoffset 0 -> 1 instead (the only room
-# available, canvas_height - VIEWPORT_HEIGHT = 1); the 28th press should be
-# a no-op (no further room). After scrolling, canvas row 1 (where '@' was
-# plotted) becomes visible at screen row 0.
+# This test: plots '@' at canvas row 1, resizes the canvas height to 29
+# (Screen > Height, one row taller than the 28-row viewport -- viewport
+# bumped 27->28 2026-06-21, see appstate.h's VIEWPORT_HEIGHT comment),
+# then presses DOWN 29 times from row 0. The first 27 presses move the
+# cursor to the last viewport row (27); the 28th press has nowhere left
+# to move the cursor, so it should scroll yoffset 0 -> 1 instead (the
+# only room available, canvas_height - VIEWPORT_HEIGHT = 1); the 29th
+# press should be a no-op (no further room). After scrolling, canvas
+# row 1 (where '@' was plotted) becomes visible at screen row 0.
 #
 # --type-keys notes (see CLAUDE.md "Phosphoric testing notes"):
 #   \p1 = pause 1s (releases all keys). \fN = FUNCT+N. A \p1 MUST precede
@@ -85,17 +86,23 @@ if [ ! -x "$PHOS" ]; then
 fi
 
 # Plot 'A' at canvas row 1 (DOWN, SPACE, UP back to row0), resize height
-# 27 -> 28 (FUNCT+1, ENTER opens Screen pulldown, DOWN selects Height:,
-# ENTER opens its dialog, LEFT,LEFT to idx0, '2','8' overwrite "27"->"28",
-# ENTER confirms, ESC closes the menu), then DOWN x28.
-DOWNS28=""
-for i in $(seq 1 28); do DOWNS28+='\p1\d'; done
-KEYS="\\p1\\d\\p1 \\p1\\u\\p1\\f1\\p1\\n\\p1\\d\\p1\\n\\p1\\l\\p1\\l\\p12\\p18\\p1\\n\\p1\\e${DOWNS28}"
+# 28 -> 29 (FUNCT+1, ENTER opens Screen pulldown, DOWN selects Height:,
+# ENTER opens its dialog, LEFT,LEFT to idx0, '2','9' overwrite "28"->"29",
+# ENTER confirms, ESC closes the menu), then DOWN x29, then one UP.
+# The UP at the end is needed because viewport row 27 (VIEWPORT_HEIGHT-1)
+# is now also STATUSBAR_ROW (statusbar.c) -- the statusbar auto-hides
+# while the cursor sits there, so the XY assertion below couldn't see it
+# at the very bottom row; stepping up one row (still well within the
+# scrolled view) puts the statusbar back in view without disturbing the
+# scroll-position byte check.
+DOWNS29=""
+for i in $(seq 1 29); do DOWNS29+='\p1\d'; done
+KEYS="\\p1\\d\\p1 \\p1\\u\\p1\\f1\\p1\\n\\p1\\d\\p1\\n\\p1\\l\\p1\\l\\p12\\p19\\p1\\n\\p1\\e${DOWNS29}\\p1\\u"
 
 DUMP1="$OUT/capture_autoscroll_down.bin"
-run_capture 65000000 "$KEYS" "$DUMP1"
+run_capture 67000000 "$KEYS" "$DUMP1"
 echo ""
-echo "Resize height 27->28, plot '@' at row1, DOWN x28 from row0"
+echo "Resize height 28->29, plot '@' at row1, DOWN x29 from row0, UP x1"
 check_bytes "row0 col0 now shows '@' (yoffset scrolled to 1)" "0xBB80:1" "40" "$DUMP1"
 check_found "statusbar shows canvas-absolute row 27 (viewport row26 + yoffset1, XY 0,27)" "XY 0,27" "$DUMP1"
 

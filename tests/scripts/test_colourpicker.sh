@@ -18,19 +18,27 @@
 #   key indefinitely. Cycle budget: 8,080,000 (boot+splash) +
 #   N_pairs*1,100,000 + 300,000 margin.
 #
-# Grid layout (src/colourpicker.c): split 4-wide/16-row grid (CP_GRID_X0=2,
-# CP_CELL_STEP=4, CP_ROW_GRID0=1, CP_INKS_PER_ROW=4) -- grid column = ink%4,
-# grid row = paper*2 + ink/4. Cell (ink, paper) is 4 bytes at screen col
-# (2 + CP_GRID_X0 + col*4), row (CP_ROW_GRID0 + row): [paper-attr, ink-attr,
-# swatch0, swatch1]. Paper-attr is written *before* ink-attr deliberately --
-# paper-setting attribute bytes take effect immediately on their own
-# column (confirmed via Phosphoric pixel-level screenshot inspection),
-# while ink-setting bytes don't affect a blank cell's rendering, so this
-# order needs no separate reset byte and produces no visible gap between
-# cells (a 5-byte reset+ink+paper+swatch+swatch order, used before this
-# fix, showed 2 stale-white columns per cell). When highlighted, swatch0/1
-# = CH_INVSPACE(0xa0)/CH_SPACE(0x20); normal = CH_SPACE/CH_INVSPACE
-# (0x20/0xa0).
+# Grid layout (src/colourpicker.c, rewritten 2026-06-21 to match V1's
+# colourpicker() exactly): a single 8-wide grid row per paper value
+# (CP_ROW_GRID0=1, screen row = CP_ROW_GRID0 + paper), all 8 ink columns on
+# it (CP_CELL_STEP=5, screen col = ink*5) -- written via direct screen-RAM
+# writes (cp_screen_put()), not through the popup's bordered window, so the
+# ink=0 cell's leading reset byte can land on literal screen column 0.
+# Cell (ink, paper) is 5 bytes at screen col (ink*5), row (1+paper):
+# [A_BGWHITE reset, ink-attr, paper-attr, swatch0, swatch1] -- this exact
+# order (reset, then ink, then paper) matches V1's literal byte order; an
+# earlier round of this feature reordered to paper-before-ink with no
+# reset byte based on Phosphoric pixel sampling that didn't hold up on real
+# hardware, so this rewrite reverted to V1's order instead. 8 cells * 5
+# bytes = 40 columns exactly, so no end-of-row reset pair is needed either
+# (unlike the earlier 4-wide/16-row split, which had unused columns to
+# reset). Swatch glyphs are '*'(0x2a)/inverse-'*'(0xaa), not a blank/solid
+# space (2026-06-21, user-requested -- a glyph with visible foreground AND
+# background lets both ink and paper be seen in the same swatch). The
+# highlighted/selected cell uses '-'(0x2d)/inverse-'-'(0xad) instead of
+# '*'/inverse-'*', so it stands out by glyph as well as by swap order
+# (2026-06-21, user-requested). Non-highlighted swatch0/1 = '*'/inverse-'*'
+# (0x2a/0xaa); highlighted swatch0/1 = inverse-'-'/'-' (0xad/0x2d).
 #
 # Required env vars (set by `make test-colourpicker`):
 #   PHOS      path to oric1-emu
@@ -101,8 +109,8 @@ if [ ! -x "$PHOS" ]; then
 fi
 
 # --- Scenario 1: 'c' opens the popup on the default ink/paper (7/0) -------
-# Cell (ink=7, paper=0): col=7%4=3, row=0*2+7/4=1 -> screen col=4+3*4=16,
-# screen row=1+1=2 -> addr 0xBB80+2*40+16=0xBBE0.
+# Cell (ink=7, paper=0): screen col=7*5=35, screen row=1+0=1 ->
+# addr 0xBB80+1*40+35=0xBBCB.
 DUMP1="$OUT/capture_cp_open.bin"
 run_capture 9480000 '\p1c' "$DUMP1"
 echo ""
@@ -111,29 +119,29 @@ check_found "title shown" "Select ink and paper colour" "$DUMP1"
 check_found "Ink: 7 feedback line"   "Ink:    7" "$DUMP1"
 check_found "Paper: 0 feedback line" "Paper:  0" "$DUMP1"
 check_found "Result: feedback line"  "Result:"   "$DUMP1"
-check_bytes "cell (7,0) highlighted (paper,ink,inv,norm)" \
-    "0xBBE0:4" "10 07 a0 20" "$DUMP1"
+check_bytes "cell (7,0) highlighted (reset,ink,paper,inv,norm)" \
+    "0xBBCB:5" "17 07 10 ad 2d" "$DUMP1"
 
 # --- Scenario 2: RIGHT wraps ink 7 -> 0 ------------------------------------
-# Cell (ink=0, paper=0): col=0%4=0, row=0 -> screen col=4+0*4=4,
-# screen row=1+0=1 -> addr 0xBB80+1*40+4=0xBBAC.
+# Cell (ink=0, paper=0): screen col=0*5=0, screen row=1 ->
+# addr 0xBB80+1*40+0=0xBBA8.
 DUMP2="$OUT/capture_cp_right_wrap.bin"
 run_capture 10580000 '\p1c\p1\r' "$DUMP2"
 echo ""
 echo "RIGHT wraps ink 7 -> 0"
 check_found "Ink: 0 feedback line" "Ink:    0" "$DUMP2"
-check_bytes "cell (0,0) now highlighted" "0xBBAC:4" "10 00 a0 20" "$DUMP2"
-check_bytes "cell (7,0) back to normal" "0xBBE0:4" "10 07 20 a0" "$DUMP2"
+check_bytes "cell (0,0) now highlighted" "0xBBA8:5" "17 00 10 ad 2d" "$DUMP2"
+check_bytes "cell (7,0) back to normal" "0xBBCB:5" "17 07 10 2a aa" "$DUMP2"
 
 # --- Scenario 3: UP wraps paper 0 -> 7 -------------------------------------
-# Cell (ink=7, paper=7): col=7%4=3, row=7*2+7/4=15 -> screen col=4+3*4=16,
-# screen row=1+15=16 -> addr 0xBB80+16*40+16=0xBE10.
+# Cell (ink=7, paper=7): screen col=7*5=35, screen row=1+7=8 ->
+# addr 0xBB80+8*40+35=0xBCE3.
 DUMP3="$OUT/capture_cp_up_wrap.bin"
 run_capture 12500000 '\p1c\p1\u' "$DUMP3"
 echo ""
 echo "UP wraps paper 0 -> 7"
 check_found "Paper: 7 feedback line" "Paper:  7" "$DUMP3"
-check_bytes "cell (7,7) now highlighted" "0xBE10:4" "17 07 a0 20" "$DUMP3"
+check_bytes "cell (7,7) now highlighted" "0xBCE3:5" "17 07 17 ad 2d" "$DUMP3"
 
 # --- Scenario 4: ENTER commits the highlighted cell ------------------------
 DUMP4="$OUT/capture_cp_enter.bin"

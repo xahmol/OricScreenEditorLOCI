@@ -67,7 +67,7 @@ overlay RAM, not just file loading/saving. If no LOCI device is detected,
 the program shows a message and exits instead of starting the editor.
 
 Main features of the program:
-- Support for screen maps larger than 40x25 characters. Screens can be up to 10 KiB (10,240 bytes), all sizes fitting in that memory with width of 40 at minimum and height of 27 at minimum are supported.
+- Support for screen maps larger than 40x25 characters. Screens can be up to 10 KiB (10,240 bytes), all sizes fitting in that memory with width of 40 at minimum and height of 28 at minimum are supported.
 - Supports resizing canvas size, clear or fill the canvas
 - Support for loading user defined charsets (should be standard charsets of 96 characters of 6 bits width and 8 bits height, alternate charsets of 80 characters or combined charsets of 176 characters).
 - Includes a simple character editor to change characters on the fly and directly see the result in your designed screen.
@@ -75,7 +75,7 @@ Main features of the program:
 - Write mode to freely type characters with the keyboard
 - Line and box mode for drawing lines and boxes
 - Select mode to cut, copy, delete or repaint (only color or all attributes) the selection.
-- Move mode to scroll the screen contents (due to memory constraints only for the 40x27 viewport)
+- Move mode to scroll the screen contents (due to memory constraints only for the 40x28 viewport)
 - Palette mode, including visual charmap mode, to visually select characters and colors
 - Favorite slots to quickly select 10 favorite characters
 - **OSE-LOCI addition**: supports an IJK-compatible joystick (Raxiss IJK
@@ -169,7 +169,7 @@ Press these keys in main mode for editing:
 
 *Moving cursor*
 
-Press the **cursor keys** to move the cursor around the screen. If the canvas size is bigger than the 40x27 screensize, the screen will scroll on reaching the edges.
+Press the **cursor keys** to move the cursor around the screen. If the canvas size is bigger than the 40x28 screensize, the screen will scroll on reaching the edges.
 
 *Selecting the screencode to plot*
 
@@ -218,7 +218,7 @@ Press **J** to open a popup asking for an X then a Y canvas coordinate
 (both pre-filled with the cursor's current position). Confirming both
 jumps the cursor and viewport there in one step, scrolling as needed --
 much quicker than scrolling cell by cell on a canvas bigger than the
-40x27 screen. ESC at either field cancels with no change. Press **H** to
+40x28 screen. ESC at either field cancels with no change. Press **H** to
 jump straight back to the canvas origin (0,0) without any popup.
 
 *Find/Replace (OSE-LOCI new)*
@@ -300,7 +300,7 @@ Note that with shrinking the width you might loose data, as all characters right
 
 *Height: Resize height*
 
-Similar to resize width, with this option you can resize the height in the same way. Minimum height is 27, maximum again dependent on width given maximum of 10 KiB memory allocation.
+Similar to resize width, with this option you can resize the height in the same way. Minimum height is 28, maximum again dependent on width given maximum of 10 KiB memory allocation.
 
 Also here: on shrinking you might loose data, which is lost if you confirm.
 
@@ -319,15 +319,39 @@ Similar to clear, but this will fill the canvas with the present selected screen
 ![File menu](https://github.com/xahmol/OricScreenEditor/blob/main/screenshots/OSE%20filemenu.png?raw=true)
 
 **OSE-LOCI note**: this rewrite uses the **LOCI mass-storage device** for
-all file I/O instead of V1's tape commands. **Save** actions ask for a
-typed filename (up to 48 characters). **Load** actions open a file
-picker instead: a scrollable directory listing (cursor keys to move,
-ENTER to descend into a folder or select a highlighted file, LEFT to go
-back up to the parent folder, ESC to cancel) showing only the files
-relevant to the action you chose (e.g. Load Project only shows project
-files). If no LOCI device is detected, every File/Charset menu item shows
-a "No LOCI device detected" message instead of attempting the operation,
-so the rest of the editor keeps working normally without one attached.
+all file I/O instead of V1's tape commands. Both **Save** and **Load**
+actions now open the same file-picker directory browser first: **Save**
+actions let you browse to and confirm the directory to save into (press
+**S** once you're in the right place), then ask for a typed filename (up
+to 48 characters); **Load** actions browse and select the file directly,
+showing only the files relevant to the action you chose (e.g. Load
+Project only shows project files). If no LOCI device is detected, every
+File/Charset menu item shows a "No LOCI device detected" message instead
+of attempting the operation, so the rest of the editor keeps working
+normally without one attached.
+
+The file picker supports full filesystem traversal, not just the
+directory you started in:
+
+|Key|Description
+|---|---|
+|**Cursor UP/DOWN**|Move the highlighted entry
+|**Cursor LEFT**|Go up to the parent directory
+|**Cursor RIGHT / RETURN**|Enter a highlighted directory
+|**RETURN**|Select a highlighted file (Load actions only)
+|**S**|Confirm the current directory (Save actions only)
+|**T**|Jump to the top of the listing
+|**B**|Jump to the bottom of the listing
+|**D**|Page down
+|**P**|Page up
+|**\\**|Jump to the root of the current drive
+|**. / ,**|Switch to the next/previous drive (0-9)
+|**E**|Create a new subdirectory here
+|**FUNCT+6**|Toggle the statusbar
+|**ESC**|Cancel and go back
+
+Copying, renaming and deleting files/directories aren't supported --
+use a LOCI-aware tool on the host side for that.
 
 *Save screen / Load screen*
 
@@ -855,7 +879,7 @@ Note that in OSE calculation of these attribute codes by yourselves is not neces
 ([Back to contents](#contents))
 
 As the Oric does not have separate attribute memory, screendata is basically just a width*height dump of screen codes. The screen file is a flat data file with these screencodes, length is calculated as width*height.
-So a standard 40x27 screen would be 1.080 bytes.
+So a standard 40x28 screen would be 1.120 bytes.
 
 ## Credits
 ([Back to contents](#contents))

@@ -23,6 +23,7 @@
 #include "canvas.h"
 #include "statusbar.h"
 #include "charset.h"
+#include "charsetswap.h"
 #include "menu.h"
 #include "menudata.h"
 #include "strings.h"
@@ -41,29 +42,32 @@
 // app.filename + the longest suffix ("CA.BIN") + NUL.
 #define FILEIO_PATH_MAXLEN (FILENAME_MAXLEN + 7)
 
-// FILEIO_PATH_MAXLEN's result, homedir_join()-ed onto app.homedir, plus a
-// separator -- the buffer every actual loci_open()/file_save()/
-// file_load()/file_exists() call site uses (see homedir.h "Homedir-
-// relative LOCI paths"). Module-static, not a per-function local: at
-// ~120 bytes, a local of this size in every one of fileio.c's File/
-// Charset menu action functions blew Oscar64's static stack budget
-// (error 3034) -- none of these functions are reentrant or recursive
-// (each runs to completion, synchronously, from one key/menu choice),
-// so a single shared buffer is safe and costs nothing on the stack.
+// FILEIO_PATH_MAXLEN's result, filedir_join()-ed onto app.filedir
+// (2026-06-21: every File/Charset action now resolves against
+// app.filedir, the file picker's last-navigated/confirmed directory --
+// see homedir.h -- not app.homedir, which stays boot-assets-only), plus
+// a separator -- the buffer every actual loci_open()/file_save()/
+// file_load()/file_exists() call site uses. Module-static, not a
+// per-function local: at ~120 bytes, a local of this size in every one
+// of fileio.c's File/Charset menu action functions blew Oscar64's
+// static stack budget (error 3034) -- none of these functions are
+// reentrant or recursive (each runs to completion, synchronously, from
+// one key/menu choice), so a single shared buffer is safe and costs
+// nothing on the stack.
 //
-// Exact worst-case content length homedir_join_suffix() can write:
-// HOMEDIR_MAXLEN (64, app.homedir's longest content) + 1 (the '/'
-// separator homedir_join() inserts) + FILENAME_MAXLEN (48, app.filename's
+// Exact worst-case content length filedir_join_suffix() can write:
+// FILEDIR_MAXLEN (64, app.filedir's longest content) + 1 (the '/'
+// separator filedir_join() inserts) + FILENAME_MAXLEN (48, app.filename's
 // longest content) + 6 (the longest suffix, "PJ.BIN"/"SC.BIN"/etc) + 1
-// (NUL) = 120 -- which is exactly what `HOMEDIR_MAXLEN +
+// (NUL) = 120 -- which is exactly what `FILEDIR_MAXLEN +
 // FILEIO_PATH_MAXLEN + 1` below evaluates to (FILEIO_PATH_MAXLEN already
 // bundles FILENAME_MAXLEN + the longest suffix + NUL). That means this
 // buffer fits its worst case with *zero* spare bytes -- correct as of
-// 2026-06-20, but fragile: if HOMEDIR_MAXLEN/FILENAME_MAXLEN/any suffix
+// 2026-06-20, but fragile: if FILEDIR_MAXLEN/FILENAME_MAXLEN/any suffix
 // string ever grows without re-deriving this formula by hand, it would
 // silently start overflowing. The "+ 4" below is deliberate slack
 // against exactly that, not part of the real worst-case math.
-#define FILEIO_FULLPATH_MAXLEN (HOMEDIR_MAXLEN + FILEIO_PATH_MAXLEN + 1 + 4)
+#define FILEIO_FULLPATH_MAXLEN (FILEDIR_MAXLEN + FILEIO_PATH_MAXLEN + 1 + 4)
 static char fullpath[FILEIO_FULLPATH_MAXLEN];
 
 /**
@@ -156,14 +160,28 @@ uint8_t loci_check_present(void)
  * app.filename (persisting the last-used name as the next prompt's
  * default, matching V1's UX).
  *
+ * Browses for a save directory first (added 2026-06-21, user-requested:
+ * "on save user should be enabled to first browse to and select save
+ * directory") via filepicker_browse_dir() -- app.filedir is updated to
+ * wherever the user confirms ('s'), and every Save action downstream
+ * resolves its path against that (filedir_join_suffix(), not
+ * homedir_join_suffix() any more). ESC at the directory-browse step
+ * cancels the whole Save action (the filename prompt is never shown);
+ * ESC at the filename step still cancels too, but by then app.filedir
+ * has already been updated to the browsed directory -- intentional, the
+ * same way app.filename already persists across a cancelled prompt.
+ *
  * @param title Title line (the calling action's label).
- * @return 1 if ENTER accepted (app.filename updated), 0 if ESC cancelled
- *         (app.filename unchanged).
+ * @return 1 if ENTER accepted (app.filename updated), 0 if either step
+ *         was cancelled (app.filename unchanged on a filename-step
+ *         cancel).
  */
 uint8_t fileio_get_filename(const char *title)
 {
     OricCharWin win;
     uint8_t result;
+
+    if (!filepicker_browse_dir(MSG_FILE_PICKER_SAVEDIR)) return 0;
 
     menu_winsave(8, 7, 1);
     cwin_init(&win, 5, 8, 30, 7, A_FWBLACK, A_BGWHITE);
@@ -193,7 +211,7 @@ void fileio_save_screen(void)
     if (!loci_check_present()) return;
     if (!fileio_get_filename(MSG_FILE_SAVE_SCREEN)) return;
 
-    homedir_join_suffix(fullpath, ".BIN");
+    filedir_join_suffix(fullpath, ".BIN");
 
     fd = loci_open(fullpath, O_WRONLY | O_CREAT | O_TRUNC);
     if (fd < 0)
@@ -230,7 +248,7 @@ void fileio_load_screen(void)
         return;
     }
 
-    homedir_join_suffix(fullpath, ".BIN");
+    filedir_join_suffix(fullpath, ".BIN");
 
     fd = loci_open(fullpath, O_RDONLY);
     if (fd < 0)
@@ -266,7 +284,7 @@ void fileio_save_combined(void)
     if (!loci_check_present()) return;
     if (!fileio_get_filename(MSG_FILE_SAVE_COMBINED)) return;
 
-    homedir_join_suffix(fullpath, ".BIN");
+    filedir_join_suffix(fullpath, ".BIN");
 
     fd = loci_open(fullpath, O_WRONLY | O_CREAT | O_TRUNC);
     if (fd < 0)
@@ -302,7 +320,7 @@ void fileio_load_combined(void)
         return;
     }
 
-    homedir_join_suffix(fullpath, ".BIN");
+    filedir_join_suffix(fullpath, ".BIN");
 
     fd = loci_open(fullpath, O_RDONLY);
     if (fd < 0)
@@ -314,6 +332,13 @@ void fileio_load_combined(void)
     loci_read(fd, screenmap, (uint16_t)(neww * newh));
     loci_close(fd);
 
+    // charsetswap_mark_changed() (not just app.stdchanged) -- this load
+    // bypasses the character editor's own ce_snapshot() chokepoint, the
+    // only other call site for charsetswap_mark_changed(), so without
+    // this the general popup-chrome Std-charset-swap mechanism would
+    // never realise CHARSET_STD just changed and would leave menus/
+    // dialogs unprotected (found 2026-06-21, user report).
+    charsetswap_mark_changed();
     app.stdchanged = 1;
     app.cursor_x = 0;
     app.cursor_y = 0;
@@ -375,14 +400,14 @@ void fileio_save_project(void)
     proj.stdchanged      = app.stdchanged;
     proj.altchanged      = app.altchanged;
 
-    homedir_join_suffix(fullpath, "PJ.BIN");
+    filedir_join_suffix(fullpath, "PJ.BIN");
     if (file_save(fullpath, &proj, sizeof(proj)) < 0)
     {
         menu_messagepopup(MSG_FILE_INVALID_FORMAT);
         return;
     }
 
-    homedir_join_suffix(fullpath, "SC.BIN");
+    filedir_join_suffix(fullpath, "SC.BIN");
     fd = loci_open(fullpath, O_WRONLY | O_CREAT | O_TRUNC);
     if (fd < 0)
     {
@@ -394,12 +419,12 @@ void fileio_save_project(void)
 
     if (app.stdchanged)
     {
-        homedir_join_suffix(fullpath, "CS.BIN");
+        filedir_join_suffix(fullpath, "CS.BIN");
         file_save(fullpath, (const void *)(CHARSET_STD + CHARSET_GLYPH_AREA_OFFSET), charset_area_size(CHARSET_STD));
     }
     if (app.altchanged)
     {
-        homedir_join_suffix(fullpath, "CA.BIN");
+        filedir_join_suffix(fullpath, "CA.BIN");
         file_save(fullpath, (const void *)(CHARSET_ALT + CHARSET_GLYPH_AREA_OFFSET), charset_area_size(CHARSET_ALT));
     }
 }
@@ -472,7 +497,7 @@ void fileio_load_project(void)
     if (!loci_check_present()) return;
     if (!filepicker_run(MSG_FILE_LOAD_PROJECT, PICKER_FILTER_PROJECT)) return;
 
-    homedir_join_suffix(fullpath, "PJ.BIN");
+    filedir_join_suffix(fullpath, "PJ.BIN");
     if (file_load(fullpath, &proj, sizeof(proj)) < 0)
     {
         menu_messagepopup(MSG_FILE_INVALID_FORMAT);
@@ -495,7 +520,7 @@ void fileio_load_project(void)
         return;
     }
 
-    homedir_join_suffix(fullpath, "SC.BIN");
+    filedir_join_suffix(fullpath, "SC.BIN");
     fd = loci_open(fullpath, O_RDONLY);
     if (fd < 0)
     {
@@ -516,18 +541,28 @@ void fileio_load_project(void)
     app.plotblink      = proj.plotblink;
     app.plotdouble     = proj.plotdouble;
 
-    homedir_join_suffix(fullpath, "CS.BIN");
+    // charsetswap_mark_changed() is called only ONCE, after both possible
+    // loads below, not once per bank -- found 2026-06-21: calling it
+    // after the CS.BIN load and again after the CA.BIN load made the
+    // second call re-capture CHARSET_STD's *currently swapped-in safe*
+    // content (charsetswap_mark_changed() had already re-applied
+    // CHARSETROM during the first call, if a swap session was active)
+    // as the new "restore on exit" backup, discarding the correctly-
+    // captured loaded-Std backup from the first call. A single call
+    // covering both banks at once avoids this entirely.
+    filedir_join_suffix(fullpath, "CS.BIN");
     if (file_exists(fullpath))
     {
         file_load(fullpath, (void *)(CHARSET_STD + CHARSET_GLYPH_AREA_OFFSET), charset_area_size(CHARSET_STD));
         app.stdchanged = 1;
     }
-    homedir_join_suffix(fullpath, "CA.BIN");
+    filedir_join_suffix(fullpath, "CA.BIN");
     if (file_exists(fullpath))
     {
         file_load(fullpath, (void *)(CHARSET_ALT + CHARSET_GLYPH_AREA_OFFSET), charset_area_size(CHARSET_ALT));
         app.altchanged = 1;
     }
+    charsetswap_mark_changed();
 
     update_size_titles();
     canvas_blit();
@@ -582,7 +617,7 @@ void fileio_load_charset(uint8_t altorstd)
     if (!loci_check_present()) return;
     if (!filepicker_run(title, PICKER_FILTER_PLAIN)) return;
 
-    homedir_join_suffix(fullpath, ".BIN");
+    filedir_join_suffix(fullpath, ".BIN");
     if (file_load(fullpath, (void *)(base + CHARSET_GLYPH_AREA_OFFSET), charset_area_size(base)) < 0)
     {
         menu_messagepopup(MSG_FILE_NOT_FOUND);
@@ -592,15 +627,18 @@ void fileio_load_charset(uint8_t altorstd)
     if (altorstd == 2)
     {
         charset_load(CHARSET_ALT, (const uint8_t *)(CHARSET_STD + CHARSET_GLYPH_AREA_OFFSET));
+        charsetswap_mark_changed();
         app.stdchanged = 1;
         app.altchanged = 1;
     }
     else if (altorstd == 1)
     {
+        charsetswap_mark_changed();
         app.altchanged = 1;
     }
     else
     {
+        charsetswap_mark_changed();
         app.stdchanged = 1;
     }
 }
@@ -623,7 +661,7 @@ void fileio_save_charset(uint8_t altorstd)
     if (!loci_check_present()) return;
     if (!fileio_get_filename(title)) return;
 
-    homedir_join_suffix(fullpath, ".BIN");
+    filedir_join_suffix(fullpath, ".BIN");
     if (file_save(fullpath, (const void *)(base + CHARSET_GLYPH_AREA_OFFSET), charset_area_size(base)) < 0)
         menu_messagepopup(MSG_FILE_INVALID_FORMAT);
 }

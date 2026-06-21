@@ -104,18 +104,19 @@ void info_version_show(void)
     OricCharWin win;
     uint8_t x, y;
 
-    menu_winsave(0, VIEWPORT_HEIGHT + 1, 1);
+    // VIEWPORT_HEIGHT alone (not +1) -- the viewport now spans the full
+    // 28-row screen itself, so there's no separate statusbar row beyond
+    // it to add for (found 2026-06-21, VIEWPORT_HEIGHT 27->28 change).
+    menu_winsave(0, VIEWPORT_HEIGHT, 1);
 
-    // idi8b_logo[] embeds A_ALT attribute bytes (its block-letter shapes
-    // rely on CHARSET_ALT holding the ROM-stock mosaic glyphs, not
-    // whatever the user may have redefined via the character editor's
-    // Alt mode) -- swap in the stock Alt charset for as long as the logo
-    // is actually on screen (the ULA re-renders from charset RAM every
-    // frame, so this must stay swapped until the user advances past page
-    // 1, not just for the instant of the blit itself), then restore the
-    // user's live Alt edits before page 2 (which doesn't use Alt at all).
-    charsetswap_alt_enter();
-
+    // idi8b_logo[] embeds A_ALT attribute bytes -- its block-letter
+    // shapes depend on CHARSET_ALT holding its genuine boot-time content
+    // (captured once, very early in main(), by charsetswap_capture_boot_
+    // alt()). menu_winsave(..., 1) above already swapped CHARSET_ALT to
+    // that content (and CHARSET_STD too, if changed) -- charsetswap.c's
+    // enter()/exit() pair now covers both banks for every popup, not just
+    // this one, since 2026-06-21 (see CLAUDE.md "Information menu" for
+    // the full history). No separate Alt-specific call needed here.
     uint8_t *dst = (uint8_t *)TEXTVRAM;
     for (uint16_t i = 0; i < sizeof(idi8b_logo); i++)
         dst[i] = idi8b_logo[i];
@@ -131,8 +132,6 @@ void info_version_show(void)
     cwin_putat_string(&win, 0, 10, MSG_INFO_VERSION_COPYRIGHT);
     cwin_putat_string(&win, 0, 14, MSG_MENU_PRESSAKEY);
     key_read();
-
-    charsetswap_alt_exit();
 
     cwin_init(&win, 2, 0, 38, 28, A_FWWHITE, A_BGBLACK);
     cwin_clear(&win);

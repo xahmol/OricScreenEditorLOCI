@@ -12,6 +12,8 @@
 #   - Information > Version shows its 3 pages (title image, version/credits
 #     text, QR code) and returns cleanly to the bar/Main mode
 #   - the Fill dispatch actually fills the canvas
+#   - Fill is visible immediately, before the bar is closed (regression
+#     test for a missing canvas_blit() call, see Scenario 8)
 #
 # --type-keys notes (see CLAUDE.md "Phosphoric testing notes"):
 #   \fN = FUNCT+N, \pN = pause N sec (releases all keys). A \p1 MUST precede
@@ -86,7 +88,7 @@ run_capture 10500000 '\p1\f1\p1\n' "$DUMP2"
 echo ""
 echo "Screen pulldown content (ENTER on bar)"
 check_found "Width item shown"  "Width:   40" "$DUMP2"
-check_found "Height item shown" "Height:  27" "$DUMP2"
+check_found "Height item shown" "Height:  28" "$DUMP2"
 check_found "Clear item shown"  "Clear"       "$DUMP2"
 check_found "Fill item shown"   "Fill"        "$DUMP2"
 
@@ -138,6 +140,24 @@ echo "Screen > Fill fills the canvas with the current char"
 check_found "row 0 filled with @"  "@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@" "$DUMP6"
 check_found "row 26 filled with @" "@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@" "$DUMP6"
 check_found "statusbar intact"     "Main      XY 0, 0C40@ S40I7P0S" "$DUMP6"
+
+# --- Scenario 8: Fill is visible immediately, before the menu bar closes ----
+# Regression test for a 2026-06-21 bug: menudata.c's Clear/Fill cases never
+# called canvas_blit() themselves, only menu_run()'s own canvas_blit() at the
+# very end of the whole bar session (after ESC at bar level) did -- so the
+# fill was applied in screenmap[] immediately but stayed visually hidden
+# (menu_pulldown()'s own menu_winrestore() repaints the PRE-fill canvas back
+# over the covered rows) until the user backed all the way out of the menu.
+# This scenario dumps right after Fill is chosen, with NO trailing \e --
+# the bar (row 0) is still open and waiting for the next key, but rows 1/26
+# must already show the fill, not stale pre-fill content.
+DUMP7="$OUT/capture_menu_fill_immediate.bin"
+run_capture 15200000 '\p1\f1\p1\n\p1\d\p1\d\p1\d\p1\n' "$DUMP7"
+echo ""
+echo "Screen > Fill is visible immediately, while the menu bar is still open"
+check_found "bar still open"            "Screen File  Charset  Information" "$DUMP7"
+check_found "row 1 filled with @ already" "@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@" "$DUMP7"
+check_found "row 26 filled with @ already" "@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@" "$DUMP7"
 
 echo ""
 echo "==========================================================="

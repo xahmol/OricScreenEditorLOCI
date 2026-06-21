@@ -51,6 +51,8 @@
 #define MSG_FILE_NO_FILES         "Aucun fichier correspondant trouve."
 #define MSG_FILE_PATH_TOO_LONG    "Chemin trop long."
 #define MSG_FILE_PICKER_KEYS      "UpDn:Deplacer Ent:Ouvrir Esc:Annuler"
+#define MSG_FILE_PICKER_NEWDIR    "Nom du nouveau dossier:"
+#define MSG_FILE_PICKER_SAVEDIR   "Choisir dossier pour sauver"
 #define MSG_FILEIO_PROMPT_WIDTH   "Entrer largeur ecran:"
 #define MSG_FILEIO_PROMPT_HEIGHT  "Entrer hauteur ecran:"
 
@@ -62,6 +64,7 @@
 #define MSG_CHARSET_LOAD_COMBINED  "Charger combine"
 #define MSG_CHARSET_SAVE_COMBINED  "Sauver combine"
 #define MSG_CHARSET_RESET_STD      "Reinit std->ROM"
+#define MSG_CHARSET_RESET_ALT      "Reinit alt->ROM"
 
 // ── Pulldown 3 -- Information ───────────────────────────────────────────────
 #define MSG_INFO_VERSION  "Version/credits"

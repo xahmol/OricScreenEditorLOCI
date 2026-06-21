@@ -17,15 +17,25 @@
 
 /**
  * Block until a key is pressed (keyboard or IJK joystick) and return it.
- * Each spin: if an IJK joystick is present, reads both sticks
- * (ijk_read()) and maps the first matching direction/fire bit (checked
- * FIRE/RIGHT/LEFT/DOWN/UP on the left stick then the right, last match
- * wins -- mirrors nonworkingcc65's exact check order) to
- * KEY_ENTER/KEY_RIGHT/KEY_LEFT/KEY_DOWN/KEY_UP; if a direction fired,
- * drains the stick to neutral before returning so a single press can't
- * repeat. Falls back to a non-blocking keyboard poll (keyb_poll(),
- * include/keyboard.h) if the joystick gave nothing this spin (or no
- * joystick is present at all).
+ * Each spin: polls the keyboard first (keyb_poll(), include/keyboard.h);
+ * only if that comes back empty AND an IJK joystick is present does it
+ * read the sticks (ijk_read()) and map the first matching direction/fire
+ * bit (checked FIRE/RIGHT/LEFT/DOWN/UP on the left stick then the right,
+ * last match wins -- mirrors nonworkingcc65's exact check order) to
+ * KEY_ENTER/KEY_RIGHT/KEY_LEFT/KEY_DOWN/KEY_UP. If a direction fired,
+ * drains the stick to neutral, then re-syncs the keyboard scanner with a
+ * burst of keyb_scan() calls before returning, so a single joystick press
+ * can't repeat and the next keyboard poll starts from a clean state.
+ *
+ * Keyboard-before-joystick (not the reverse): ijk_read() (include/ijk.c)
+ * shares VIA Port A with the keyboard scanner (include/keyboard.c's
+ * keyb_scan()). This order matches locifilemanager-v2's own fm_getkey().
+ * (Investigated 2026-06-21 as a candidate fix for '=' never registering
+ * on real hardware -- ruled out via a temporary build with IJK disabled
+ * entirely, which showed '=' still failing, so this is not that bug's
+ * cause. Kept anyway since it matches the proven reference and has no
+ * observed downside. See memory equals_plus_key_not_recognized for the
+ * still-open investigation.)
  *
  * @return The key code read (keyboard key code, or the joystick's
  *         mapped equivalent).
@@ -36,9 +46,9 @@ uint8_t key_read(void)
 
     do
     {
-        key = 0;
+        key = keyb_poll();
 
-        if (ijk_present)
+        if (!key && ijk_present)
         {
             ijk_read();
 
@@ -56,10 +66,9 @@ uint8_t key_read(void)
             if (key)
             {
                 do { ijk_read(); } while (ijk_ljoy || ijk_rjoy);
+                for (uint16_t d = 0; d < 1000; d++) keyb_scan();
             }
         }
-
-        if (!key) key = keyb_poll();
     } while (!key);
 
     return key;

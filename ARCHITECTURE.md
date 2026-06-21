@@ -221,7 +221,7 @@ call (just the register write) is sufficient at each of those sites.
 src/
   main.c          Application entry point: splash, canvas/statusbar init, editor_run()
   appstate.h      Global AppState struct (canvas size, cursor, viewport, mode, ...)
-  canvas.c/h      Flat 40x27 screenmap[] buffer + raw $BB80 blit (bypasses charwin),
+  canvas.c/h      Flat 40x28 screenmap[] buffer + raw $BB80 blit (bypasses charwin),
                   canvas_resize() (up to CANVAS_MAX_SIZE)
   statusbar.c/h   Row-27 statusbar (OricCharWin, Mode/XY/C/S/I/P readout +
                   A/D/B attribute flags, see §6.2/§6.7/§6.8);
@@ -351,7 +351,7 @@ locifilemanager-v2 for future use.
 
 ```c
 #define VIEWPORT_WIDTH   40
-#define VIEWPORT_HEIGHT  27
+#define VIEWPORT_HEIGHT  28
 #define CANVAS_WIDTH     VIEWPORT_WIDTH
 #define CANVAS_HEIGHT    VIEWPORT_HEIGHT
 #define CANVAS_MAX_SIZE  8192
@@ -428,7 +428,7 @@ void cursor_move_scroll(int8_t dx, int8_t dy);
 
 `screenmap[]` is a flat, row-major buffer holding raw screen bytes (both
 characters and serial-attribute bytes `$00`-`$1F`) for the whole canvas,
-which can be larger than the 40x27 viewport. **It's a pointer macro
+which can be larger than the 40x28 viewport. **It's a pointer macro
 into overlay RAM, not a real array** (`CANVAS_REGION_BASE`, `$C000`,
 `CANVAS_MAX_SIZE=10240` — see §2.1's note and CLAUDE.md "Canvas storage
 is overlay RAM, LOCI is required") — every `screenmap[i]` call site
@@ -462,7 +462,7 @@ are mutually exclusive in time, so sharing one 320-byte buffer is safe.
 `cursor_move_scroll(dx, dy)` (Phase 5) moves `app.cursor_x`/`cursor_y` by one
 cell, except at a viewport edge on a canvas larger than the viewport, where
 it scrolls `app.xoffset`/`yoffset` (and `canvas_blit()`s) instead — fixing a
-pre-Phase-5 gap where cells beyond the 40x27 viewport on a resized canvas
+pre-Phase-5 gap where cells beyond the 40x28 viewport on a resized canvas
 were unreachable. Used by `editor_run()`'s cursor keys, Select/Line-Box's
 rect-grower (`select.c`), and Write mode (`write.c`).
 
@@ -638,7 +638,7 @@ the second time.
    - Splash screen: `cwin_init(&splash, 2, 0, 38, 28, A_FWWHITE, A_BGBLACK)`,
      `cwin_clear`, three lines of text (title, build version, "Press any key
      to start"), `cwin_getch()` to wait.
-   - `canvas_init()` — allocate/clear `screenmap[]` at the default 40x27 size.
+   - `canvas_init()` — allocate/clear `screenmap[]` at the default 40x28 size.
    - `statusbar_init()` — set up the row-27 `OricCharWin`.
    - `menu_init()` — reset the main-RAM window-save stack
      (`menu_winbuf`/`menu_win_stack`).
@@ -1191,9 +1191,9 @@ norepeat=1)` — V1 itself has no joystick code at all.
 ### 6.19 Help screens (`src/help.c`, `FUNCT+8`, Phase 9b)
 
 `help_show(screennumber)` (1=Main, 2=Character editor, 3=Select/Move/
-Line-Box, 4=Write) loads one of 4 raw 1080-byte screen dumps from LOCI
+Line-Box, 4=Write) loads one of 4 raw 1120-byte screen dumps from LOCI
 at runtime (`loci_open("OSEHS<n>.BIN", O_RDONLY)` +
-`loci_read(fd, TEXTVRAM, 1080)` + `loci_close(fd)`) straight into
+`loci_read(fd, TEXTVRAM, 1120)` + `loci_close(fd)`) straight into
 `$BB80`, bracketed by `charsetswap_enter()`/`exit()` (so the dump's own
 text renders with ROM glyphs regardless of user charset edits) and a
 `key_read()` wait; `canvas_blit()` + `statusbar_draw()` restore the

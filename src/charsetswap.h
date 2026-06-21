@@ -6,60 +6,71 @@
 
 // Charset-swap mechanism for popup chrome (menu bar, pulldowns, popups).
 //
-// Popups must render with the ROM-standard charset even after the user has
-// redefined glyphs via the character editor -- otherwise menu text becomes
-// unreadable. charsetswap_enter()/exit() back up and restore the
-// user-redefined standard charset around a popup's lifetime; the character
+// Popups must render with safe charset content even after the user has
+// redefined glyphs (via the character editor) or loaded a project/charset
+// file with different glyphs -- otherwise menu/dialog text becomes
+// unreadable. charsetswap_enter()/exit() back up and restore BOTH
+// CHARSET_STD and CHARSET_ALT around a popup's lifetime; the character
 // editor itself opts out (see menu_winsave()'s swap_charset parameter in
-// menu.h) so live glyph edits stay visible while editing.
+// menu.h) so live glyph edits stay visible while editing. Merged into one
+// pair 2026-06-21 (was Std-only + a separate one-off Alt pair used by
+// exactly one popup) after a real-hardware report showed *any* popup that
+// can trigger a Load action needs both banks protected, not just
+// Information > Version's idi8b_logo.
 //
-// Std-only for the general popup-chrome mechanism below: a spike confirmed
-// `jsr $F816` (ROM_ALTCHARS) is a no-op for CHARSET_ALT in this bare-metal
-// context (it needs ROM-reset-time state we don't replicate). General
-// popup chrome only ever uses CHARSET_STD glyphs, so CHARSET_ALT keeps
-// user content during ordinary popups -- but see charsetswap_alt_enter()/
-// exit() below for the one popup (Information > Version's idi8b_logo)
-// that genuinely needs CHARSET_ALT's *stock* content too.
+// CHARSET_STD restores from CHARSETROM (the genuine ROM-standard ASCII
+// font -- unambiguous, no real/boot-time-content distinction the way Alt
+// has, see below). CHARSET_ALT restores from a one-time boot snapshot
+// (charsetswap_capture_boot_alt(), called once at the very start of
+// main()) rather than CHARSETROM -- CHARSETROM was tried first and found
+// to NOT match CHARSET_ALT's real boot-time content on real hardware
+// (only ever verified via Phosphoric before that), breaking the one
+// popup that visibly depends on Alt's content.
 //
-// charset_changed gates all work: if the user never edited a glyph, enter/
-// exit are no-ops (matches V1's charsetchanged[0] flag).
+// charset_changed gates the CHARSET_STD half of the work: if the user
+// never edited/loaded a Std glyph, enter()/exit() skip backing it up and
+// restoring it (matches V1's charsetchanged[0] flag) -- popups on an
+// unmodified Std charset render identically with or without the swap.
+// The CHARSET_ALT half always runs unconditionally regardless (cheap, no
+// harm even when Alt was never touched).
 //
 // Depth-counted: nested popups (e.g. pulldown -> areyousure) only back up/
 // restore once, on the outermost opt-in enter/exit pair.
+//
+// Mid-popup-load handling: charsetswap_mark_changed() (called by every
+// LOCI Load action that overwrites CHARSET_STD/ALT directly, not just the
+// character editor) also re-syncs an *already active* swap session if one
+// exists -- see its own doc comment in charsetswap.c for why this matters
+// (src/menudata.c's menu_run() keeps one swap session active across its
+// entire bar-level lifetime, so a File > Load Project action executed
+// from within it would otherwise corrupt the popup's chrome and discard
+// the freshly-loaded charset on exit without this).
 
-// Call once when the user edits a glyph (from charsetedit's ce_snapshot()).
+// Call whenever CHARSET_STD or CHARSET_ALT is overwritten by something
+// other than charsetswap_enter()/exit() themselves (the character
+// editor's ce_snapshot(), or any LOCI Load action in src/fileio.c/
+// src/menudata.c). Safe to call even when no swap is currently active.
 void charsetswap_mark_changed(void);
 
-// Opt-in: on the outermost call (if a glyph was ever edited), back up
-// CHARSET_STD's displayable range and restore it from CHARSETROM.
+// Opt-in: back up CHARSET_STD (if charset_changed) and CHARSET_ALT
+// (always) on the outermost call, and load the safe content into both.
 void charsetswap_enter(void);
 
-// Opt-in: on the outermost call (if a glyph was ever edited), restore
-// CHARSET_STD's displayable range from the backup made by charsetswap_enter().
+// Opt-in counterpart to charsetswap_enter(): restores CHARSET_STD (if a
+// backup was taken) and CHARSET_ALT from their respective backups on the
+// outermost call.
 void charsetswap_exit(void);
 
-// CHARSET_ALT equivalent of charsetswap_enter()/exit(), for the one popup
-// that needs the *stock* (ROM-original) Alt charset rather than leaving
-// the user's edited Alt content in place: Information > Version's
-// idi8b_logo[] (src/info.c) embeds A_ALT attribute bytes, so it depends
-// on CHARSET_ALT holding the ROM's mosaic-graphics bit patterns, not
-// whatever the user may have redefined via the character editor's Alt
-// mode. Unlike charsetswap_enter()/exit(), this is unconditional (no
-// charset_changed gate, no depth-counting) -- it has exactly one call
-// site, never nested with itself, and the always-restore-from-ROM
-// behaviour is correct (cheap, no harm) even if Alt was never edited.
-//
-// CHARSETROM is a valid restore source for CHARSET_ALT too, not just
-// CHARSET_STD: per the Oric ROM's own boot sequence (~/.claude/
-// oric_atmos_reference.md, "Character Set ROM Data"), $FC78-$FF77 is
-// copied to *both* $B400 (Std) and $B800 (Alt) at RESET -- the
-// "alternate"/mosaic look comes entirely from the A_ALT attribute byte
-// changing how the ULA *interprets* those bytes at render time, not from
-// a separate ROM table for Alt. So charset_load(CHARSET_ALT, CHARSETROM)
-// reproduces exactly the boot-time content, the same way
-// charset_load(CHARSET_STD, CHARSETROM) already does for Std.
-void charsetswap_alt_enter(void);
-void charsetswap_alt_exit(void);
+// Call once, as early as possible in main() -- before anything else in the
+// session can write to CHARSET_ALT -- to capture its genuine boot-time
+// content. See charsetswap.c's doc comment for why CHARSETROM doesn't
+// work as a stand-in for this.
+void charsetswap_capture_boot_alt(void);
+
+// Restore CHARSET_ALT from the boot-time snapshot above, not CHARSETROM
+// (see charsetswap.c's doc comment for why). Used by Charset > Reset
+// Alt->ROM (src/menudata.c).
+void charsetswap_reset_alt_from_boot(void);
 
 #pragma compile("charsetswap.c")
 

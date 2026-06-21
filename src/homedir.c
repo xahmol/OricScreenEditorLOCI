@@ -12,6 +12,15 @@
 // branch's src/main.c (getcwd_loci()-based `homedir`, prefixed onto every
 // asset path by hand) -- adapted here into a single shared helper instead
 // of repeating the concatenation at each call site.
+//
+// filedir_join()/filedir_join_suffix() (added 2026-06-21, full file
+// picker navigation) are the File/Charset-menu counterpart of
+// homedir_join()/homedir_join_suffix() above, resolving against
+// app.filedir (the file picker's last-navigated/confirmed directory,
+// src/filepicker.c) instead of app.homedir -- kept deliberately
+// separate so a user browsing elsewhere with the picker never affects
+// where the boot-time splash/help assets (still app.homedir-relative)
+// load from.
 
 #include <string.h>
 #include "appstate.h"
@@ -67,5 +76,66 @@ void homedir_join(char *out, const char *name)
 void homedir_join_suffix(char *out, const char *suffix)
 {
     homedir_join(out, app.filename);
+    strcat(out, suffix);
+}
+
+/**
+ * Lazily default app.filedir to app.homedir (or "/" if that's empty
+ * too) the first time it's needed this session. No-op once app.filedir
+ * is already set -- see homedir.h.
+ *
+ * @return (none)
+ */
+void filedir_init_default(void)
+{
+    if (app.filedir[0]) return;
+
+    if (app.homedir[0])
+    {
+        strncpy(app.filedir, app.homedir, FILEDIR_MAXLEN);
+        app.filedir[FILEDIR_MAXLEN] = '\0';
+    }
+    else
+    {
+        strcpy(app.filedir, "/");
+    }
+}
+
+/**
+ * Join app.filedir and name into out -- same convention as
+ * homedir_join(), against app.filedir instead. See homedir.h.
+ *
+ * @param out  Destination buffer.
+ * @param name Name (or relative sub-path) to resolve against app.filedir.
+ * @return (none)
+ */
+void filedir_join(char *out, const char *name)
+{
+    uint8_t len;
+
+    filedir_init_default();
+
+    strcpy(out, app.filedir);
+    len = (uint8_t)strlen(out);
+    if (len > 0 && out[len - 1] != '/')
+    {
+        out[len] = '/';
+        out[len + 1] = '\0';
+    }
+    strcat(out, name);
+}
+
+/**
+ * Join app.filedir and app.filename + suffix into out in one step --
+ * same convention as homedir_join_suffix(), against app.filedir
+ * instead. See homedir.h.
+ *
+ * @param out    Destination buffer.
+ * @param suffix Suffix appended directly after app.filename.
+ * @return (none)
+ */
+void filedir_join_suffix(char *out, const char *suffix)
+{
+    filedir_join(out, app.filename);
     strcat(out, suffix);
 }

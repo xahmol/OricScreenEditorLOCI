@@ -3,9 +3,15 @@
 
 #include <stdint.h>
 
-// Visible viewport: 40 columns x 27 rows (row 27 is the statusbar)
+// Visible viewport: 40 columns x 28 rows (the Oric's true full screen
+// height -- see SCREEN_ROWS, include/oric.h). Was 27 (inherited from V1's
+// own bug; the screen is really 28 rows) with the statusbar permanently
+// occupying a separate row 27 beyond the viewport -- changed 2026-06-21
+// so the cursor can reach every real screen row. The statusbar now
+// overlays the viewport's own last row (VIEWPORT_HEIGHT-1) and
+// auto-hides while the cursor is on it -- see statusbar.c.
 #define VIEWPORT_WIDTH   40
-#define VIEWPORT_HEIGHT  27
+#define VIEWPORT_HEIGHT  28
 
 // Canvas size: starts at the viewport size, resizable up to CANVAS_MAX_SIZE
 // cells (Screen > Width/Height, canvas_resize()). screenmap[] (src/canvas.h)
@@ -29,11 +35,23 @@
 
 // LOCI's boot-time current working directory (the directory oseloci.tap
 // was actually loaded from, per loci_getcwd() -- src/homedir.c), captured
-// once at startup. Every LOCI file path in this codebase is built
-// relative to this captured directory (homedir_join()) rather than
-// relying on LOCI's CWD still being correct at the time of a later file
-// operation -- see CLAUDE.md "Homedir-relative LOCI paths".
+// once at startup. Used ONLY for the boot-time assets (splash/help
+// screens, src/main.c/src/help.c) -- NOT for File/Charset menu actions
+// any more (see app.filedir below), so a user browsing elsewhere with
+// the file picker never affects where the next help screen loads from.
 #define HOMEDIR_MAXLEN 64
+
+// The LOCI directory File/Charset Load/Save actions resolve paths
+// against (src/homedir.c's filedir_join()/filedir_join_suffix()) --
+// distinct from app.homedir above. Always a full, drive-prefixed
+// absolute path ("N:/sub/dir", matching locifilemanager-v2's own
+// convention) once the file picker has navigated anywhere; defaults to
+// app.homedir (or "/" if that's empty) the first time it's used this
+// session. Updated by src/filepicker.c whenever the user navigates or
+// confirms a directory, persisting across actions like app.filename
+// already does -- this is what lets Load/Save remember the last
+// browsed location instead of always resetting to the boot directory.
+#define FILEDIR_MAXLEN 64
 
 typedef enum {
     MODE_MAIN = 0,
@@ -64,6 +82,7 @@ typedef struct {
     uint8_t    altchanged;      // 0/1, CHARSET_ALT edited this session (charsetedit.c)
     char       filename[FILENAME_MAXLEN + 1]; // LOCI base filename (src/fileio.c)
     char       homedir[HOMEDIR_MAXLEN + 1]; // LOCI boot directory (src/homedir.c)
+    char       filedir[FILEDIR_MAXLEN + 1]; // LOCI Load/Save directory (src/filepicker.c)
 } AppState;
 
 extern AppState app;

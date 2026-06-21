@@ -45,12 +45,15 @@
 #include "input.h"
 #include "loci.h"
 #include "homedir.h"
+#include "charsetswap.h"
 
 AppState app;
 
 /**
  * Program entry point. Shows the splash screen (V1's title image, loaded
- * from LOCI at runtime, MSG_SPLASH_PRESSKEY overlaid at row 26) and waits
+ * from LOCI at runtime, MSG_SPLASH_PRESSKEY overlaid at row 27, the
+ * screen's true last row -- post-launch correction, see "Boot splash" in
+ * CLAUDE.md) and waits
  * for a keypress, then initialises the canvas, statusbar, and menu system
  * before handing control to the main-mode editor loop (editor_run(),
  * never returns).
@@ -59,6 +62,12 @@ AppState app;
  */
 int main(void)
 {
+    // Must be the very first thing this program does, before anything
+    // else can write to CHARSET_ALT ($B800) -- captures its genuine
+    // boot/RESET-time content for Information > Version's idi8b_logo
+    // popup to restore from later. See charsetswap.c's doc comment.
+    charsetswap_capture_boot_alt();
+
     charwin_init();
     ijk_detect();
 
@@ -72,7 +81,15 @@ int main(void)
         key_read();
         return 0;
     }
-    enable_overlay_ram();
+    // homedir_init()/the title-screen load deliberately run BEFORE
+    // enable_overlay_ram() (below) -- found 2026-06-21, real hardware:
+    // enable_overlay_ram() writes MICRODISCCFG ($0314), adjacent to
+    // LOCI's own register block ($0315/$0319, include/loci.h), and
+    // issuing LOCI's first file ops of the session right after that
+    // write consistently failed on real hardware (title/help screens
+    // never loaded) even though every later LOCI call succeeded fine.
+    // Moving these boot-time loads before the overlay-RAM toggle fixed
+    // it -- don't move enable_overlay_ram() back above this block.
     homedir_init();
 
     {
@@ -87,13 +104,21 @@ int main(void)
         }
     }
     {
-        uint8_t *row = (uint8_t *)TEXTVRAM + 26 * SCREEN_COLS;
+        // Row 27 is the screen's true last row (28 rows total, 0-27).
+        // assets/OSETSC.BIN is now 1120 bytes (28 rows, padded blank on
+        // this row -- see VIEWPORT_HEIGHT's appstate.h comment) so the
+        // image load above already covers it; still blanked explicitly
+        // here in case the file is missing/unreadable and the load was
+        // skipped entirely, leaving stale screen content otherwise.
+        uint8_t *row = (uint8_t *)TEXTVRAM + 27 * SCREEN_COLS;
         const char *msg = MSG_SPLASH_PRESSKEY;
-        uint8_t col = 0;
-        while (msg[col]) { row[col] = (uint8_t)msg[col]; col++; }
+        uint8_t col;
+        for (col = 0; col < SCREEN_COLS; col++) row[col] = CH_SPACE;
+        for (col = 0; msg[col]; col++) row[col] = (uint8_t)msg[col];
     }
     key_read();
 
+    enable_overlay_ram();
     canvas_init();
     statusbar_init();
     menu_init();

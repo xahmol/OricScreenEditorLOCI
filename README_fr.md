@@ -323,17 +323,42 @@ Comme pour Clear, mais cette option remplit la zone de dessin avec le code écra
 
 **Note OSE-LOCI** : cette réécriture utilise le **périphérique de stockage
 de masse LOCI** pour toutes les opérations sur fichiers, au lieu des
-commandes cassette de V1. Les actions de **sauvegarde** demandent un nom
-de fichier saisi (48 caractères maximum). Les actions de **chargement**
-ouvrent à la place un navigateur de fichiers : une liste défilante du
-répertoire (touches curseur pour se déplacer, ENTER pour entrer dans un
-dossier ou sélectionner le fichier en surbrillance, GAUCHE pour remonter
-au dossier parent, ESC pour annuler) n'affichant que les fichiers
-pertinents pour l'action choisie (par exemple, Charger projet n'affiche
-que les fichiers de projet). Si aucun périphérique LOCI n'est détecté,
-chaque option des menus Fichier/Charset affiche un message "Aucun LOCI
-detecte" au lieu de tenter l'opération, le reste de l'éditeur continuant
-à fonctionner normalement sans périphérique connecté.
+commandes cassette de V1. Les actions de **sauvegarde** et de
+**chargement** ouvrent désormais le même navigateur de fichiers : les
+actions de **sauvegarde** vous permettent de naviguer jusqu'au dossier
+souhaité et de le confirmer (appuyez sur **S** une fois au bon endroit),
+puis demandent un nom de fichier saisi (48 caractères maximum) ; les
+actions de **chargement** naviguent et sélectionnent directement le
+fichier, n'affichant que les fichiers pertinents pour l'action choisie
+(par exemple, Charger projet n'affiche que les fichiers de projet). Si
+aucun périphérique LOCI n'est détecté, chaque option des menus Fichier/
+Charset affiche un message "Aucun LOCI detecte" au lieu de tenter
+l'opération, le reste de l'éditeur continuant à fonctionner normalement
+sans périphérique connecté.
+
+Le navigateur de fichiers permet de parcourir tout le système de
+fichiers, pas seulement le dossier de départ :
+
+|Touche|Description
+|---|---|
+|**Curseur HAUT/BAS**|Deplacer la surbrillance
+|**Curseur GAUCHE**|Remonter au dossier parent
+|**Curseur DROITE / ENTER**|Entrer dans le dossier en surbrillance
+|**ENTER**|Selectionner le fichier en surbrillance (chargement uniquement)
+|**S**|Confirmer le dossier actuel (sauvegarde uniquement)
+|**T**|Aller au debut de la liste
+|**B**|Aller a la fin de la liste
+|**D**|Page suivante
+|**P**|Page precedente
+|**\\**|Aller a la racine du lecteur actuel
+|**. / ,**|Changer de lecteur suivant/precedent (0-9)
+|**E**|Creer un nouveau sous-dossier ici
+|**FUNCT+6**|Afficher/masquer la barre d'etat
+|**ESC**|Annuler et revenir en arriere
+
+Copier, renommer ou supprimer des fichiers/dossiers n'est pas pris en
+charge -- utilisez un outil compatible LOCI sur l'ordinateur hote pour
+cela.
 
 *Save screen / Load screen (sauvegarder/charger l'écran)*
 

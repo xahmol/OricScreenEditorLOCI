@@ -125,14 +125,20 @@ fi
 # Bare raw dump, no header -- matches V1 exactly (see fileio.h: a saved
 # screen is meant to be a portable, tool-agnostic raw dump, loadable from
 # any source, not just OSE's own saves).
+#
+# Every Save action now browses for a save directory first
+# (filepicker_browse_dir(), src/fileio.c's fileio_get_filename() --
+# 2026-06-21, "on save user should be enabled to first browse to and
+# select save directory"): the extra `\p1s` confirms the default/current
+# directory in that popup before the filename prompt appears.
 reset_flash
 DUMP1="$OUT/capture_fileio_save_screen.bin"
-run_capture 24000000 '\p1 \p1\f1\p1\r\p1\n\p1\n\p1T\p1\n' "$DUMP1"
+run_capture 25200000 '\p1 \p1\f1\p1\r\p1\n\p1\n\p1s\p1T\p1\n' "$DUMP1"
 echo ""
 echo "File > Save Screen writes a bare screenmap[] dump (no header)"
 check_found "statusbar shows '@' plotted" "Main      XY 0, 0C40@ S40I7P0S" "$DUMP1"
-check_file_bytes "t.BIN: size 1080 (40x27, no header)" "$LOCIFLASH/t.BIN" \
-    "len(data) == 1080"
+check_file_bytes "t.BIN: size 1120 (40x28, no header)" "$LOCIFLASH/t.BIN" \
+    "len(data) == 1120"
 check_file_bytes "t.BIN: '@' (0x40) at screen offset 0" "$LOCIFLASH/t.BIN" \
     "data[0] == 0x40"
 
@@ -144,8 +150,8 @@ check_file_bytes "t.BIN: '@' (0x40) at screen offset 0" "$LOCIFLASH/t.BIN" \
 # then ENTER/ENTER accepts the pre-filled width/height defaults
 # (fileio_get_dimensions(), see fileio.c).
 DUMP2="$OUT/capture_fileio_load_screen.bin"
-run_capture 35000000 \
-    '\p1 \p1\f1\p1\r\p1\n\p1\n\p1T\p1\n\p1\e\p1\f1\p1\n\p1\d\p1\d\p1\n\p1\e\p1\f1\p1\r\p1\n\p1\d\p1\n\p1\n\p1\n\p1\n' "$DUMP2"
+run_capture 36100000 \
+    '\p1 \p1\f1\p1\r\p1\n\p1\n\p1s\p1T\p1\n\p1\e\p1\f1\p1\n\p1\d\p1\d\p1\n\p1\e\p1\f1\p1\r\p1\n\p1\d\p1\n\p1\n\p1\n\p1\n' "$DUMP2"
 echo ""
 echo "File > Load Screen restores a saved canvas after Screen > Clear"
 check_found "statusbar shows '@' restored" "Main      XY 0, 0C40@ S40I7P0S" "$DUMP2"
@@ -153,42 +159,42 @@ check_found "statusbar shows '@' restored" "Main      XY 0, 0C40@ S40I7P0S" "$DU
 # --- Scenario 3: File > Save Combined ----------------------------------------
 reset_flash
 DUMP3="$OUT/capture_fileio_save_combined.bin"
-run_capture 30000000 \
-    '\p1 \p1\f1\p1\r\p1\n\p1\d\p1\d\p1\d\p1\d\p1\n\p1C\p1\n' "$DUMP3"
+run_capture 31100000 \
+    '\p1 \p1\f1\p1\r\p1\n\p1\d\p1\d\p1\d\p1\d\p1\n\p1s\p1C\p1\n' "$DUMP3"
 echo ""
 echo "File > Save Combined writes 768B charset + screenmap[] (no header)"
 check_found "statusbar shows '@' plotted" "Main      XY 0, 0C40@ S40I7P0S" "$DUMP3"
-check_file_bytes "c.BIN: size 1848 (768 + 1080, no header)" "$LOCIFLASH/c.BIN" \
-    "len(data) == 1848"
+check_file_bytes "c.BIN: size 1888 (768 + 1120, no header)" "$LOCIFLASH/c.BIN" \
+    "len(data) == 1888"
 check_file_bytes "c.BIN: '@' at screen-section offset 768" "$LOCIFLASH/c.BIN" \
     "data[768] == 0x40"
 
 # --- Scenario 4: File > Save Project -----------------------------------------
 reset_flash
 DUMP4="$OUT/capture_fileio_save_project.bin"
-run_capture 28000000 \
-    '\p1 \p1\f1\p1\r\p1\n\p1\d\p1\d\p1\n\p1P\p1\n' "$DUMP4"
+run_capture 29100000 \
+    '\p1 \p1\f1\p1\r\p1\n\p1\d\p1\d\p1\n\p1s\p1P\p1\n' "$DUMP4"
 echo ""
 echo "File > Save Project writes <name>PJ.BIN + <name>SC.BIN"
 check_found "statusbar shows '@' plotted" "Main      XY 0, 0C40@ S40I7P0S" "$DUMP4"
 check_file_bytes "pPJ.BIN: size 22 (ProjectHeader)" "$LOCIFLASH/pPJ.BIN" \
     "len(data) == 22"
-check_file_bytes "pPJ.BIN: canvas 40x27, cursor (0,0)" "$LOCIFLASH/pPJ.BIN" \
-    "data[2:10] == bytes([40,0,27,0,0,0,0,0])"
+check_file_bytes "pPJ.BIN: canvas 40x28, cursor (0,0)" "$LOCIFLASH/pPJ.BIN" \
+    "data[2:10] == bytes([40,0,28,0,0,0,0,0])"
 check_file_bytes "pPJ.BIN: plotscreencode is '@'" "$LOCIFLASH/pPJ.BIN" \
     "data[14] == 0x40"
 check_file_bytes "pPJ.BIN: stdchanged/altchanged both 0" "$LOCIFLASH/pPJ.BIN" \
     "data[20] == 0 and data[21] == 0"
-check_file_bytes "pSC.BIN: size 1080, '@' at offset 0 (no header)" "$LOCIFLASH/pSC.BIN" \
-    "len(data) == 1080 and data[0] == 0x40"
+check_file_bytes "pSC.BIN: size 1120, '@' at offset 0 (no header)" "$LOCIFLASH/pSC.BIN" \
+    "len(data) == 1120 and data[0] == 0x40"
 [ -f "$LOCIFLASH/pCS.BIN" ] && { echo "  [FAIL] pCS.BIN should not exist (charset unedited)"; fail=$((fail+1)); } \
     || { echo "  [PASS] pCS.BIN correctly absent (charset unedited)"; pass=$((pass+1)); }
 
 # --- Scenario 5: Charset > Save Standard -------------------------------------
 reset_flash
 DUMP5="$OUT/capture_fileio_save_charset.bin"
-run_capture 22000000 \
-    '\p1\f1\p1\r\p1\r\p1\n\p1\d\p1\d\p1\n\p1S\p1\n' "$DUMP5"
+run_capture 23100000 \
+    '\p1\f1\p1\r\p1\r\p1\n\p1\d\p1\d\p1\n\p1s\p1S\p1\n' "$DUMP5"
 echo ""
 echo "Charset > Save Standard writes a raw 768-byte charset dump"
 check_file_bytes "s.BIN: size 768" "$LOCIFLASH/s.BIN" "len(data) == 768"
@@ -202,8 +208,8 @@ check_file_bytes "s.BIN: size 768" "$LOCIFLASH/s.BIN" "len(data) == 768"
 # it were charset data.
 reset_flash
 DUMP6="$OUT/capture_fileio_save_charset_alt.bin"
-run_capture 23000000 \
-    '\p1\f1\p1\r\p1\r\p1\n\p1\d\p1\d\p1\d\p1\n\p1A\p1\n' "$DUMP6"
+run_capture 24100000 \
+    '\p1\f1\p1\r\p1\r\p1\n\p1\d\p1\d\p1\d\p1\n\p1s\p1A\p1\n' "$DUMP6"
 echo ""
 echo "Charset > Save Alternate writes exactly 640 bytes (not 768)"
 check_file_bytes "a.BIN: size 640" "$LOCIFLASH/a.BIN" "len(data) == 640"
@@ -220,7 +226,7 @@ data = bytes([
     0, 0,        # stdchanged, altchanged
     5, 3,        # cursor_x, cursor_y
     0, 40,       # width=40
-    0, 27,       # height=27
+    0, 28,       # height=28
     0x04, 0x38,  # screentotal (ignored)
     3, 2, 0, 0, 0, # plotink, plotpaper, plotblink, plotdouble, plotaltchar
     0x42,        # plotscreencode = 'B'
@@ -228,7 +234,7 @@ data = bytes([
     0, 0,        # xoffset, yoffset
 ])
 open('$LOCIFLASH/V1PJ.BIN', 'wb').write(data)
-scr = bytearray(b' ' * 1080)
+scr = bytearray(b' ' * 1120)
 scr[0] = 0x43  # 'C' at (0,0)
 open('$LOCIFLASH/V1SC.BIN', 'wb').write(bytes(scr))
 "

@@ -387,10 +387,41 @@ uint8_t rect_select(uint8_t draworselect)
 }
 
 /**
+ * Build the Line/Box shape-prompt's statusbar hint, uppercasing the 'o'/
+ * 'c' key letter whenever the matching toggle (select_hollow/
+ * select_ellipse) is currently on -- e.g. "o:Box c:El" (neither toggled)
+ * becomes "O:Box c:El" (hollow on) or "o:Box C:El" (ellipse on) or
+ * "O:Box C:El" (both). Gives the user live feedback that a keypress
+ * registered, fixing a user report (2026-06-21) that the prompt "does
+ * not appear to do anything" when o/c are pressed -- previously the
+ * hint string was static for the whole prompt. Assumes 'o' is at index 0
+ * and 'c' at index 6 of MSG_LINEBOX_MODE_HINT in every language (true
+ * for both strings_en.h's "o:Box c:El" and strings_fr.h's "o:Bte c:El")
+ * -- re-check this if either string is ever restructured.
+ *
+ * @return (none) -- calls statusbar_set_override() with the built string.
+ */
+static void linebox_update_hint(void)
+{
+    static char hint[sizeof(MSG_LINEBOX_MODE_HINT)];
+    uint8_t i;
+
+    for (i = 0; MSG_LINEBOX_MODE_HINT[i]; i++) hint[i] = MSG_LINEBOX_MODE_HINT[i];
+    hint[i] = '\0';
+
+    if (select_hollow)  hint[0] = (char)(hint[0] - 32); // 'o' -> 'O'
+    if (select_ellipse) hint[6] = (char)(hint[6] - 32); // 'c' -> 'C'
+
+    statusbar_set_override(hint);
+}
+
+/**
  * Line/Box mode, entered via 'l' from Main mode. Grows a rectangle
  * (rect_select(1)); if accepted, prompts for the shape (MSG_LINEBOX_
  * MODE_HINT, same statusbar-override mechanism as select_run()'s own
- * MSG_SELECT_ACTION_HINT): 'o' toggles hollow/filled, 'c' toggles
+ * MSG_SELECT_ACTION_HINT, but rebuilt by linebox_update_hint() on every
+ * toggle instead of set once -- see its own doc comment): 'o' toggles
+ * hollow/filled, 'c' toggles
  * box/ellipse (both repeatable, independent of each other), ENTER plots
  * app.plotscreencode with whatever combination is currently toggled --
  * filled box (default, neither toggle), hollow box ('o' only,
@@ -415,7 +446,7 @@ void linebox_run(void)
     if (!rect_select(1)) return;
 
     app.mode = MODE_LINEBOX;
-    statusbar_set_override(MSG_LINEBOX_MODE_HINT);
+    linebox_update_hint();
     statusbar_draw();
 
     do
@@ -424,8 +455,8 @@ void linebox_run(void)
 
         switch (key)
         {
-        case 'o': select_hollow  = !select_hollow;  break;
-        case 'c': select_ellipse = !select_ellipse; break;
+        case 'o': select_hollow  = !select_hollow;  linebox_update_hint(); statusbar_draw(); break;
+        case 'c': select_ellipse = !select_ellipse; linebox_update_hint(); statusbar_draw(); break;
         case KEY_F6: statusbar_show((uint8_t)!app.showstatusbar); break;
         default: break;
         }

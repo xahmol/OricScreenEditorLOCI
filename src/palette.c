@@ -15,10 +15,18 @@
 // original 12-row post-check order could reach when wrapping DOWN from the
 // last alternate row into a favourites column > 9.
 //
-// Opts IN to the charset-swap mechanism (menu_winsave(..., 1)) -- unlike
-// charsetedit, the palette's Std/Alt grids render via the A_STD/A_ALT
-// attribute bytes written per row below, not via direct charset-RAM access,
-// so there is no live-edit-preview requirement.
+// Opts OUT of the charset-swap mechanism (menu_winsave(..., 0)), same as
+// charsetedit -- changed 2026-06-21 (user report: "palette view should not
+// be charset safe, otherwise you cannot select properly the redefined
+// chars"). The palette's whole purpose is letting the user pick a
+// character from the *actual current* Std/Alt content, including their
+// own edits; swapping to safe/ROM content for both banks (the general
+// mechanism's scope since charsetswap_enter()/exit() were merged to cover
+// Alt for every popup, not just Information > Version) would hide exactly
+// the redefined glyphs the user needs to see and select. Accepts the same
+// minor risk charsetedit already does: the palette's own "Fav:"/"Std:"/
+// "Alt:" labels render via the live (unprotected) Std charset too, so they
+// could look odd if the user has heavily redefined those specific glyphs.
 
 #include "oric.h"
 #include "keyboard.h"
@@ -218,7 +226,7 @@ void palette_run(void)
     rowsel = (uint8_t)(code / PAL_COLS + PAL_ROW_STD0);
     colsel = (uint8_t)(code % PAL_COLS);
 
-    menu_winsave(PAL_WIN_SY, PAL_WIN_WY, 1);
+    menu_winsave(PAL_WIN_SY, PAL_WIN_WY, 0);
     cwin_init(&pal_win, PAL_WIN_SX, PAL_WIN_SY, PAL_WIN_WX, PAL_WIN_WY, A_FWBLACK, A_BGWHITE);
     cwin_clear(&pal_win);
 

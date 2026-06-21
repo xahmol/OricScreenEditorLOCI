@@ -58,7 +58,7 @@ V1-derived).
 
 ### Canvas architecture
 
-The 40x27 **canvas** (rows 0-26) is a custom flat `screenmap[]` buffer
+The 40x28 **canvas** (rows 0-27) is a custom flat `screenmap[]` buffer
 (`src/canvas.c/h`), blitted to `$BB80` via raw pointer writes covering all 40
 columns. It deliberately does **not** use `OricCharWin`/`OricViewport`/
 `cwin_viewport_*`/`cwin_get_rect/put_rect`: `cwin_init` clamps `sx >= 2`, and
@@ -174,7 +174,7 @@ all updated to pass under the new behavior.
 
 ### Cursor auto-scroll fix
 
-Originally, `editor_run()`'s cursor-move keys clamped to the 40x27
+Originally, `editor_run()`'s cursor-move keys clamped to the 40x28
 viewport with no way to reach canvas cells beyond it — a real gap, since
 Screen > Width/Height already lets the canvas grow past the
 viewport. `cursor_move_scroll(dx, dy)` (`src/canvas.c/h`) fixes this: at a
@@ -348,6 +348,27 @@ Verified visually too: a Phosphoric screenshot mid-grow shows the plain
 "Line/Box" statusbar Mode field; a second screenshot right after the
 first `ENTER` shows `"o:Box c:El"` only then. Suite: 180/180 -> 182/182.
 
+**Toggle-state feedback (post-launch, user-requested 2026-06-21)**: user
+reported that pressing `o`/`c` at the shape prompt "does not appear to
+do anything" — confirmed this was the deliberate "no live visual
+feedback" design above, now found confusing in practice rather than a
+regression. The static `MSG_LINEBOX_MODE_HINT` string didn't reveal
+whether a toggle had registered. Fixed with `linebox_update_hint()`
+(`src/select.c`, new): rebuilds the hint string on every entry to the
+prompt *and* on every `'o'`/`'c'` press (previously set once, at entry,
+and never again), uppercasing the `'o'`/`'c'` key letter whenever the
+matching toggle is on — `"o:Box c:El"` (neither) becomes `"O:Box
+c:El"` (hollow), `"o:Box C:El"` (ellipse), or `"O:Box C:El"` (both).
+Fits the existing `STATUSBAR_MODE_WIDTH` (10-char) budget exactly, in
+both EN and FR (`"o:Bte c:El"`), since only two characters change case
+— no string lengthening, no layout changes. Assumes `'o'` is at index 0
+and `'c'` at index 6 in both language strings (true today; flagged in
+the function's own doc comment to re-check if either string is ever
+restructured). Verified visually via Phosphoric screenshots: `O:Box
+c:El` after `'o'`, `O:Box C:El` after also pressing `'c'`. No test
+changes needed (no existing assertion checked the hint string's
+content). Suite stayed 182/182.
+
 ### Select mode
 
 `select_run()` (`src/select.c`), entered via `s` from Main mode. Calls
@@ -459,7 +480,7 @@ of bank-switched VDC RAM.
   `u`, Line/Box fill, Select's `d`/`i`/`p`/`m` fills and cut/copy, Move
   mode's per-keypress shift (whole-viewport snapshot, since a 1-cell shift
   changes every cell along that axis — bounded by the viewport, not the
-  canvas, so always 1080 bytes regardless of canvas size), Write mode's
+  canvas, so always 1120 bytes regardless of canvas size), Write mode's
   every plotted/cleared cell, and Screen menu Clear/Fill (whole-canvas
   snapshot — now explicitly skipped if it would exceed the undo region,
   see above). Dirty-rect snapshots are cheap (a few bytes for a 1-cell
@@ -627,7 +648,7 @@ attribute bytes, which are `<0x20` and so render as nothing (not a visible
 gap).
 
 **XY field bugfix (post-launch)**: user-reported (2026-06-20) — once the
-canvas is larger than the 40x27 viewport and the view auto-scrolls (see
+canvas is larger than the 40x28 viewport and the view auto-scrolls (see
 "Cursor auto-scroll fix" above), the statusbar's `XY` field froze at the
 viewport-relative coordinate instead of continuing to show the true
 canvas-absolute position. Root cause: `statusbar_draw()` passed
@@ -640,6 +661,68 @@ regression scenarios added to `tests/scripts/test_cursor_autoscroll.sh`
 corrected from the old (buggy) "XY 0,26" to "XY 0,27" (viewport row26 +
 yoffset1), and a new horizontal-scroll scenario (resize width 40->41,
 RIGHT x41 from col0) asserts "XY40, 0" (viewport col39 + xoffset1).
+
+**`VIEWPORT_HEIGHT` 27->28 + statusbar auto-hide (post-launch, user-
+requested 2026-06-21)**: the real Oric Atmos screen is 40x28 (`SCREEN_
+ROWS`, `include/oric.h`), but `VIEWPORT_HEIGHT` was hardcoded 27 (a bug
+inherited from V1, which also uses 27), with the statusbar permanently
+occupying a row *beyond* the 27-row viewport. This meant the cursor
+could never reach the screen's true last row at all, and scrolling on a
+canvas taller than the viewport always left one real screen row
+permanently reserved for the statusbar even when scrolled.
+
+**Fix**: `VIEWPORT_HEIGHT` is now 28 (`src/appstate.h`) — the viewport
+spans the full screen, and the statusbar (`src/statusbar.c`) now
+overlays the viewport's own last row (`STATUSBAR_ROW = VIEWPORT_HEIGHT -
+1`, still literally row 27, just no longer a row *beyond* the viewport)
+instead of owning a separate row. `statusbar_draw()` auto-hides
+whenever `app.cursor_y == STATUSBAR_ROW` (and `app.showstatusbar` is on)
+— `canvas_blit()` reveals the real canvas content there the moment the
+cursor arrives (a fresh `canvas_blit()` is needed here specifically
+because ordinary in-viewport cursor moves, unlike scrolling moves, don't
+otherwise trigger one — see `cursor_move_scroll()`, "Cursor auto-scroll
+fix" above); moving the cursor away restores the statusbar normally on
+the next `statusbar_draw()` call. A new `autohidden` static tracks the
+transition so `canvas_blit()` only fires once per entry, not on every
+redraw while parked there.
+
+**Interaction with the manual FUNCT+6 toggle** (confirmed with the
+user): auto-hide only applies when `app.showstatusbar` is already on —
+if the user has manually hidden the statusbar, `STATUSBAR_ROW` is
+already always canvas, so auto-hide has nothing to do.
+`statusbar_show(0)` (the manual-hide path) was *also* changed: it used
+to blank that row with spaces directly (correct back when it was a
+dedicated statusbar-only row); now that it's a genuine canvas row, that
+would have erased real content, so it now calls `canvas_blit()` instead
+(and sets `autohidden = 1`, since the row already shows real canvas
+content at that point, exactly the auto-hidden invariant).
+
+**Ripple effects, all updated together**: `info_version_show()`'s
+`menu_winsave(0, VIEWPORT_HEIGHT, 1)` dropped its `+1` (no separate
+statusbar row to add for any more, see "Information menu" below).
+`assets/OSETSC.BIN`/`OSEHS1-4.BIN` (the boot splash/help screens, raw
+`VIEWPORT_HEIGHT*SCREEN_COLS`-byte dumps) grew from 1080 to 1120 bytes
+— padded with a blank 40-byte row (regenerating from original artwork
+wasn't needed; appending spaces was sufficient since row 27 was already
+either reserved-blank, for the splash's press-key overlay, or simply
+extends help screens with one more blank row) rather than re-authored
+from scratch. Move mode's per-shift undo snapshot
+(`VIEWPORT_WIDTH*VIEWPORT_HEIGHT`) grew from 1080 to 1120 bytes
+accordingly (still comfortably within `UNDO_REGION_SIZE`'s budget). A
+global "40x27"->"40x28" doc pass was done across this file,
+`ARCHITECTURE.md`, and `README.md`.
+
+**Test impact**: `tests/scripts/test_menus.sh`'s default-height pulldown
+assertion ("27"->"28"), `test_fileio_traffic.sh`'s several byte-size
+assertions (1080->1120, 1848->1888, the `ProjectHeader` canvas-height
+byte, the synthetic V1-project-import fixture's height field and bare
+screen buffer size), and `test_cursor_autoscroll.sh`'s vertical-scroll
+scenario (now resizes to 29 instead of 28 to stay one row taller than
+the new 28-row viewport, and the DOWN sweep gained a trailing UP press
+since the scroll now lands the cursor on `STATUSBAR_ROW` itself, where
+the statusbar is auto-hidden and the `XY` assertion couldn't see it)
+were all updated. Full suite: 182/182 unchanged in count, all green
+after these updates.
 
 A feature-scoping pass after the initial build shipped, inspired by
 VDCScreenEditor2's own feature set plus OSE-LOCI-specific ideas,
@@ -685,7 +768,7 @@ current absolute position; ESC at either field cancels with no change.
 `(0,0)` and no popup -- a single-corner "Home" shortcut, not a second
 bottom-right-corner key (kept deliberately small, matching VDCSE2's own
 single-HOME-key scope). Genuinely useful once the canvas can be up to
-10240 cells against a 40x27 viewport -- scrolling cell-by-cell to a
+10240 cells against a 40x28 viewport -- scrolling cell-by-cell to a
 known position is tedious once you know exactly where you want to go.
 
 
@@ -836,50 +919,109 @@ glyph for `app.plotscreencode`/`app.plotaltchar`.
 ### Charset-swap mechanism
 
 `src/charsetswap.c/h` + `include/charset.c/h` ensure popup chrome (menu bar,
-pulldowns, Are-you-sure/message popups, the resize dialog) always renders
-with the ROM-standard `CHARSET_STD` glyphs, even after the user has redefined
-characters in the character editor -- without permanently discarding the
-user's edits.
+pulldowns, Are-you-sure/message popups, the resize dialog, Information >
+Version) always renders with safe glyphs in **both** `CHARSET_STD` and
+`CHARSET_ALT`, even after the user has redefined characters in the
+character editor or loaded a project/charset file with different glyphs --
+without permanently discarding the user's content. `charsetswap_enter()`/
+`exit()` originally only covered `CHARSET_STD` (`CHARSET_ALT` had its own
+separate, one-off `charsetswap_alt_enter()`/`_exit()` pair used by exactly
+one popup); **merged into a single pair covering both banks on
+2026-06-21** after a real-hardware report showed *any* popup that can
+trigger a Load action needs both protected, not just Information >
+Version's logo.
 
 - **Generic primitives** (`include/charset.c/h`, no OSE-specific state, no
   `#pragma compile` chain back into `src/`): `charset_address()`,
-  `charset_save()`/`charset_load()` (768-byte displayable-range copies
-  between a charset bank and a buffer or `CHARSETROM`), `charset_rom_glyph()`,
-  and the 7 glyph-bitmap transforms
+  `charset_save()`/`charset_load()` (displayable-range copies between a
+  charset bank and a buffer or `CHARSETROM`), `charset_rom_glyph()`, and
+  the 7 glyph-bitmap transforms
   (`charset_glyph_invert/mirror_v/mirror_h/scroll_up/scroll_down/rotate_left/
   rotate_right`) used by the character editor's `i`/`x`/`y`/`u`/`d`/`l`/`r`
   commands.
-- **Std-only for general popup chrome** (Part 1 spike outcome): `jsr $F816`
-  (`ROM_ALTCHARS`, used by V1 to regenerate `CHARSET_ALT` from
-  `CHARSET_STD`) is a no-op when called from Oscar64 in this runtime --
-  but this is about that specific ROM *subroutine call*, not about
-  whether `CHARSET_ALT` can be restored at all (see below). The general
-  `charsetswap_enter()`/`exit()` only backs up/restores `CHARSET_STD`'s
-  768-byte displayable range; `CHARSET_ALT` keeps whatever the user has
-  edited during ordinary popups, which is acceptable because popup
-  chrome (menu bar, pulldowns, dialogs) only ever uses `CHARSET_STD`
-  glyphs (`A_STD` attribute). **One exception**: Information > Version's
-  `idi8b_logo[]` does use `A_ALT`, and has its own dedicated
-  `charsetswap_alt_enter()`/`_exit()` pair for exactly that popup -- see
-  "Information menu" below. `CHARSETROM` is a valid direct restore
-  source for `CHARSET_ALT` too (not just `CHARSET_STD`), confirmed via
-  `~/.claude/oric_atmos_reference.md`: the Oric ROM's own boot sequence
-  copies the same `$FC78-$FF77` data to both `$B400` and `$B800` at
-  RESET. This correction supersedes an earlier, less precise version of
-  this bullet that implied `CHARSET_ALT` simply has no available ROM
-  restore source at all.
-- **`charset_changed` gate**: `charsetswap_mark_changed()` is called once,
-  from `ce_snapshot()` (the chokepoint already called before every
-  destructive glyph edit in `charsetedit.c`). Until the user edits a glyph
-  for the first time, `charsetswap_enter()`/`exit()` are no-ops -- popups on
-  an unmodified charset render identically with or without the swap.
+- **`CHARSET_STD` restores from `CHARSETROM`** (the genuine ROM-standard
+  ASCII font -- unambiguous, no real/boot-time-content distinction the
+  way Alt has). **`CHARSET_ALT` restores from a one-time boot snapshot**
+  (`charsetswap_capture_boot_alt()`, called as literally the first
+  statement in `main()`, before anything else in the session can write to
+  `CHARSET_ALT`) -- **not** from `CHARSETROM`. `CHARSETROM`'s content was
+  originally assumed to match `CHARSET_ALT`'s genuine boot-time content
+  (citing `~/.claude/oric_atmos_reference.md`'s claim that Oric ROM boot
+  copies the same `$FC78-$FF77` data to both `$B400` and `$B800`) -- that
+  assumption did not hold up on real hardware (only ever verified in
+  Phosphoric before this was caught). **Resolved 2026-06-21**: the Oric
+  ROM actually *generates* the alternate/mosaic font algorithmically at
+  boot (`jsr $F816`, `ROM_ALTCHARS`) rather than copying a static table
+  -- so `CHARSETROM` (the literal byte table for the *standard* font
+  only) was never going to work as an Alt source; nothing in ROM holds a
+  static copy of what `ROM_ALTCHARS` computes. `ROM_ALTCHARS` itself is a
+  confirmed no-op when called from Oscar64 in this runtime (no
+  ROM-reset-time state this bare-metal program replicates), hence the
+  boot-snapshot approach instead -- it captures the *result* of whatever
+  the real boot already computed, without needing to re-run the
+  algorithm.
+- **`charset_changed` gate, Std only**: `charsetswap_mark_changed()` is
+  called from `ce_snapshot()` (the chokepoint already called before every
+  destructive glyph edit in `charsetedit.c`) and from every LOCI action
+  that overwrites `CHARSET_STD`/`CHARSET_ALT` directly (`src/fileio.c`'s
+  `fileio_load_combined()`/`fileio_load_project()`/`fileio_load_charset()`,
+  `src/menudata.c`'s `charset_reset_std()`). Until it's been called at
+  least once, `charsetswap_enter()`/`exit()` skip the `CHARSET_STD` half
+  of their work -- popups on an unmodified Std charset render identically
+  with or without the swap. The `CHARSET_ALT` half of enter()/exit()
+  always runs unconditionally regardless (cheap, no harm even when Alt was
+  never touched) -- every popup needs Alt safe, not just the one that
+  visibly renders `A_ALT` content.
+- **Mid-popup-load re-sync (found 2026-06-21, real hardware, user
+  report)**: `src/menudata.c`'s `menu_run()` keeps a single
+  `charsetswap_enter()`/`exit()` pair active across its *entire*
+  bar-level session (one call at the top, one at the bottom, spanning
+  every pulldown action in between) -- so a File > Load Project action
+  dispatched from within it runs *while* that swap session is still
+  open. Before this fix, that broke two things: (1) the still-visible
+  menu chrome immediately started rendering with the newly-loaded
+  (possibly unreadable) glyphs, since the swap was never engaged in the
+  first place if `charset_changed` was still false when `menu_run()`'s
+  own `charsetswap_enter()` ran; (2) on eventual exit, the *stale*
+  pre-load backup got restored, discarding the freshly-loaded charset
+  entirely. Fixed: `charsetswap_mark_changed()` now also checks
+  `swap_depth > 0` -- if a swap session is currently active, it
+  immediately re-captures the just-overwritten live content as the new
+  "restore on exit" target (`backup_std`/`backup_alt_current`) and
+  re-applies the safe chrome glyphs, so the popup's remaining lifetime
+  stays readable *and* the freshly-loaded charset survives the eventual
+  exit. A new `std_swap_active` flag (distinct from `charset_changed`,
+  which persists across the whole session) tracks whether *this specific*
+  swap session has a valid Std backup to restore, since `charset_changed`
+  can flip from false to true mid-session in exactly this scenario --
+  `charsetswap_exit()` checks `std_swap_active`, not `charset_changed`,
+  to decide whether to restore Std.
+- **Call `charsetswap_mark_changed()` once per multi-bank action, not
+  once per bank** (found 2026-06-21, real hardware, immediately after the
+  re-sync fix above): `fileio_load_project()` originally called it once
+  right after loading `CS.BIN` (Std) and again right after loading
+  `CA.BIN` (Alt). The first call correctly captured the just-loaded Std
+  content into `backup_std`, then re-applied `CHARSETROM`. The *second*
+  call re-captured `CHARSET_STD`'s *current* content into `backup_std`
+  again -- but by then it held the safe `CHARSETROM` content from the
+  first call's re-apply, not the loaded project's Std charset --
+  clobbering the correct backup. Symptom: on exiting the menu, only Alt
+  pointed back to the freshly-loaded charset; Std reverted to
+  ROM-standard instead. Fixed by moving the call to once, after both
+  conditional bank loads complete (calling it when neither bank's file
+  existed is harmless -- it just re-captures/re-applies unchanged
+  content). The other 3 call sites (`fileio_load_combined()`,
+  `fileio_load_charset()`'s std/alt/combined branches,
+  `charset_reset_std()`) each only ever touch one or both banks in a
+  single call already, so this double-call bug was specific to
+  `fileio_load_project()`'s two-separate-`if`-blocks structure.
 - **Depth-counting** (`swap_depth`): `charsetswap_enter()` only backs up
-  `CHARSET_STD` on the *outermost* call (`swap_depth==0`);
-  `charsetswap_exit()` only restores on the call that brings `swap_depth`
-  back to 0. This lets nested popups (e.g. the Screen pulldown opening the
-  resize dialog, which can open an Are-you-sure popup) share a single backup
-  buffer safely.
-- **`menu_winsave(ypos, height, swap_charset)`**: the new third parameter is
+  on the *outermost* call (`swap_depth==0`); `charsetswap_exit()` only
+  restores on the call that brings `swap_depth` back to 0. This lets
+  nested popups (e.g. the Screen pulldown opening the resize dialog, which
+  can open an Are-you-sure popup) share a single pair of backup buffers
+  safely.
+- **`menu_winsave(ypos, height, swap_charset)`**: the third parameter is
   stored in the pushed `MenuWinRecord` (see "Menu System" below);
   `menu_winrestore()` pairs `charsetswap_exit()` with a saved record's
   `charsetswap_enter()` automatically via the LIFO window stack, so callers
@@ -889,7 +1031,9 @@ user's edits.
   Current call sites: `menu_run()` (menu bar, `menudata.c`),
   `menu_pulldown()`, `menu_areyousure()`, `menu_messagepopup()` (all
   `src/menu.c`), `resize_dialog()` (`src/menudata.c`), `palette_run()`
-  (`src/palette.c`) and `colourpicker_run()` (`src/colourpicker.c`) all pass
+  (`src/palette.c`), `colourpicker_run()` (`src/colourpicker.c`), and
+  `info_version_show()` (`src/info.c` -- now covered automatically by this
+  general mechanism instead of its own separate Alt-only pair) all pass
   `1`; `charsetedit_run()` (`src/charsetedit.c`) passes `0` — the only popup
   with the live-charset-RAM preview requirement.
 
@@ -941,10 +1085,10 @@ per "Charset-swap mechanism" above, is a no-op when called from Oscar64
 in this runtime.
 
 **Second correction (2026-06-20, supersedes the "uninitialised at boot"
-claim two paragraphs below in earlier drafts)**: `CHARSET_ALT` does
-**not** start uninitialised — confirmed via `~/.claude/
-oric_atmos_reference.md` ("Character Set ROM Data") and verified
-directly (Phosphoric screenshot of Information > Version's logo
+claim two paragraphs below in earlier drafts; itself now in doubt, see
+below)**: `CHARSET_ALT` does **not** start uninitialised — confirmed via
+`~/.claude/oric_atmos_reference.md` ("Character Set ROM Data") and
+verified directly (Phosphoric screenshot of Information > Version's logo
 rendering correctly on a fresh boot, see "Information menu" below): the
 Oric ROM's own boot/RESET sequence copies the master font at
 `$FC78-$FF77` to *both* `$B400` (Std) and `$B800` (Alt), independent of
@@ -952,33 +1096,86 @@ whether `jsr $F816` is ever called again afterward. So at a fresh boot,
 `CHARSET_ALT` actually holds a byte-identical copy of `CHARSET_STD`'s
 own glyphs (the "mosaic" look is purely the `A_ALT` attribute changing
 how the ULA *interprets* those bytes, not a different ROM table) —
-there genuinely is a deterministic, ROM-sourced bitmap available, and
-it's directly recoverable any time via `charset_load(CHARSET_ALT,
-CHARSETROM)` (now used by `charsetswap_alt_enter()`,
-`src/charsetswap.c`). What's still **unconfirmed/unclear** is whether
-reordering *that* data (plain Std-font letter shapes, not genuine
-mosaic-block patterns) via `visualchar[]` actually produces a
-*useful* result for `visualmap`'s original intent — the factual premise
-("nothing meaningful to reorder, CHARSET_ALT is garbage") is now known
-to be wrong, but whether the feature is *worth* anything beyond that
-correction is a separate, still-open question, not resolved by this fix.
+there genuinely is a deterministic, ROM-sourced bitmap available. What's
+still **unconfirmed/unclear** is whether reordering *that* data (plain
+Std-font letter shapes, not genuine mosaic-block patterns) via
+`visualchar[]` actually produces a *useful* result for `visualmap`'s
+original intent — the factual premise ("nothing meaningful to reorder,
+CHARSET_ALT is garbage") is now known to be wrong, but whether the
+feature is *worth* anything beyond that correction is a separate,
+still-open question, not resolved by this fix.
 
-### Charset > Reset Std->ROM (`menudata.c`, Charset pulldown)
+**Third correction (2026-06-21)**: the claim above was used to justify
+an earlier version of `charsetswap_alt_enter()`
+(`charset_load(CHARSET_ALT, CHARSETROM)`, restoring Information >
+Version's logo from this same "ROM-sourced bitmap") — but real-hardware
+testing showed that restore *broke* the logo instead of protecting it
+(see "Information menu" below). So either this claim doesn't hold on
+real hardware the way the reference document states, or there's a
+missing piece (e.g. what "boot" actually means for a `.tap`-launched
+program vs. a true cold RESET). `charsetswap_alt_enter()` now restores
+from a snapshot captured at the start of `main()` instead of from
+`CHARSETROM` — don't cite this section's `CHARSETROM`-for-Alt claim as
+justification for a similar fix without re-verifying on real hardware
+first.
 
-`PULLDOWN_MAXOPTIONS` grew from 6 to 7 (`src/menu.h`) -- cheap now that
-moving the canvas into overlay RAM (see "Canvas storage is overlay RAM"
-below) freed ~8.7KB of main RAM that used to be nearly exhausted.
-New `charset_reset_std()` (`src/menudata.c`, `static`, dispatched as
-Charset-pulldown choice 37): after a `menu_areyousure()` confirmation
-(`MSG_CHARSET_RESETWARN`, matching the canvas-shrink-confirm pattern),
-calls `charset_load(CHARSET_STD, (const uint8_t *)CHARSETROM)`
+**Fourth correction (2026-06-21, the actual resolution)**: the "missing
+piece" above is now identified — the second correction's premise (ROM
+boot does a *literal byte copy* of `$FC78-$FF77` into both `$B400` and
+`$B800`) is itself wrong. `jsr $F816` (`ROM_ALTCHARS`, already noted
+elsewhere in this file as the routine V1 calls to regenerate
+`CHARSET_ALT` from `CHARSET_STD`) is a *subroutine that generates* the
+mosaic font algorithmically at boot, not a static table the ROM copies
+verbatim. That's precisely why `CHARSETROM` never worked as a source for
+Alt: it's the literal byte table for the *standard* font only, and
+nothing in ROM holds a static copy of whatever `ROM_ALTCHARS` computes.
+The boot-time-snapshot approach (`charsetswap_capture_boot_alt()`,
+captured once before anything else in the session can touch
+`CHARSET_ALT`) is therefore the only correct source — confirmed
+consistent with this resolution, kept as-is. A `Charset > Reset
+Alt->ROM` menu item (mirroring `Reset Std->ROM`) was added on this
+basis, sourcing from that same boot snapshot via
+`charsetswap_reset_alt_from_boot()` (`src/charsetswap.c`) -- see
+"Charset > Reset Std->ROM" below.
+
+### Charset > Reset Std->ROM / Reset Alt->ROM (`menudata.c`, Charset pulldown)
+
+`PULLDOWN_MAXOPTIONS` grew from 6 to 7 (`src/menu.h`) for Reset
+Std->ROM -- cheap now that moving the canvas into overlay RAM (see
+"Canvas storage is overlay RAM" below) freed ~8.7KB of main RAM that
+used to be nearly exhausted. New `charset_reset_std()` (`src/menudata.c`,
+`static`, dispatched as Charset-pulldown choice 37): after a
+`menu_areyousure()` confirmation (`MSG_CHARSET_RESETWARN`, matching the
+canvas-shrink-confirm pattern), calls
+`charset_load(CHARSET_STD, (const uint8_t *)CHARSETROM)`
 (`include/charset.h` -- the same primitive `charsetswap.c` already uses
 for popup chrome) and sets `app.stdchanged = 1` so File > Save Project
 knows the standard charset changed this session. Restores the whole
 768-byte displayable range in one step, instead of the character
-editor's glyph-by-glyph `s` key. Std-only, like every other ROM-restore
-path in this codebase -- the Oric ROM has no alternate-charset table to
-restore from.
+editor's glyph-by-glyph `s` key. Real bug found and fixed 2026-06-21
+(user report: "gives all garbage for the charset") -- this call site was
+missing the `disable_overlay_ram()`/`enable_overlay_ram()` bracket every
+*other* `CHARSETROM` read in this codebase has, since `CHARSETROM`
+($FC78) lives inside $C000-$FFFF (the overlay-RAM range, enabled for the
+whole session) -- without it, the read pulled canvas/undo overlay data
+instead of the real ROM font.
+
+`PULLDOWN_MAXOPTIONS` grew again, 7 to 8, for **Reset Alt->ROM**
+(2026-06-21, user-requested after asking why no Alt counterpart
+existed). New `charset_reset_alt()` (`src/menudata.c`, `static`,
+Charset-pulldown choice 38), same `menu_areyousure()` confirmation, but
+calls `charsetswap_reset_alt_from_boot()` (`src/charsetswap.c`, new) --
+**not** `charset_load(CHARSET_ALT, CHARSETROM)` the way Std does. Unlike
+Std, `CHARSETROM` is not a valid source for Alt: the user clarified
+that the Oric ROM *generates* the mosaic/alternate font algorithmically
+at boot (`jsr $F816`, `ROM_ALTCHARS`) rather than copying a static table
+-- see "Charset-swap mechanism"'s "Fourth correction" above for the full
+resolution of this long-running confusion. `charsetswap_reset_alt_from_
+boot()` restores from the same boot-time snapshot
+(`charsetswap_capture_boot_alt()`'s `backup_alt_boot` buffer) that
+`charsetswap_alt_enter()` already uses, the only known-good source. No
+`disable_overlay_ram()`/`enable_overlay_ram()` bracket needed here
+(unlike Std) -- that buffer is plain main RAM, not inside $C000-$FFFF.
 
 
 
@@ -989,90 +1186,166 @@ restore from.
 `src/colourpicker.c/h` — entered via `c` from main mode, a **new OSE-LOCI
 feature over V1** (see README.md "Planned feature additions over V1": "Enhanced
 palette mode also showing inverse ink/paper colour combinations"). Popup
-(`CP_WIN_SX=2/SY=0/WX=36/WY=20`, `menu_winsave(0, 20, 1)`) for selecting
-`app.plotink`/`app.plotpaper` from an 8x8 ink x paper grid, **split 4-wide/
-16-row** (see "Colour picker rendering fix" below for why) — grid column =
-`ink%4`, grid row = `paper*2 + ink/4` (`cp_grid_pos()`).
+(`CP_WIN_SX=2/SY=0/WX=36/WY=12`, `menu_winsave(0, 12, 1)`) for selecting
+`app.plotink`/`app.plotpaper` from an 8x8 ink x paper grid, **a single
+8-wide screen row per paper value** (`CP_ROW_GRID0=1`, screen row =
+`CP_ROW_GRID0 + paper`; `CP_CELL_STEP=5`, screen col = `ink*5`) — see
+"Colour picker rewrite (round 3)" below for why this isn't the
+4-wide/16-row split two earlier rounds used.
 
-- **Layout**: row 0 = title (`MSG_COLOURPICKER_TITLE`); rows 1-16
-  (`CP_ROW_GRID0=1`) = the split grid, 4 cells per row (`CP_GRID_X0=2`,
-  `CP_CELL_STEP=4` cols/cell): `[paper-attr byte (16+paper), ink-attr byte,
-  normal swatch, inverse swatch]`. Rows 17-19
-  are feedback lines: `"Ink:    N"` + swatch (`CP_ROW_INK`), `"Paper:
-  N"` + swatch (`CP_ROW_PAPER`), `"Result:"` + ink/paper attrs + normal+inverse
-  preview pair (`CP_ROW_RESULT`).
+- **Layout**: row 0 = title (`MSG_COLOURPICKER_TITLE`, via the popup's
+  normal bordered window); rows 1-8 = the grid, one row per paper value,
+  all 8 ink columns on it, 5 bytes/cell: `[A_BGWHITE reset, ink-attr byte,
+  paper-attr byte (16+paper), normal swatch, inverse swatch]` — 8 cells x 5
+  bytes = 40 columns exactly, so no end-of-row reset pair is needed. Rows
+  9-11 are feedback lines (back on the popup's normal bordered window):
+  `"Ink:    N"` + swatch (`CP_ROW_INK`), `"Paper:  N"` + swatch
+  (`CP_ROW_PAPER`), `"Result:"` + ink/paper attrs + normal+inverse preview
+  pair (`CP_ROW_RESULT`).
+- **The grid is drawn via direct screen-RAM writes** (`cp_screen_put()`,
+  the same raw-`TEXTVRAM`-pointer technique `canvas.c`'s `canvas_blit()`
+  already uses), bypassing this popup's own `OricCharWin` entirely for
+  those 8 rows — see "round 3" below for why.
 - **Cursor**: the highlighted cell swaps its two swatch chars
   (`CH_SPACE`<->`CH_INVSPACE`; normal = paper-colour swatch then ink-colour
   swatch, highlighted = reversed) — a 2-char analogue of charsetedit's `^0x80`
   cursor. Initial position = `(app.plotink, app.plotpaper)`.
-- **Keys**: LEFT/RIGHT cycle ink (wrap 0-7, jumping between the two grid-row
-  halves when crossing the 3/4 boundary), UP/DOWN cycle paper (wrap 0-7,
-  moves by exactly 2 grid rows, same column); `SPACE`/`ENTER` commit the
-  highlighted cell to `plotink`/`plotpaper` and close the popup; `FUNCT+6`
-  toggles the statusbar; `ESC` closes the popup unchanged.
+- **Keys**: LEFT/RIGHT cycle ink (wrap 0-7), UP/DOWN cycle paper (wrap
+  0-7); `SPACE`/`ENTER` commit the highlighted cell to `plotink`/
+  `plotpaper` and close the popup; `FUNCT+6` toggles the statusbar; `ESC`
+  closes the popup unchanged.
 - **Adapted from** V1's `colourpicker()`/`colorpicker_cursorplot()` (archived
   `nonworkingcc65:src/colorpicker.c`) — same ink x paper grid + Ink:/Paper:/
   Result: feedback concept; the border-drawing cursor is replaced with the
-  simpler 2-char swatch swap.
+  simpler 2-char swatch swap (V1's literal `'-'`/`'-'+128` swatch glyphs
+  are kept as `CH_SPACE`/`CH_INVSPACE` instead — a solid colour block reads
+  better than a bare hyphen; the one deliberate deviation from V1 kept
+  from the earlier rounds, unrelated to the hardware bug below).
 - **Charset-swap**: opts IN — swatch glyphs (`CH_SPACE`/`CH_INVSPACE`) are
   plain Std-charset chars, no live-edit-preview requirement.
 
 **Colour picker rendering fix, round 1 (history)**: a user screenshot from
 real Oric Atmos hardware showed each grid cell rendering as repeating
-rainbow bands instead of a solid ink/paper swatch pair — never reproduced
-in emulation at the time. The original 8-wide/8-row grid's per-cell write
-was `[ink-attr, paper-attr, swatch0, swatch1]` (4 bytes); the fix applied
-then added a leading `A_BGWHITE` reset byte (5 bytes total,
-`[A_BGWHITE, ink, paper+16, swatch0, swatch1]`, matching V1's
-`colourpicker()` literally) and split the grid 4-wide/16-row
+rainbow bands instead of a solid ink/paper swatch pair. The original
+8-wide/8-row grid's per-cell write was `[ink-attr, paper-attr, swatch0,
+swatch1]` (4 bytes); the fix applied then added a leading `A_BGWHITE`
+reset byte (5 bytes total, `[A_BGWHITE, ink, paper+16, swatch0, swatch1]`,
+matching V1's `colourpicker()` literally) and split the grid 4-wide/16-row
 (`cp_grid_pos()` maps `(ink, paper)` to `(col=ink%4, row=paper*2+ink/4)`)
 since 8 cells x 5 bytes = 40 columns didn't fit alongside this popup's 2
 reserved border columns.
 
-**Round 2 (the actual root cause, found via Phosphoric screenshot pixel
-inspection, not real hardware)**: round 1's fix reduced the artifact but
-didn't eliminate it — a later user screenshot (this time reproduced
-directly in Phosphoric, which evidently *can* emulate this ULA behaviour
-correctly, unlike the "never reproduced in emulation" framing above)
-still showed visible white gaps inside and between cells. Diagnosed by
-sampling `--screenshot-at`'s PPM pixel-by-pixel per text column for a
-known cell and comparing against the exact byte sequence written there:
-**paper-setting attribute bytes take effect immediately, on their own
-column; ink-setting attribute bytes do not affect that (blank) column's
-rendering at all** — the opposite of the "takes effect one column late"
-model round 1 assumed for *all* attribute bytes. Round 1's 5-byte order
-(`reset=A_BGWHITE, ink, paper, swatch0, swatch1`) writes paper *twice* (the
-reset and the real paper-attr) with an ink-attr sandwiched between them;
-since paper only "sticks" instantly and ink doesn't matter until a glyph
-is drawn, the reset's column and the ink-attr's column both rendered as
-stale **white** (from the reset) before the real paper-attr column
-finally switched to the cell's actual paper colour — visible as a
-2-column-wide white flash at the start of every cell. The same backwards
-order in the end-of-row trailing reset (`ink-reset` written before
-`paper-reset`) left a 1-column stale-colour artifact at the row's tail
-for the same reason.
+**Round 2 (reverted — see round 3)**: a later Phosphoric screenshot still
+showed white gaps, diagnosed (via `--screenshot-at` PPM pixel sampling) as
+"paper-setting attribute bytes take effect immediately, ink-setting bytes
+don't" — round 1's 5-byte order writes paper twice with an ink byte
+sandwiched between, supposedly causing stale-white columns. Round 2
+dropped the leading reset byte and reordered to **paper before ink**
+(`[paper-attr, ink-attr, normal swatch, inverse swatch]`, 4 bytes/cell).
+Verified via Phosphoric pixel sampling at the time — **this did not hold
+up on real hardware** (user report, 2026-06-21: "color picker still
+quite broken").
 
-**Fix**: drop the redundant leading reset byte entirely and write
-**paper before ink**: `[paper-attr (16+paper), ink-attr, normal swatch,
-inverse swatch]`, 4 bytes/cell (`CP_CELL_STEP=4`). The paper-attr byte is
-self-resetting (it overrides whatever paper was active before, immediately,
-on its own column) so no separate reset is needed; the trailing end-of-row
-reset pair was reordered the same way (`A_BGWHITE` before `A_FWBLACK`).
-Verified via Phosphoric `--screenshot-at` PPM pixel sampling, before and
-after: the before-image showed exactly the predicted 2-column white gaps
-per cell and a 1-column tail artifact; the after-image showed clean,
-gap-free colour blocks with no stale bleed anywhere in the row. Byte-level
-sanity-checked too: cell (ink=7, paper=0) now writes `10 07 a0 20`
-(paper, ink, swatches) at the recomputed split-grid address.
-`tests/scripts/test_colourpicker.sh` updated for the new cell
-addresses/4-byte shape (179/179 full suite still green);
-`app.plotink`/`plotpaper` remain settable without this popup via the
-`,`/`.`/`;`/`'` cycling keys ("Main-mode attribute-selection keys and
-statusbar redesign" above, `src/editor.c`) regardless. The
-freed 5th column per cell wasn't reclaimed by widening back to a single
-8-wide row in this pass (would need re-deriving `CP_ROW_INK/PAPER/RESULT`
-positions and window height, and re-touching every test address again) —
-left as a possible future simplification, not done here.
+**Round 3 (2026-06-21, the actual fix — rewrite back to V1's exact
+logic)**: per explicit user instruction ("prefer going back exactly to
+nonworkingcc65 logic and solve the problem of the first two chars by not
+using the regular popup routine but customise here"), re-read
+`nonworkingcc65:src/colorpicker.c` in full (per
+`feedback_dont_oversimplify_ported_designs` — don't re-derive an assumed
+layout from a named reference, read its actual code) rather than
+continuing to patch the existing port incrementally. Two findings:
+1. **V1's grid is a single 8-wide row per paper value** (`gotoxy(ink*5,
+   5+paper*2)`, one `cprintf` per cell), not a split grid — 8 cells x 5
+   bytes = 40 columns exactly fits the screen width with no leftover
+   columns to reset, unlike the 4-wide/16-row split's spare columns.
+2. **V1's cell byte order is reset-then-ink-then-paper** — the literal
+   order round 1 used and round 2 "corrected" away from. Since round 2's
+   reordering (based on Phosphoric pixel sampling) didn't hold up on real
+   hardware, this rewrite trusts V1's own long-tested byte order instead
+   and reverts to it: `[A_BGWHITE, ink, paper+16, swatch0, swatch1]`.
+3. **The "first two chars" problem, now understood**: V1 draws its grid
+   via direct screen writes (`ORIC_HChar`/`cputcxy`), not through any
+   window/border abstraction — its window's own border columns (0-1) are
+   only protected on rows *outside* the grid; grid rows fully overwrite
+   them. The earlier OSE port instead drew the grid via
+   `cwin_putat_*()`, which is *window-relative* (`CP_WIN_SX=2` offsets
+   every write by 2 columns) — so the ink=0 cell's leading reset byte
+   never actually reached literal column 0/1 the way V1's did, and the
+   grid was permanently confined to the window's bordered content area
+   instead of the full screen width V1 uses. Fixed by adding
+   `cp_screen_put(col, row, value)` (absolute-coordinate, direct
+   `TEXTVRAM` write, same technique `canvas_blit()` uses) and routing the
+   entire grid through it instead of `cwin_putat_*()` — the popup's
+   normal bordered window is still used for the title and feedback rows,
+   which don't have this problem.
+
+This also shrank the popup from 20 rows to 12 (8 grid rows instead of 16)
+and removed the 4-wide split's separate end-of-row reset pair (`CP_RESET_X`)
+entirely, since 8x5=40 needs none. `tests/scripts/test_colourpicker.sh`
+updated for the new 8-wide/5-byte-per-cell addresses (full suite green,
+colour-picker scenarios 14/14); `app.plotink`/`plotpaper` remain settable
+without this popup via the `,`/`.`/`;`/`'` cycling keys regardless.
+Verified via Phosphoric `--screenshot-at`: clean, gap-free colour columns,
+no banding.
+
+**Swatch glyph changed to `'*'`/inverse-`'*'` (`CP_STAR`/`CP_INVSTAR`),
+not a blank/solid space (user-requested same day)**: a blank `CH_SPACE`
+swatch shows only the paper colour (no foreground pixels at all); a solid
+`CH_INVSPACE` swatch shows only ink (the whole cell inverts to one solid
+colour). Neither lets the user see the actual ink-on-paper combination in
+one glance. `CP_STAR`/`CP_INVSTAR` (`'*'`/`'*'|0x80`) have both visible
+foreground (ink) and background (paper) pixels in the same cell — used for
+both the grid's per-cell swatches (`cp_draw_cell()`) and the Result line's
+normal/inverse preview pair (`cp_draw_feedback()`). The Ink:/Paper: lines'
+own single-colour swatches are unchanged (no combo to show there, just one
+colour). `test_colourpicker.sh`'s swatch byte assertions updated
+(`a0`/`20` → `aa`/`2a`).
+
+**Left-edge border-order mismatch (found and fixed the same day, while
+verifying the `'*'` change visually)**: with the swatch glyphs now visible,
+a screenshot showed a vertical white strip at screen column 0 spanning
+exactly the grid's 8 rows, misaligned with the black left edge of the
+title/feedback rows above and below it. Root cause: this codebase's
+`cwin_clear()` (`row_setattr()`) writes the window border as `[ink,
+paper]` at columns 0-1 (ink=`A_FWBLACK`, paper=`A_BGWHITE` for this popup)
+— but V1's own grid (and V1's own window border, `ORIC_VChar(2,0,
+A_BGWHITE,23)` then `ORIC_VChar(2,1,A_FWBLACK,23)`, i.e. **paper first**)
+both use the opposite order, `[paper, ink]`. Since the grid bypasses cwin
+to write its own column 0-1 (the ink=0 cell's leading reset+ink bytes
+always land there, see "round 3" above), the grid rows showed white-then-
+white at columns 0-1 while the surrounding cwin-bordered rows showed
+black-then-white — a visible jump exactly at the grid's top/bottom edge.
+Fixed with a new `cp_draw_border()` that overrides columns 0-1 for *every*
+row of the popup (not just the grid) to V1's paper-then-ink order, called
+right after `cwin_clear()` — this is a colourpicker-local override (the
+shared `row_setattr()`/`cwin_clear()` convention used by every other popup
+in this codebase is untouched), since V1's own window genuinely uses the
+opposite byte order from this codebase's usual convention. Verified via a
+raw screen-RAM dump: columns 0-1 now read `17 00` (paper-white, ink-black)
+on every one of the popup's 12 rows, and a follow-up screenshot showed a
+uniform white left margin with no jump. No test changes needed (no
+existing assertion checked column 0-1's bytes).
+
+**Title left-alignment (same day, user-requested)**: `CP_TITLE_X` was `2`
+(window-relative), placing the title at absolute column 4 — two columns
+right of the Ink:/Paper:/Result: feedback lines (window-relative `x=0`,
+absolute column 2). Changed to `0` so the title lines up with those three
+lines' left edge.
+
+**Highlighted-cell glyph (same day, user-requested)**: the selected grid
+cell originally distinguished itself only by swapping `CP_STAR`/
+`CP_INVSTAR`'s left-right order within the cell — easy to miss at a
+glance. Added `CP_DASH`/`CP_INVDASH` (`'-'`/`'-'|0x80`): `cp_draw_cell()`
+now draws the highlighted cell with `-`/inverse-`-` instead of `*`/
+inverse-`*`, so the selection stands out by glyph, not just by swap
+order (the swap is still applied too). `test_colourpicker.sh`'s
+highlighted-cell byte assertions updated (`aa`/`2a` → `ad`/`2d` for the
+highlighted cell; non-highlighted cells stay `2a`/`aa`).
+
+**Real-hardware confirmation still pending** for the round 3 grid rewrite
+itself — this exact feature has had two "confirmed via Phosphoric" rounds
+already that didn't hold up, so a Phosphoric pass alone doesn't close
+that out; flagged in memory until a real Oric Atmos check happens.
 
 
 ## Menu System & Popups
@@ -1106,11 +1379,46 @@ Yes/No confirm dialog, `PULLDOWN_MAXOPTIONS=6`) → popup dialogs.
 - **Canvas resize** (`canvas_resize()`, dispatched from `menudata.c`
   `resize_dialog()`): new size validated as
   `(newval >= minval) && (neww*newh <= CANVAS_MAX_SIZE=8192)`, where
-  `minval = VIEWPORT_WIDTH` (40) for width, `VIEWPORT_HEIGHT` (27) for height
+  `minval = VIEWPORT_WIDTH` (40) for width, `VIEWPORT_HEIGHT` (28) for height
   — both equal the *default* canvas size, so a dimension can only be shrunk
   below its default after first being grown above it. Shrinking below the
   *current* (already-grown) size triggers `menu_areyousure()` (Yes applies,
   No leaves the size unchanged).
+
+**Screen > Clear/Fill redraw timing fix (post-launch, user-requested
+2026-06-21):**
+
+User report: Clear/Fill ran (and `undo_snapshot()`'d/mutated `screenmap[]`
+correctly) but the visual update only appeared after the whole menu bar
+was closed (ESC at bar level), not immediately. Root cause:
+`menudata.c`'s `case 13`/`case 14` (`canvas_clear()`/`canvas_fill()`)
+never called `canvas_blit()` themselves — the only `canvas_blit()` in
+`menu_run()` was the one at the very end, after the `do`/`while` loop
+exits. In between, `menu_pulldown()`'s own `menu_winrestore()` (called
+right after Fill/Clear is chosen, to close that pulldown) repaints the
+*pre-clear* canvas content back over the covered rows from its
+`menu_winsave()` backup — so the screen kept showing the stale,
+unmodified canvas under the reopened bar until the bar session itself
+ended and triggered the final blit.
+
+**Fix**: added `canvas_blit()` right after `canvas_clear()`/
+`canvas_fill()` in both cases. This matches an existing precedent already
+in the codebase: `fileio.c`'s Load actions (Load Screen/Combined/Project)
+are dispatched from this same `menu_run()` loop and already call
+`canvas_blit()` immediately after loading, for exactly the same reason —
+so the loaded screen is visible right away rather than only after
+exiting the bar. Clear/Fill had simply never picked up the same pattern.
+
+**Test coverage**: `tests/scripts/test_menus.sh` gained Scenario 8,
+specifically designed to catch this regression — it dispatches Fill via
+the same key sequence as the pre-existing Scenario 7, but with no
+trailing `\e` (ESC), so the dump happens while the bar is still open and
+waiting for the next key. Asserts the bar is still visible (row 0) *and*
+the fill is already showing on rows 1/26 — the previous code would have
+failed this assertion (rows showing stale pre-fill content) while
+Scenario 7 (which always exits the bar first) could never have caught
+it. Full suite: 182/182 → 185/185 (3 new assertions in this one script,
+no other script changed).
 
 **Popup background bleed-through fix (post-launch):**
 
@@ -1651,6 +1959,141 @@ touched again.
   the exact arithmetic, so the margin is visible next time someone
   touches a related constant.
 
+### File picker full navigation + Save-side directory browsing (2026-06-21)
+
+User request: file-picker navigation was previously limited to a single
+flat subdirectory descent (LEFT to ascend one level, ENTER to descend or
+select) floored at `app.homedir` — no way to reach the rest of the
+filesystem, switch drives, or create a directory; Save actions had no
+browsing at all (`fileio_get_filename()` just typed a bare name, always
+resolved against `app.homedir`). Explicit instruction: implement
+locifilemanager-v2's full navigation key set (left = parent, right =
+enter dir, top/bottom/pagedown/pageup, drive switch), skip copy/rename/
+delete, keep create-dir, and add directory browsing to the Save path too.
+
+- **New `app.filedir`** (`src/appstate.h`, `FILEDIR_MAXLEN=64`),
+  deliberately separate from `app.homedir`: `app.homedir` stays
+  boot-assets-only (splash/help screens, captured once at startup,
+  `homedir_join()`/`homedir_join_suffix()` unchanged); `app.filedir` is
+  the file picker's own last-navigated/confirmed directory, persisted
+  across File/Charset actions the same way `app.filename` already
+  persists. `src/homedir.c/h` gained the parallel
+  `filedir_init_default()` (defaults to `app.homedir`, or `"/"` if that's
+  empty too, the first time it's needed)/`filedir_join()`/
+  `filedir_join_suffix()`. Every `src/fileio.c` Load/Save call site now
+  resolves through `filedir_join_suffix()`, not `homedir_join_suffix()`
+  — this is a real behaviour change for Load, not just Save: previously
+  Load always re-resolved against `app.homedir` regardless of which
+  subdirectory the picker actually found the file in (silently relying
+  on `app.filename` carrying the subdirectory prefix instead); now
+  `app.filedir` carries the directory and `app.filename` is just the
+  base name.
+- **`src/filepicker.c` rewritten around a single `picker_engine(title,
+  filter, mode)`** shared by both public entry points: `filepicker_run()`
+  (`PICKER_MODE_FILE`, unchanged contract, used by every Load action) and
+  the new `filepicker_browse_dir()` (`PICKER_MODE_DIR` — `'s'` confirms
+  the currently-browsed directory into `app.filedir`; ENTER never selects
+  a file in this mode, only descends directories; files are still shown,
+  for context). `fileio_get_filename()` (`src/fileio.c`) now calls
+  `filepicker_browse_dir(MSG_FILE_PICKER_SAVEDIR)` first, aborting the
+  whole Save action on ESC there, before showing the existing filename
+  popup — so every Save action (Screen/Combined/Project, Charset Save
+  Standard/Alternate/Combined) gets directory browsing for free from this
+  one call site.
+- **Full key set** (locifilemanager-v2's `src/dir.c`, the primary
+  reference per explicit instruction): LEFT ascends to the parent
+  (`picker_path_ascend()`, floored at a drive's own root, drive-prefix-
+  aware — see below); RIGHT descends into a directory (an ENTER alias for
+  that one branch only — selecting a file still needs ENTER specifically,
+  matching the user's own framing "right to enter a dir"); `'t'`/`'b'`
+  jump to top/bottom (`picker_top()` O(1) via `picker_firstelement`,
+  `picker_bottom()` O(n) via repeated `picker_step_down()`); `'d'`/`'p'`
+  page down/up (`picker_pagedown()`/`picker_pageup()`, `PICKER_PAGE_ROWS`
+  steps via the same step helpers); `'\'` jumps to the current drive's
+  root; `'.'`/`','` cycle drives 0-9 (`picker_set_drive_root()`, builds
+  `"N:/"`, matching locifilemanager-v2's own next/prev-drive convention —
+  **no** `locicfg.validdev[]` availability check, unlike that reference;
+  cycling onto an empty/invalid drive just shows an empty listing, same
+  as any other empty directory, not specially handled); `'e'` creates a
+  subdirectory (`picker_make_dir()`, `cwin_textinput()` + `loci_mkdir()`,
+  then reloads the listing so it shows up immediately). Copy/rename/
+  delete were explicitly excluded, per the request.
+- **`picker_step_down()`/`picker_step_up()`** (new, factored out of what
+  was previously inline `KEY_DOWN`/`KEY_UP` handling) are the shared
+  per-element-move primitive every navigation key beyond plain
+  UP/DOWN builds on (top/bottom/pagedown/pageup) — avoids reimplementing
+  the `picker_cursorrow`/`picker_firstprint` scroll bookkeeping four
+  times.
+- **Drive-prefix-aware path floor**: `picker_path_ascend()` previously
+  only ever saw bare `"/..."` paths (LEFT was floored at `app.homedir`
+  well before reaching it) — detecting "found slash at index 0" as the
+  floor was sufficient. Now that `'.'`/`','` can put a `"N:/..."` path in
+  play, the floor slash sits at index 2 instead; naively truncating there
+  would leave `"N:"` (missing its trailing slash) rather than `"N:/"`.
+  Fixed by checking for the `N:/` prefix and adjusting the floor index
+  accordingly.
+- **Bare paths stay the default, drive-prefixed paths are opt-in**: a
+  real risk identified during design — if `app.filedir` defaulted to a
+  drive-prefixed path, every existing test (Phosphoric's `--loci-flash`
+  test mode expects bare, non-drive-prefixed paths, matching the
+  pre-existing `homedir_join()`/now `filedir_join()` empty-fallback
+  convention) would break. Resolved by keeping the *default* path format
+  exactly as before (bare `"/..."`, matching the existing fallback) and
+  only introducing `"N:/"` paths when the user explicitly presses
+  `'.'`/`','` — drive-switching is effectively a real-hardware-only
+  feature for now, consistent with this project's established convention
+  for LOCI-dependent features that Phosphoric's flash mode can't fully
+  exercise.
+- **Real design bug found and fixed while wiring up Save's directory
+  browser**: the original `picker_engine()` (and the `filepicker_run()`
+  it was adapted from) treated an empty directory listing as a hard
+  failure — `menu_messagepopup(MSG_FILE_NO_FILES)` and an immediate
+  return, before the user could press anything. Harmless for Load (an
+  empty directory genuinely has nothing to select, though it also
+  blocked navigating elsewhere from there, also fixed), but fatal for
+  Save: a freshly reset LOCI flash root has no files in it yet, so
+  `fileio_get_filename()`'s new directory-browse step aborted Save
+  *immediately*, before `'s'` could even be pressed to confirm the
+  directory. Fixed by making `picker_reload()` (and `picker_engine()`'s
+  own initial listing) always succeed visually — an empty directory just
+  renders as a blank list (`picker_present` left at 0, all the
+  XRAM-list-walking functions guard against that and no-op rather than
+  read XRAM address 0), and every navigation key (drive switch, `'\'`,
+  LEFT, ENTER-descend) keeps working from there. This also dropped a
+  pile of "reload failed, fall back to the previous path" error-recovery
+  branches that turned out to be solving a problem (a directory that
+  exists but legitimately has nothing in it) that was never actually an
+  error in the first place.
+- **Static-stack budget, same failure class as the homedir fix above**:
+  Oscar64's static stack usage is the sum of every simultaneously-live
+  function's locals along a call path, not a true runtime stack — adding
+  `picker_engine()`'s own large buffers (`path`/`name`/`newpath`, each up
+  to 64 bytes) on top of the buffers `picker_make_dir()` needs when
+  called from inside `picker_engine()`'s loop (and, separately, on top of
+  `fileio_get_filename()`'s own popup buffers, now that Save's call path
+  runs through `filepicker_browse_dir()` too) blew the same `error 3034:
+  Static stack usage exceeds stack segment` the homedir fix already hit
+  once. Fixed the same way: `picker_path`/`picker_before`/`picker_name`/
+  `picker_newpath` (engine) and `picker_mkdir_name`/`picker_mkdir_newpath`
+  (mkdir helper) are module-static buffers, accessed via local pointer
+  aliases (`char *path = picker_path;` etc.) so the rest of each
+  function's logic reads unchanged. None of these functions are
+  reentrant or recursive, so sharing static storage is safe.
+- **Test coverage**: `tests/scripts/test_fileio_traffic.sh`'s Save
+  scenarios each gained one `\p1s` keypress (confirming the
+  default/current directory in the new browse-dir popup) right after
+  opening the Save action and before typing the filename, with cycle
+  budgets bumped accordingly — all 18 assertions still pass. The new
+  navigation keys themselves (top/bottom/pagedown/pageup/drive-switch/
+  mkdir/RIGHT-descend) aren't yet covered by an automated test, only by
+  direct manual Phosphoric `--loci-flash` captures during development
+  (confirmed: `'e'` + typed name + ENTER creates a subdirectory on the
+  host filesystem and the listing reloads to show it; a subsequent ENTER
+  descends into it; `'s'` then confirms it as the save directory, and the
+  resulting file lands inside it on the host filesystem, exactly as
+  expected end-to-end). Full suite: 182/182, unchanged in count (no new
+  scripts added this pass).
+
 
 ## Boot, Help & Information
 
@@ -1699,7 +2142,7 @@ peripheral-specific knowledge).
 `src/help.c/h` (new; runtime LOCI loads -- see "Reverted from `#embed`
 to runtime LOCI loads" below for why): `help_show(screennumber)` shows one of 4 help screens (1=Main,
 2=Character editor, 3=Select/Move/Line-Box, 4=Write — ported from V1's
-`helpscreen_load(screennumber)`), each a raw 1080-byte (40x27)
+`helpscreen_load(screennumber)`), each a raw 1120-byte (40x28)
 screencode dump loaded from LOCI at runtime as `OSEHS<n>.BIN` (matching
 V1's own filenames exactly, `loci_open`/`loci_read`/`loci_close`).
 `charsetswap_enter()`/`exit()` bracket the raw `$BB80` blit (same
@@ -1760,9 +2203,10 @@ screens needed to survive. Reverted to runtime LOCI loads, regaining
 the ~2.2KB of binary size (and the larger code/data/bss headroom) the
 embedding cost, and — the user's actual motivation for reopening this —
 making the title image and help screens **editable directly in OSE
-itself** (dog-fooding: OSE can load/save its own bare 1080-byte screen
+itself** (dog-fooding: OSE can load/save its own bare 1120-byte screen
 format via File > Load/Save Screen, and these 5 assets are now in
-exactly that format).
+exactly that format -- regenerated at 1120 bytes when VIEWPORT_HEIGHT
+grew 27->28, see "Memory Layout" below).
 
 - **Renamed to match V1's own filenames exactly**: `assets/
   OSEforLOCI-Title.bin` → `assets/OSETSC.BIN`; `assets/
@@ -1814,7 +2258,7 @@ exactly that format).
   `idi8b_logo[]` (520-byte logo artwork) and QR code in `src/info.c`
   stay `#embed`'d as plain static arrays — small, and not part of this
   reversal's "make it editable in OSE" motivation (neither is a
-  1080-byte screen dump OSE's own Save/Load Screen format could load
+  1120-byte screen dump OSE's own Save/Load Screen format could load
   back anyway).
 
 ### Information menu
@@ -1838,9 +2282,12 @@ permanent stubs since the menu system was first introduced.
   `/usr/share/nodejs/qrcode-terminal/vendor/QRCode/`, just a different
   `TEXT` constant — pasted into `info.c` as a static array, a one-time
   generation step, not a build dependency). Any key advances each page;
-  `menu_winsave(0, VIEWPORT_HEIGHT+1, 1)`/`menu_winrestore()` (main-RAM,
+  `menu_winsave(0, VIEWPORT_HEIGHT, 1)`/`menu_winrestore()` (main-RAM,
   not `locifilemanager-v2`'s overlay-RAM `menu_popup_open`/`close()`)
-  save/restore the whole screen around both pages.
+  save/restore the whole screen around both pages (no `+1` -- the
+  viewport spans the full 28-row screen itself since VIEWPORT_HEIGHT
+  27->28, see "Memory Layout" below, so there's no separate statusbar
+  row beyond it to add for any more).
   **An earlier draft of this popup** used OSE's own title-screen image
   (now `assets/OSETSC.BIN`, see "Boot splash" above) as a dedicated
   first page instead of the `idi8b_logo`, with the version/credits text
@@ -1862,44 +2309,54 @@ permanent stubs since the menu system was first introduced.
   testable (a real reset is indistinguishable from a crash to the test
   harness from outside).
 
-**`idi8b_logo[]`'s Alt-charset dependency, protected (post-launch
-fix)**: `idi8b_logo[]` embeds `A_ALT` attribute bytes (e.g. byte index 5
-of each of its first ~11 rows) before drawing block/mosaic glyph codes
-(`0x35` etc.) — its colourful block-letter shapes depend on
-`CHARSET_ALT` holding the Oric ROM's stock semigraphics font, not
-whatever the user may have redefined via the character editor's Alt
-mode. The general charset-swap mechanism (next section) deliberately
-only protects `CHARSET_STD`, so this logo was a latent corruption risk:
-edit any Alt-charset glyph, then open Information > Version, and the
-logo would render with the user's edited glyphs instead of the
-original artwork (never reported as an actual visible bug — found by
-inspecting the embedded `A_ALT` bytes and the charset-swap mechanism's
-own documented Std-only scope — but the mechanism for it was real).
+**`idi8b_logo[]`'s Alt-charset dependency — two rounds (2026-06-20/21)**:
+`idi8b_logo[]` embeds `A_ALT` attribute bytes before drawing block/mosaic
+glyph codes — its colourful block-letter shapes depend on `CHARSET_ALT`
+holding *something* specific.
 
-Fixed with `charsetswap_alt_enter()`/`charsetswap_alt_exit()`
-(`src/charsetswap.c/h`, new) — see "Charset-swap mechanism" above for
-why `CHARSETROM` ($FC78) is a valid restore source for `CHARSET_ALT`
-too, not just `CHARSET_STD` (confirmed via
-`~/.claude/oric_atmos_reference.md`: the Oric ROM's own boot sequence
-copies the *same* `$FC78-$FF77` data to *both* `$B400` and `$B800` at
-RESET — Alt's "mosaic" look comes entirely from the `A_ALT` attribute
-changing how the ULA *interprets* those bytes, not from a separate ROM
-table). `info_version_show()` brackets the logo's on-screen lifetime
-(from just before the blit until the user advances past page 1 — not
-just the instant of the blit, since the ULA re-renders from charset RAM
-every frame) with `charsetswap_alt_enter()`/`_exit()`, restoring the
-user's live Alt edits before page 2 (which doesn't use Alt at all).
-Costs one new 640-byte static buffer (`backup_alt_current`,
-`src/charsetswap.c`) — confirmed via the build's `.map` file output
-that this left ~5.05KB of main-RAM headroom still free (down from
-~5.68KB before this fix), comfortably within budget. No permanent
-"stock Alt charset" snapshot buffer was needed — restoring directly
-from `CHARSETROM` on demand (exactly how `charsetswap_enter()` already
-restores `CHARSET_STD`) is sufficient and halves the RAM cost a naive
-boot-time-snapshot approach would have needed. Verified via Phosphoric
-screenshot: the logo still renders correctly through this new code
-path (confirming `CHARSETROM` really is byte-identical to what boot
-already put in `CHARSET_ALT`).
+**Round 1 (2026-06-20)**: added `charsetswap_alt_enter()`/`charsetswap_
+alt_exit()` (`src/charsetswap.c/h`) to force `CHARSET_ALT` to
+`CHARSETROM`'s content around this popup, on the theory (citing
+`~/.claude/oric_atmos_reference.md`'s claim that Oric ROM boot copies the
+same `$FC78-$FF77` data to both `$B400` and `$B800`) that this would
+reproduce the logo's correct boot-time appearance. **Verified only via a
+Phosphoric screenshot at the time — never on real hardware.** Reverted
+2026-06-21 (first pass) after real-hardware testing showed it broke the
+logo — readable ROM-standard-font shapes instead of mosaic blocks.
+
+**Round 2 (2026-06-21, same day, corrected)**: removing the mechanism
+entirely *also* didn't fix it — the logo still showed Standard-style
+shapes with no charset-swap active at all. Real diagnosis (from the
+user): `CHARSET_ALT`'s bitmap content genuinely doesn't differ from
+`CHARSET_STD`'s by the time this popup runs in a real session, so
+`A_ALT`/`A_STD` render identically — confirming the `CHARSETROM`-equals-
+boot-time-Alt-content claim doesn't hold in practice (either wrong
+outright, or "boot" in that claim means a true cold RESET, which differs
+from however a `.tap` actually starts a session on this hardware). The
+user explicitly confirmed protection *is* still needed, just not sourced
+from `CHARSETROM`.
+
+**Fix (round 2)**: `charsetswap_capture_boot_alt()` (`src/charsetswap.c`,
+new) snapshots `CHARSET_ALT` into a new 640-byte `backup_alt_boot`
+buffer, called as **literally the first statement in `main()`**
+(`src/main.c`) — before anything else in the session can write to
+`CHARSET_ALT`. `charsetswap_alt_enter()`/`charsetswap_alt_exit()`
+restored, now sourcing from this captured snapshot instead of
+`CHARSETROM`. **Confirmed fixed on real hardware** — the logo renders
+with genuine mosaic blocks again.
+
+**Round 3 (2026-06-21, same day, generalized)**: confirming round 2's fix
+also surfaced a related gap — the user found that loading a project with
+an *edited* Alt charset made the menu/dialogs around it misbehave the
+same way Std charset changes did (see "Charset-swap mechanism" above's
+mid-popup-load re-sync writeup), and asked for the same Std+Alt
+protection to apply to *every* popup, not just this one. `charsetswap_alt_
+enter()`/`charsetswap_alt_exit()` were folded into the general
+`charsetswap_enter()`/`exit()` (now handling both banks for every popup
+via `menu_winsave(..., 1)`) and deleted as separate functions;
+`info_version_show()` no longer calls them explicitly — `menu_winsave(0,
+VIEWPORT_HEIGHT, 1)` already covers it. See "Charset-swap mechanism"
+above for the full merged design.
 
 
 ## Keyboard
@@ -2028,7 +2485,7 @@ make test         # full automated Phosphoric test suite (test-boot, test-menus,
                   # path) and test-fileio-traffic (uses --loci-flash DIR
                   # instead, a real host filesystem directory for
                   # byte-level LOCI file I/O assertions).
-                  # Current total: 182/182.
+                  # Current total: 185/185.
 make test-boot    # headless boot smoke test (splash + canvas/statusbar render)
 make test-capture CYCLES=N TYPEKEYS='...'
                   # calibration helper: dumps tests/out/capture.bin + .png
@@ -2132,7 +2589,7 @@ tag) as a revert point.
   so capping undo at 6KB costs nothing extra versus a bigger allocation;
   Clear/Fill is made explicitly non-undoable either way (see "Canvas
   undo/redo" above). 6KB comfortably covers Move-mode's per-shift
-  snapshots (bounded by the *viewport*, not the canvas — always 1080
+  snapshots (bounded by the *viewport*, not the canvas — always 1120
   bytes regardless of canvas size — 5-6 consecutive shifts) and any
   realistic Select/Line-Box fill.
 - **`screenmap` is a pointer macro, not a real array**:
@@ -2197,7 +2654,7 @@ tag) as a revert point.
 src/
   main.c          Application entry point: splash, canvas/statusbar init, editor_run()
   appstate.h      Global AppState struct (canvas size, cursor, viewport, mode, ...)
-  canvas.c/h      Flat 40x27 screenmap[] buffer + raw $BB80 blit (bypasses charwin),
+  canvas.c/h      Flat 40x28 screenmap[] buffer + raw $BB80 blit (bypasses charwin),
                   canvas_resize() (up to CANVAS_MAX_SIZE)
   statusbar.c/h   Row-27 statusbar (OricCharWin, Mode/XY/C/S/I/P + A/D/B flags,
                   see "Main-mode attribute-selection keys and statusbar

@@ -31,7 +31,7 @@
 #define MENUBAR_MAXOPTIONS   4
 #define MENUBAR_MAXLENGTH   12   // char[] size for each bar title
 #define PULLDOWN_NUMBER      5
-#define PULLDOWN_MAXOPTIONS  7   // grew from 6 for Charset > Reset Std->ROM
+#define PULLDOWN_MAXOPTIONS  8   // grew from 7 for Charset > Reset Alt->ROM
 #define PULLDOWN_MAXLENGTH  17   // 16 visible chars + NUL
 
 #define MENU_WIN_DEPTH       9   // maximum nested window saves

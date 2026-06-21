@@ -11,6 +11,11 @@ OricCharWin statusbar_win;
 // Width of the Mode field (cols 0-9), blank-padded -- see statusbar_draw().
 #define STATUSBAR_MODE_WIDTH 10
 
+// Screen row the statusbar overlays -- the viewport's own last row, not a
+// row beyond it (the viewport now spans the full 28-row screen, see
+// appstate.h's VIEWPORT_HEIGHT comment).
+#define STATUSBAR_ROW (VIEWPORT_HEIGHT - 1)
+
 // When set (statusbar_set_override()), replaces the Mode field's normal
 // mode_name(app.mode) text -- ported from V1's lineandbox()/selectmode(),
 // which overwrite programmode itself with a key-hint string (e.g.
@@ -19,29 +24,53 @@ OricCharWin statusbar_win;
 // by statusbar_draw()'s existing fixed-width loop.
 static const char *mode_override = nullptr;
 
+// Tracks whether the statusbar is currently auto-hidden (cursor sitting on
+// STATUSBAR_ROW while app.showstatusbar is on) -- see statusbar_draw().
+static uint8_t autohidden;
+
 /**
- * Initialise the row-27 statusbar window and draw its initial content.
- * Called once at startup.
+ * Initialise the statusbar window (overlaying the viewport's last row) and
+ * draw its initial content. Called once at startup.
  *
  * @return (none)
  */
 void statusbar_init(void)
 {
-    cwin_init(&statusbar_win, 2, VIEWPORT_HEIGHT, 38, 1, A_FWBLACK, A_BGWHITE);
+    cwin_init(&statusbar_win, 2, STATUSBAR_ROW, 38, 1, A_FWBLACK, A_BGWHITE);
     statusbar_draw();
 }
 
 /**
  * Redraw the statusbar with the current cursor position, the screencode
  * under the cursor, and the current plot attributes (screencode/glyph,
- * ink/paper colour incl. swatches, and altchar/double/blink flags). No-op
- * if the statusbar is currently hidden (app.showstatusbar == 0).
+ * ink/paper colour incl. swatches, and altchar/double/blink flags).
+ *
+ * No-op if the statusbar is currently hidden (app.showstatusbar == 0) --
+ * STATUSBAR_ROW already shows real canvas content in that case (see
+ * statusbar_show()). Also auto-hides whenever the cursor is on
+ * STATUSBAR_ROW, even if app.showstatusbar is on (found 2026-06-21: this
+ * is the only screen row the cursor could otherwise never reach, since the
+ * statusbar used to permanently occupy a row beyond the viewport instead
+ * of the viewport's own last row) -- canvas_blit() reveals the real
+ * content there the moment the cursor arrives; moving away restores the
+ * statusbar normally on the next call.
  *
  * @return (none)
  */
 void statusbar_draw(void)
 {
     if (!app.showstatusbar) return;
+
+    if (app.cursor_y == STATUSBAR_ROW)
+    {
+        if (!autohidden)
+        {
+            canvas_blit();
+            autohidden = 1;
+        }
+        return;
+    }
+    autohidden = 0;
 
     cwin_clear(&statusbar_win);
 
@@ -75,7 +104,13 @@ void statusbar_draw(void)
 
 /**
  * Toggle the statusbar on or off (FUNCT+6). When turning on, redraws its
- * content; when turning off, blanks row 27 of screen RAM directly.
+ * content (or, if the cursor is on STATUSBAR_ROW, leaves the real canvas
+ * content showing there via the same auto-hide path statusbar_draw()
+ * already uses). When turning off, reveals the real canvas content at
+ * STATUSBAR_ROW -- it's a genuine viewport row now, not a dedicated
+ * statusbar-only row, so blanking it with spaces (the old behaviour, back
+ * when it was a separate row beyond the viewport) would erase real canvas
+ * content.
  *
  * @param on 1 to show the statusbar, 0 to hide it.
  * @return (none)
@@ -90,9 +125,8 @@ void statusbar_show(uint8_t on)
     }
     else
     {
-        uint8_t *row = (uint8_t *)TEXTVRAM + VIEWPORT_HEIGHT * SCREEN_COLS;
-        for (uint8_t x = 0; x < SCREEN_COLS; x++)
-            row[x] = CH_SPACE;
+        autohidden = 1;
+        canvas_blit();
     }
 }
 

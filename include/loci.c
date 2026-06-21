@@ -1078,14 +1078,32 @@ int16_t loci_mkdir(const char *path)
  *             a NUL terminator.
  * @return (none) -- result is written to buf.
  */
-// getcwd protocol (from initcwd.s in sodiumlb/loci-rom):
-//   ax = max_length (len-1); call MIA_OP_GETCWD; then pop bytes from XSTACK
-//   until '\0' or max reached.
+// getcwd protocol (from initcwd.s in sodiumlb/loci-rom): confirmed via
+// the proven-working nonworkingcc65 branch's libsrc/getcwd_xram.s, which
+// loads correctly on the same real hardware this is failing on -- ax is
+// NOT "the caller's buffer length minus one" (this function's own
+// previous behaviour, and a real bug found 2026-06-21): the reference
+// implementation always passes a hardcoded 255 here regardless of the
+// destination buffer's actual size, then separately caps how many bytes
+// it copies out to its own buffer length. Passing this codebase's much
+// smaller HOMEDIR_MAXLEN-1 (63) instead of 255 is suspected to be why
+// MIA_OP_GETCWD was erroring out on real hardware (title screen/help
+// screens never finding a usable app.homedir) while the reference
+// implementation's identical-firmware call succeeds.
 void loci_getcwd(char *buf, uint8_t len)
 {
     uint8_t i = 0;
-    mia_set_ax((uint16_t)(len - 1));
-    mia_call_int_errno(MIA_OP_GETCWD);
+    mia_set_ax(255);
+    if (mia_call_int_errno(MIA_OP_GETCWD) < 0)
+    {
+        // On error, the firmware may not have pushed anything onto
+        // XSTACK at all -- don't pop from it (found 2026-06-21: the
+        // unconditional pop below was reading whatever stale XSTACK
+        // content happened to be left over from an unrelated prior op,
+        // not a real empty/terminated path).
+        buf[0] = '\0';
+        return;
+    }
     while (i < (uint8_t)(len - 1))
     {
         uint8_t ch = MIA.xstack;

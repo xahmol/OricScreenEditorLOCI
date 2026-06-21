@@ -202,8 +202,17 @@ void keyb_scan(void)
         sta     [0x030c]
 
         // Restore row (Port B write for AY above may disturb bits 0-2)
+        // stx _kbz1 here (re-storing X, unchanged since the row-level
+        // store above) is redundant on paper -- but the canonical OSDK
+        // reference (Oric-Software-Development-Kit/Keyboard-FullMatrix,
+        // keyboard.s) re-executes the equivalent "stx zpTemp02" on every
+        // column iteration, not just once per row. Matched exactly
+        // 2026-06-21 as a final, zero-cost experiment for the still-
+        // unexplained real-hardware '=' (row7/col6) bug -- see memory
+        // equals_plus_key_not_recognized.
         lda     [0x0300]
         and     #248             // $F8
+        stx     _kbz1
         ora     _kbz1
         sta     [0x0300]
 
@@ -316,8 +325,19 @@ uint8_t keyb_decode(void)
  * single spurious no-key poll is treated as a continuation of the held key,
  * not a release), and a new key is only accepted once it has been decoded
  * identically for PRESS_DEBOUNCE consecutive polls (filtering a single-poll
- * torn-matrix-read artifact from a 2-key combo). Once accepted, a key is
- * returned immediately, suppressed for REP_DELAY polls, then repeats every
+ * torn-matrix-read artifact from a 2-key combo). A momentary single
+ * no-key poll (matrix bounce) does NOT reset this candidate count back to
+ * 0 -- only a *different* nonzero key arriving does -- so a key whose
+ * contact chatters briefly while held still accumulates toward
+ * PRESS_DEBOUNCE instead of restarting from scratch every time (found
+ * 2026-06-21: an unconditional reset-on-any-zero-poll here was the reason
+ * '=' (row7/col6) never registered at all on one user's real hardware,
+ * even held continuously -- decode_normal[]/decode_shifted[] are
+ * byte-identical to locifilemanager-v2's, which has no candidate-debounce
+ * at all and no such report for the same physical key, pointing at this
+ * debounce rather than the decode tables or scan timing). Once accepted, a
+ * key is returned immediately, suppressed for REP_DELAY polls, then
+ * repeats every
  * REP_RATE polls while held. Updates the global keyb_char to the same value
  * as the return value.
  *
@@ -329,10 +349,29 @@ uint8_t keyb_poll(void)
     keyb_scan();
     uint8_t ch = keyb_decode();
 
+    // TEMPORARY diagnostic (2026-06-21): '=' still doesn't register on
+    // real hardware even after the candidate-debounce tolerance fix --
+    // live-monitor the RAW decode (before any debounce/repeat logic) at
+    // the top-right corner (row 0, cols 38-39) so we can see, in real
+    // time while holding the key, whether keyb_decode() ever produces
+    // 0x3D at all, or something else/nothing. Updates every poll, not
+    // gated by debounce, so it reflects keyb_decode()'s raw output
+    // exactly. Remove once diagnosed -- see memory
+    // equals_plus_key_not_recognized.
+    {
+        uint8_t *dbg = (uint8_t *)TEXTVRAM + 38;
+        uint8_t  hi  = (uint8_t)(ch >> 4);
+        uint8_t  lo  = (uint8_t)(ch & 0x0F);
+        dbg[0] = (uint8_t)(hi < 10 ? '0' + hi : 'A' + hi - 10);
+        dbg[1] = (uint8_t)(lo < 10 ? '0' + lo : 'A' + lo - 10);
+    }
+
     if (!ch)
     {
-        candidate       = KEY_NONE;
-        candidate_count = 0;
+        // Deliberately does NOT reset candidate/candidate_count here --
+        // see this function's doc comment. A momentary bounce-induced
+        // zero-poll should not throw away progress already made toward
+        // PRESS_DEBOUNCE for a key that's still genuinely being held.
         if (release_count > 0)
         {
             release_count--;

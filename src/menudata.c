@@ -15,10 +15,12 @@
 #include "strings.h"
 #include "menu.h"
 #include "menudata.h"
+#include "charsetswap.h"
 #include "fileio.h"
 #include "input.h"
 #include "undo.h"
 #include "info.h"
+#include "loci.h"
 
 // -------------------------------------------------------------------------
 // Menu bar and pulldown tables
@@ -32,7 +34,7 @@ MenuBar menubar = {
 
 // pulldown_titles[0][0]/[0][1] (Width:/Height:) are rewritten by
 // update_size_titles() whenever the canvas size changes.
-char pulldown_options[PULLDOWN_NUMBER] = { 4, 6, 7, 2, 2 };
+char pulldown_options[PULLDOWN_NUMBER] = { 4, 6, 8, 2, 2 };
 
 char pulldown_titles[PULLDOWN_NUMBER][PULLDOWN_MAXOPTIONS][PULLDOWN_MAXLENGTH] = {
     // 0 -- Screen
@@ -42,7 +44,8 @@ char pulldown_titles[PULLDOWN_NUMBER][PULLDOWN_MAXOPTIONS][PULLDOWN_MAXLENGTH] =
       MSG_FILE_SAVE_COMBINED, MSG_FILE_LOAD_COMBINED },
     // 2 -- Charset
     { MSG_CHARSET_LOAD_STD, MSG_CHARSET_LOAD_ALT, MSG_CHARSET_SAVE_STD, MSG_CHARSET_SAVE_ALT,
-      MSG_CHARSET_LOAD_COMBINED, MSG_CHARSET_SAVE_COMBINED, MSG_CHARSET_RESET_STD },
+      MSG_CHARSET_LOAD_COMBINED, MSG_CHARSET_SAVE_COMBINED, MSG_CHARSET_RESET_STD,
+      MSG_CHARSET_RESET_ALT },
     // 3 -- Information
     { MSG_INFO_VERSION, MSG_INFO_EXIT },
     // 4 -- Yes/No
@@ -187,8 +190,10 @@ void goto_dialog(void)
  * charsetswap.c already uses for popup chrome), instead of the
  * character editor's glyph-by-glyph 's' key. Sets app.stdchanged so
  * File > Save Project knows the standard charset changed this session.
- * Std-only, same as every other ROM-restore path in this codebase (the
- * Oric ROM has no alternate-charset table to restore from).
+ * Std-only counterpart of charset_reset_alt() below -- CHARSETROM is a
+ * genuine, unambiguous "the real ROM standard font" source for Std (no
+ * real/boot-time-content distinction the way Alt has, see
+ * charsetswap.c's doc comments).
  *
  * @return (none)
  */
@@ -196,8 +201,40 @@ static void charset_reset_std(void)
 {
     if (menu_areyousure(MSG_CHARSET_RESETWARN) != 1) return;
 
+    // CHARSETROM ($FC78) lives inside $C000-$FFFF, the same range
+    // overlay RAM occupies for the whole session -- without this
+    // bracket, this reads canvas/undo overlay data instead of the real
+    // ROM font ("garbage", user-reported 2026-06-21). Every other
+    // CHARSETROM read in this codebase (charsetswap_enter()) already
+    // brackets it the same way; this call site was missed.
+    disable_overlay_ram();
     charset_load(CHARSET_STD, (const uint8_t *)CHARSETROM);
+    enable_overlay_ram();
+    charsetswap_mark_changed();
     app.stdchanged = 1;
+}
+
+/**
+ * Charset > Reset Alt->ROM (added 2026-06-21, mirroring Reset Std->ROM
+ * above): after a menu_areyousure() confirmation, restores CHARSET_ALT
+ * from the boot-time snapshot charsetswap_capture_boot_alt() took at the
+ * very start of main() -- NOT from CHARSETROM. Unlike Std, CHARSETROM
+ * does not reproduce a useful result for Alt on real hardware (see
+ * charsetswap.c's doc comments, found via the idi8b_logo[] rendering
+ * bug) -- the boot snapshot is the only known-good source. No
+ * disable_overlay_ram()/enable_overlay_ram() bracket needed here (unlike
+ * Std's CHARSETROM read above): the snapshot buffer is plain main RAM,
+ * not inside $C000-$FFFF.
+ *
+ * @return (none)
+ */
+static void charset_reset_alt(void)
+{
+    if (menu_areyousure(MSG_CHARSET_RESETWARN) != 1) return;
+
+    charsetswap_reset_alt_from_boot();
+    charsetswap_mark_changed();
+    app.altchanged = 1;
 }
 
 // -------------------------------------------------------------------------
@@ -247,11 +284,13 @@ void menu_run(void)
         case 13:
             undo_snapshot(0, 0, app.canvas_width, app.canvas_height);
             canvas_clear();
+            canvas_blit();
             break;
 
         case 14:
             undo_snapshot(0, 0, app.canvas_width, app.canvas_height);
             canvas_fill(app.plotscreencode);
+            canvas_blit();
             break;
 
         case 21:
@@ -304,6 +343,10 @@ void menu_run(void)
 
         case 37:
             charset_reset_std();
+            break;
+
+        case 38:
+            charset_reset_alt();
             break;
 
         case 41:
