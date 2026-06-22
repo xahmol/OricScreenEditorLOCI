@@ -35,8 +35,16 @@ static const uint8_t decode_normal[64] = {
     'u', 'i', 'o', 'p',  0,   KEY_DEL, ']', '[',
     // Row 6: Y   H   G   E  RALT  A    S   W
     'y', 'h', 'g', 'e',  0,  'a', 's', 'w',
-    // Row 7: 8   L   0   /  RSHIFT RETURN  =   --
-    '8', 'l', '0', '/',  0,   KEY_ENTER, '=', 0,
+    // Row 7: 8   L   0   /  RSHIFT RETURN  --  =
+    // '=' is col7, not col6 -- confirmed against the OSDK ART20 matrix
+    // reference, the OSDK Keyboard-FullMatrix demo, and the original
+    // LOCI ROM source this table is transcribed from (all three agree).
+    // A col6/col7 transcription slip here (col6 is unused either way)
+    // went unnoticed for a long time because real hardware always
+    // correctly sensed the keypress -- it just decoded to the wrong,
+    // unused table slot. See memory equals_plus_key_not_recognized for
+    // the full investigation.
+    '8', 'l', '0', '/',  0,   KEY_ENTER, 0, '=',
 };
 
 static const uint8_t decode_shifted[64] = {
@@ -54,8 +62,10 @@ static const uint8_t decode_shifted[64] = {
     'U', 'I', 'O', 'P',  0,   KEY_DEL, '}', '{',
     // Row 6: Y   H   G   E  RALT  A    S   W
     'Y', 'H', 'G', 'E',  0,  'A', 'S', 'W',
-    // Row 7: *   L   )   ?  RSHIFT RETURN  +  --
-    '*', 'L', ')', '?',  0,   KEY_ENTER, '+', 0,
+    // Row 7: *   L   )   ?  RSHIFT RETURN  --  +
+    // Same col6/col7 fix as decode_normal[] above -- '+' (shifted '=')
+    // moves to col7, col6 unused.
+    '*', 'L', ')', '?',  0,   KEY_ENTER, 0, '+',
 };
 
 // FUNCT + digit maps: FUNCT+1=F1, FUNCT+2=F2, ... FUNCT+9=F9, FUNCT+0=F10 --
@@ -201,18 +211,17 @@ void keyb_scan(void)
         lda     #221             // $DD
         sta     [0x030c]
 
-        // Restore row (Port B write for AY above may disturb bits 0-2)
-        // stx _kbz1 here (re-storing X, unchanged since the row-level
-        // store above) is redundant on paper -- but the canonical OSDK
-        // reference (Oric-Software-Development-Kit/Keyboard-FullMatrix,
-        // keyboard.s) re-executes the equivalent "stx zpTemp02" on every
-        // column iteration, not just once per row. Matched exactly
-        // 2026-06-21 as a final, zero-cost experiment for the still-
-        // unexplained real-hardware '=' (row7/col6) bug -- see memory
-        // equals_plus_key_not_recognized.
+        // Restore row (Port B write for AY above may disturb bits 0-2).
+        // _kbz1 was already stored once at the top of this row (the
+        // "Set row select" block above) and is unchanged since -- no
+        // need to re-store it here. A redundant "stx _kbz1" briefly
+        // lived on this line, matching the OSDK reference keyboard.s's
+        // literal "stx zpTemp02" on every column iteration -- removed
+        // again to keep this routine byte-for-byte identical to
+        // locifilemanager-v2's keyb_scan() (it cost 3 cycles/column for
+        // no benefit). See memory equals_plus_key_not_recognized.
         lda     [0x0300]
         and     #248             // $F8
-        stx     _kbz1
         ora     _kbz1
         sta     [0x0300]
 
@@ -348,23 +357,6 @@ uint8_t keyb_poll(void)
 {
     keyb_scan();
     uint8_t ch = keyb_decode();
-
-    // TEMPORARY diagnostic (2026-06-21): '=' still doesn't register on
-    // real hardware even after the candidate-debounce tolerance fix --
-    // live-monitor the RAW decode (before any debounce/repeat logic) at
-    // the top-right corner (row 0, cols 38-39) so we can see, in real
-    // time while holding the key, whether keyb_decode() ever produces
-    // 0x3D at all, or something else/nothing. Updates every poll, not
-    // gated by debounce, so it reflects keyb_decode()'s raw output
-    // exactly. Remove once diagnosed -- see memory
-    // equals_plus_key_not_recognized.
-    {
-        uint8_t *dbg = (uint8_t *)TEXTVRAM + 38;
-        uint8_t  hi  = (uint8_t)(ch >> 4);
-        uint8_t  lo  = (uint8_t)(ch & 0x0F);
-        dbg[0] = (uint8_t)(hi < 10 ? '0' + hi : 'A' + hi - 10);
-        dbg[1] = (uint8_t)(lo < 10 ? '0' + lo : 'A' + lo - 10);
-    }
 
     if (!ch)
     {

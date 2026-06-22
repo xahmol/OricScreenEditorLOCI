@@ -30,12 +30,10 @@
  * Keyboard-before-joystick (not the reverse): ijk_read() (include/ijk.c)
  * shares VIA Port A with the keyboard scanner (include/keyboard.c's
  * keyb_scan()). This order matches locifilemanager-v2's own fm_getkey().
- * (Investigated 2026-06-21 as a candidate fix for '=' never registering
- * on real hardware -- ruled out via a temporary build with IJK disabled
- * entirely, which showed '=' still failing, so this is not that bug's
- * cause. Kept anyway since it matches the proven reference and has no
- * observed downside. See memory equals_plus_key_not_recognized for the
- * still-open investigation.)
+ * (Was investigated as a candidate fix for '=' never registering on
+ * real hardware and ruled out -- the actual cause was a decode-table
+ * transcription error, see memory equals_plus_key_not_recognized. Kept
+ * anyway since it matches the proven reference and has no downside.)
  *
  * @return The key code read (keyboard key code, or the joystick's
  *         mapped equivalent).

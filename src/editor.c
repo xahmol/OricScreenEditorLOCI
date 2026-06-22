@@ -108,6 +108,7 @@ void editor_run(void)
             break;
 
         case '+':
+        case '=':
             app.plotscreencode = (app.plotscreencode < PLOT_MAX) ? app.plotscreencode + 1 : PLOT_MIN;
             break;
 

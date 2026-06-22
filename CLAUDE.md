@@ -2422,6 +2422,106 @@ scenario in `test_help_funct8.sh` now sends an explicit second key to
 dismiss it, and a new scenario asserts the open-and-stays-open behavior
 directly as a regression test for the fix itself.
 
+### Standalone keyboard matrix test (`kbtest/`)
+
+A separate, minimal Oscar64 program (`kbtest/src/main.c` + its own
+`kbtest/Makefile`) that isolates `include/keyboard.c`'s `keyb_scan()`/
+`keyb_decode()` from everything else in the full OricScreenEditorLOCI
+binary: no LOCI device requirement, no overlay RAM, no IJK joystick, no
+charwin/menu system, no canvas. Builds to ~1.7KB (vs OSE-LOCI's ~34KB) via
+`-i=../include` (reuses `include/keyboard.c/h` and `include/oric.h/
+oric_crt.c` verbatim — never copied, so there's no risk of drift between
+the scanner code under test and the scanner code in the real program).
+
+Originally built to help diagnose a real-hardware-only bug where `=`
+never registered (resolved — see "The `=`/`+` key bug" below); kept as a
+permanent, reusable tool for diagnosing any future keyboard matrix issue
+on real hardware, independent of the full editor's size and complexity.
+
+**What it shows**: continuously, every single scan (calls `keyb_scan()`/
+`keyb_decode()` directly, not `keyb_poll()`, so there's no debounce/repeat
+between the display and the scanner's truly raw output) — the full 8x8
+`keyb_matrix[]` as 8 rows of 8 bits plus each row's hex byte, the decoded
+character (hex + glyph), and the four modifier flags.
+
+**Build/run**: `cd kbtest && make` produces `build/kbtest.tap`; `make run`
+launches it in Oricutron (works fine there — this program has no LOCI
+dependency at all, unlike the main OSE-LOCI binary, which can only ever
+show the LOCI-absent gate in Oricutron). For real hardware, transfer
+`kbtest/build/kbtest.tap` the same way `oseloci.tap` normally gets
+transferred.
+
+**Not part of the main editor build, but distributed via `make usb`** —
+`kbtest/` has no presence in `make`/`make LANG=FR`/`make test`/`make
+run` (it's a standalone diagnostic tool, not a feature of the editor),
+but the root `Makefile`'s `usb` target gained a `kbtest-build`
+prerequisite (`$(MAKE) -C kbtest`) and now copies `kbtest/build/
+kbtest.tap` to `$(USBPATH)` alongside `oseloci.tap`/`oseloci_fr.tap` —
+so a fresh USB-stick distribution always carries this tool too, ready
+to transfer to real hardware the same way the main program is.
+
+### The `=`/`+` key bug (resolved 2026-06-22)
+
+`=`/`+` never registered on real hardware, in any mode, for the entire
+life of this project — extensively investigated (17 rounds: scan
+timing, debounce, IJK interaction, LOCI file I/O, overlay-RAM state,
+zero-page allocation, VIA DDRA configuration, and a compiled-code
+cycle-count divergence from the sibling `locifilemanager-v2` project, all
+ruled out one by one with `kbtest/` above and a live raw-matrix-byte
+diagnostic) before the actual cause was found.
+
+**Root cause**: a one-character transcription error in
+`decode_normal[]`/`decode_shifted[]` (`include/keyboard.c`). The real
+Oric Atmos matrix has `=`/`+` at row 7, **column 7** — confirmed
+independently by the OSDK ART20 matrix reference
+(`https://osdk.org/index.php?page=articles&ref=ART20`), the OSDK
+Keyboard-FullMatrix demo's own on-screen matrix display, and the
+original LOCI ROM source (`sodiumlb/loci-rom`) this table is transcribed
+from — all three agree, and all three were always correct. This
+project's hand-transcribed C array had it at **column 6** instead, an
+otherwise-unused matrix position, inherited unchanged from this table's
+very first commit. Since nothing else lives at column 6, no other key
+was ever affected, and the symptom looked exactly like a hardware fault:
+the scanner correctly sensed the keypress every single time, it just
+looked it up at the wrong table index and decoded "no key."
+
+**What made this so hard to find**: an independent, unrelated reference
+program (the OSDK demo) genuinely worked on the same hardware, while
+this project's own scanner — copied identically into `locifilemanager-v2`
+and into `kbtest/`'s minimal isolated test — failed identically in all
+three, which strongly suggested a deep electrical/timing problem rather
+than a simple table typo. It took directly diffing the decode table
+against three independent canonical references, plus the bit-level
+`kbtest/` diagnostic, to actually find it.
+
+**A compounding factor**: this project's personal Phosphoric fork
+(`PHOSDIR`) had its own `=`/`+` key-injection mapping "corrected" earlier
+in this same investigation to match the (buggy) decode table — based on
+the wrong assumption that the table was ground truth. That made the
+emulator self-consistently wrong in the same direction, which is exactly
+why months of automated Phosphoric-based testing never caught this.
+Reverted back to Phosphoric's own original (and correct) mapping.
+
+**Fixed in**: this project's `include/keyboard.c`, `locifilemanager-v2`'s
+`include/keyboard.c` (the same table, copied from here originally), and
+the `PHOSDIR` Phosphoric fork's `src/io/keyboard.c` `char_map`. All
+diagnostic code added during the investigation (the live on-screen
+matrix-byte readout in `keyb_poll()`, various `main.c`/`input.c` `#if 0`
+experiments) has been removed — see memory
+`equals_plus_key_not_recognized` for the full round-by-round history.
+
+**Confirmed working on real hardware** (both this project and
+`locifilemanager-v2`) once the fix above landed. Surfaced one further,
+much smaller gap while testing: Main mode's `+` key (`src/editor.c`,
+increments `app.plotscreencode`) only ever handled `'+'` itself, not the
+unshifted `'='` — harmless before this investigation (neither worked
+reliably anyway), but worth fixing for ease of use now that `=` decodes
+correctly. Added `case '=':` alongside the existing `case '+':`,
+matching `charsetedit.c`'s `'+'`/`'='` pair (`case '+': case '=':`,
+already written that way), which is the only other place in the codebase
+incrementing a screencode this way. `-` (decrement) was never affected
+since it's a different matrix position, untouched by the bug.
+
 
 ## Code Style
 
@@ -2463,10 +2563,12 @@ make              # build build/oseloci.tap (English, LANG=EN default)
 make LANG=FR      # build build/oseloci_fr.tap (French)
 make all-langs    # build both build/oseloci.tap and build/oseloci_fr.tap
 make run          # build + launch in Oricutron (LANG=FR for the French build)
-make usb          # build both languages and copy oseloci.tap/oseloci_fr.tap
-                  # to USBPATH (set in .env, gitignored -- see .env.example),
-                  # auto-mounting/-unmounting the WSL2 drvfs USB drive if
-                  # detected (same convention as locifilemanager-v2)
+make usb          # build both languages + kbtest/, copy oseloci.tap/
+                  # oseloci_fr.tap/kbtest.tap (see "Standalone keyboard
+                  # matrix test (kbtest/)" above) to USBPATH (set in
+                  # .env, gitignored -- see .env.example), auto-mounting/
+                  # -unmounting the WSL2 drvfs USB drive if detected
+                  # (same convention as locifilemanager-v2)
 make clean        # remove build artifacts (both languages)
 make docs         # regenerate README.pdf from README.md (requires pandoc)
 make test         # full automated Phosphoric test suite (test-boot, test-menus,

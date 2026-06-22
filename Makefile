@@ -202,7 +202,7 @@ CYCLES   ?= 8000000
 # all: must appear first so it is the default goal
 # =========================================================================
 
-.PHONY: all all-langs clean run docs check-usb usb check-phosphoric sandbox-reset test-capture test-boot test-menus test-screenresize test-charsetram-spike test-charsetedit test-palette test-colourpicker test-cursor-autoscroll test-linebox test-select test-move test-writemode test-boot-no-loci test-select-cutcopy test-undo-overflow test-help-funct8 test-fileio-traffic test-findreplace test-write-hexattr test-trymode test-goto test-hollowbox test-ellipse test
+.PHONY: all all-langs clean run docs check-usb usb kbtest-build check-phosphoric sandbox-reset test-capture test-boot test-menus test-screenresize test-charsetram-spike test-charsetedit test-palette test-colourpicker test-cursor-autoscroll test-linebox test-select test-move test-writemode test-boot-no-loci test-select-cutcopy test-undo-overflow test-help-funct8 test-fileio-traffic test-findreplace test-write-hexattr test-trymode test-goto test-hollowbox test-ellipse test
 
 all: build/$(MAIN)$(LANGSUFFIX).tap
 
@@ -272,7 +272,7 @@ check-usb:
 	@test -d "$(USBPATH)" || \
 	    (echo "ERROR: USB path '$(USBPATH)' not found -- plug in USB stick and retry" && false)
 
-usb: check-usb all-langs
+usb: check-usb all-langs kbtest-build
 	cp build/$(MAIN).tap      "$(USBPATH)/"
 	cp build/$(MAIN)_fr.tap   "$(USBPATH)/"
 	cp assets/PETSCIIPJ.BIN assets/PETSCIISC.BIN assets/PETSCIICS.BIN assets/PETSCIICA.BIN "$(USBPATH)/"
@@ -280,11 +280,19 @@ usb: check-usb all-langs
 	cp assets/OSEDEMO.BIN "$(USBPATH)/"
 	cp assets/OSEDEMOPJ.BIN assets/OSEDEMOSC.BIN assets/OSEDEMOCS.BIN "$(USBPATH)/"
 	cp assets/OSELOGOPJ.BIN assets/OSELOGOSC.BIN assets/OSELOGOCS.BIN assets/OSELOGOCA.BIN "$(USBPATH)/"
+	cp kbtest/build/kbtest.tap "$(USBPATH)/"
 	@if [ "$(IS_WSL2)" = "1" ]; then \
 	    echo "WSL2: unmounting $(USBMOUNT)..."; \
 	    sudo umount $(USBMOUNT); \
 	    echo "Done -- USB stick can now be ejected in Windows."; \
 	fi
+
+# kbtest/ is a separate, standalone diagnostic program (see CLAUDE.md
+# "Standalone keyboard matrix test (kbtest/)") -- not part of the main
+# build, built here only so `make usb` can distribute kbtest.tap
+# alongside oseloci.tap for real-hardware testing.
+kbtest-build:
+	$(MAKE) -C kbtest
 
 # -------------------------------------------------------------------------
 # Phosphoric automated testing
