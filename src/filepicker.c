@@ -22,14 +22,25 @@
 // floored at app.homedir (or "/" in the homedir-empty fallback case) --
 // LEFT (ascend) could never go above that point. Now unbounded: LEFT
 // ascends all the way to a drive's root ("N:/" or bare "/", see
-// picker_path_ascend()), '.'/',' switch drives outright (locifilemanager-
-// v2's own next/prev-drive convention, "%u:/" reset-to-root, but without
-// its locicfg.validdev[] availability check -- simpler, cycles 0-9
-// unconditionally; an invalid/empty drive just shows "no files", same as
-// browsing into any other empty directory). The result is stored in
-// app.filedir (src/appstate.h), not app.homedir -- the file picker's own
-// persisted location is deliberately kept separate from the boot-time
-// splash/help asset directory.
+// picker_path_ascend()), '.'/',' switch drives (locifilemanager-v2's own
+// next/prev-drive convention, "%u:/" reset-to-root). The result is
+// stored in app.filedir (src/appstate.h), not app.homedir -- the file
+// picker's own persisted location is deliberately kept separate from the
+// boot-time splash/help asset directory.
+//
+// Drive-switch now skips nonexistent drives (2026-06-22, user-reported):
+// an earlier version of '.'/',' cycled all 10 drive numbers
+// unconditionally, a deliberate simplification vs. locifilemanager-v2's
+// own locicfg.validdev[] check -- the user found this confusing on real
+// hardware (switching landed on drives that don't exist at all). Fixed
+// by adopting locifilemanager-v2's exact loop (src/dir.c's
+// dir_get_next_drive()/dir_get_prev_drive()): skip while
+// !locicfg.validdev[drive]. locicfg is populated once by get_locicfg()
+// (src/main.c, called in the same pre-enable_overlay_ram() boot block as
+// homedir_init(), since it's itself a round of LOCI file ops -- see that
+// call site's comment); drive 0 is always marked valid by get_locicfg()
+// itself, so the skip-loop always terminates even if every other drive
+// is absent.
 
 #include <string.h>
 #include <stdio.h>
@@ -47,15 +58,33 @@
 
 #define PICKER_WIN_SX  2
 #define PICKER_WIN_SY  0
-#define PICKER_WIN_WX 36
-#define PICKER_WIN_WY 15
+// 38, not 36: cwin_clear()/cwin_clear_full() only fill content through
+// w->sx+w->wx-1 (include/charwin.c) -- with the old wx=36, that's
+// absolute column 37, leaving columns 38-39 permanently untouched by
+// either clear function (a structural gap, not new -- just much more
+// visible once the title screen's bold stripe pattern was underneath
+// it, user-reported 2026-06-22). Widening to 38 covers the full row
+// (sx=2 .. sx+wx-1=39) with no other layout change needed -- every
+// existing column position (PICKER_NAME_COLS's white-reset column,
+// the key-hint rows) is well inside this width already, so this just
+// adds blank padding at the right edge instead of leaving it bare.
+#define PICKER_WIN_WX 38
+#define PICKER_WIN_WY 17
 
 #define PICKER_TITLE_Y   0
 #define PICKER_PATH_Y    1
 #define PICKER_LIST_Y0   2
 #define PICKER_PAGE_ROWS 12
-#define PICKER_NAME_COLS 34   // display width for a row (window is 36 wide)
-#define PICKER_KEYS_Y    14   // key-overview row, below the list (PICKER_WIN_WY-1)
+#define PICKER_NAME_COLS 33   // display width for a row (window is 36 wide:
+                               // col0=paper attr, col1='-'/' ' indicator,
+                               // cols2-34=name, col35=paper reset -- see
+                               // picker_draw_list()'s doc comment)
+#define PICKER_KEYS_Y1   14   // key-overview rows, below the list
+#define PICKER_KEYS_Y2   15   // (PICKER_WIN_WY-3..PICKER_WIN_WY-1) -- grown
+#define PICKER_KEYS_Y3   16   // from 1 to 3 rows to fit the full 2026-06-21
+                               // navigation key set (was previously
+                               // documented only in the README, see
+                               // picker_draw_header()'s doc comment)
 
 // Internal mode for picker_engine() -- not part of the public API
 // (filepicker_run()/filepicker_browse_dir() below are the two public
@@ -122,16 +151,34 @@ static uint8_t picker_name_ends_with(const char *name, const char *suffix)
 
 /**
  * Check whether a directory entry matches filter (PICKER_FILTER_PLAIN/
- * PROJECT). Directories always match, so navigation works regardless of
- * which file-type filter is active.
+ * PROJECT/NONE). Directories always match, so navigation works
+ * regardless of which file-type filter is active.
+ *
+ * PICKER_FILTER_NONE matches every file unconditionally -- added
+ * 2026-06-22 (user-requested): suffix-based filtering is reserved for
+ * Load Project alone now (the four-file PJ/SC/CS/CA.BIN scheme is
+ * OSE-specific and self-consistent, so filtering to *PJ.BIN there is
+ * still correct); every other Load action (Screen/Combined/Charset)
+ * needs to be able to pick *any* file, including ones that don't follow
+ * OSE's own naming convention at all (e.g. a raw binary screen dump
+ * saved by another tool, or one missing the `.BIN` extension).
+ * PICKER_FILTER_PLAIN (the old *.BIN-excluding-project-suffixes filter)
+ * is unused by any filepicker_run() call site as of this change -- kept
+ * only because filepicker_browse_dir() still passes it for its
+ * context-only file listing (selection is disabled in that mode, so the
+ * filter only affects which filenames are shown alongside the
+ * directories being browsed).
  *
  * @param de     Directory entry to check.
- * @param filter PICKER_FILTER_PLAIN or PICKER_FILTER_PROJECT.
+ * @param filter PICKER_FILTER_PLAIN, PICKER_FILTER_PROJECT, or
+ *               PICKER_FILTER_NONE.
  * @return 1 if de should be shown, 0 otherwise.
  */
 static uint8_t picker_entry_matches(const LociDirent *de, uint8_t filter)
 {
     if (de->d_attrib & DIR_ATTR_DIR) return 1;
+
+    if (filter == PICKER_FILTER_NONE) return 1;
 
     if (filter == PICKER_FILTER_PROJECT)
         return picker_name_ends_with(de->d_name, "PJ.BIN");
@@ -151,7 +198,7 @@ static uint8_t picker_entry_matches(const LociDirent *de, uint8_t filter)
  * exceeded -- same guard locifilemanager-v2's dir_read() has.
  *
  * @param path   Directory to list.
- * @param filter PICKER_FILTER_PLAIN or PICKER_FILTER_PROJECT.
+ * @param filter PICKER_FILTER_PROJECT or PICKER_FILTER_NONE.
  * @return (none) -- result in picker_firstelement (0 if no matches).
  */
 static void picker_build_list(const char *path, uint8_t filter)
@@ -208,17 +255,30 @@ static void picker_build_list(const char *path, uint8_t filter)
     loci_closedir(dir);
 }
 
+// PICKER_WIN_WX - 2 (the path field's window-relative start column) =
+// the clipped width cwin_putat_string() actually writes for the path
+// row -- module-static, not a picker_draw_header() local, same
+// static-stack-budget reason as picker_path/picker_name etc. above.
+static char picker_path_padded[PICKER_WIN_WX - 2 + 1];
+
 /**
- * Draw the title and path rows, plus the key-overview row below the list
- * (MSG_FILE_PICKER_KEYS, user-requested 2026-06-20 -- the browser's
- * controls weren't discoverable without already knowing them from the
- * README). Redrawn on every reload (cheap, and never changes), not just
- * once at popup entry, since this is the function every redraw path
- * already calls. Still only documents the bare essentials (UpDn/Ent/Esc)
- * -- the fuller 2026-06-21 navigation key set (LEFT/RIGHT/top/bottom/
- * pgup/pgdn/root/drive-switch/mkdir) has no room left in the 36-column
- * budget, same precedent as LEFT itself not being mentioned before; the
- * README documents the full set.
+ * Draw the title and path rows, plus the 3-row key-overview block below
+ * the list (MSG_FILE_PICKER_KEYS1/2/3, user-requested 2026-06-20, grown
+ * to cover the full key set 2026-06-22 -- the browser's controls weren't
+ * fully discoverable without already knowing them from the README:
+ * the original single row only had room for UpDn/Ent/Esc, leaving the
+ * 2026-06-21 navigation additions (LEFT/RIGHT/top/bottom/pgup/pgdn/root/
+ * drive-switch/mkdir) undocumented on screen). Redrawn on every reload
+ * (cheap, and never changes), not just once at popup entry, since this
+ * is the function every redraw path already calls.
+ *
+ * The path row is space-padded to the field's full width before being
+ * written (found and fixed 2026-06-22, user report) -- cwin_putat_string()
+ * only overwrites as many columns as the string passed to it, so without
+ * padding, navigating from a longer path to a shorter one left stale
+ * trailing characters from the previous path visible past the new,
+ * shorter one. The title row needs no such padding (its text never
+ * changes after the popup opens).
  *
  * @param w     Popup window.
  * @param title Title row text.
@@ -228,9 +288,19 @@ static void picker_build_list(const char *path, uint8_t filter)
  */
 static void picker_draw_header(OricCharWin *w, const char *title, const char *path)
 {
+    uint8_t i;
+
+    picker_path_padded[PICKER_WIN_WX - 2] = '\0';
+    strncpy(picker_path_padded, path, PICKER_WIN_WX - 2);
+    for (i = (uint8_t)strlen(picker_path_padded); i < PICKER_WIN_WX - 2; i++)
+        picker_path_padded[i] = ' ';
+    picker_path_padded[PICKER_WIN_WX - 2] = '\0';
+
     cwin_putat_string(w, 2, PICKER_TITLE_Y, title);
-    cwin_putat_string(w, 2, PICKER_PATH_Y, path);
-    cwin_putat_string(w, 0, PICKER_KEYS_Y, MSG_FILE_PICKER_KEYS);
+    cwin_putat_string(w, 2, PICKER_PATH_Y, picker_path_padded);
+    cwin_putat_string(w, 0, PICKER_KEYS_Y1, MSG_FILE_PICKER_KEYS1);
+    cwin_putat_string(w, 0, PICKER_KEYS_Y2, MSG_FILE_PICKER_KEYS2);
+    cwin_putat_string(w, 0, PICKER_KEYS_Y3, MSG_FILE_PICKER_KEYS3);
 }
 
 /**
@@ -248,11 +318,22 @@ static void picker_draw_header(OricCharWin *w, const char *title, const char *pa
  * ink before column 2 -- so only a fresh PAPER byte is needed here, no
  * separate ink byte, exactly matching nonworkingcc65's single-attribute-
  * byte approach) hold the per-row paper attribute and the '-'/' '
- * indicator; the filename itself is unchanged, starting at column 2
- * (PICKER_NAME_COLS, unaffected -- columns 0/1 were already spare,
- * never part of that budget). Directory entries get a trailing '/'
- * marker. Rows beyond the end of the list are blanked (still coloured,
- * though the cursor can never actually land on one in practice).
+ * indicator; the filename itself starts at column 2 (PICKER_NAME_COLS
+ * wide). Directory entries get a trailing '/' marker. Rows beyond the
+ * end of the list are blanked (still coloured, though the cursor can
+ * never actually land on one in practice).
+ *
+ * **Trailing white margin column (2026-06-22, user-requested)**: the
+ * cyan/yellow paper attribute set at column 0 otherwise carries through
+ * to the row's last screen column (the ULA applies an attribute byte
+ * from the column it's written at onward until the next one) -- giving
+ * every list row a coloured stripe running flush to the popup's right
+ * edge, with no visual breathing room. PICKER_NAME_COLS shrank from 34
+ * to 33 and the very last column (window-relative 35) is reset to
+ * A_BGWHITE right after the name text, restoring the window's normal
+ * background there for the rest of the row (the change is immediate --
+ * no further attribute byte follows it on this row, so it simply stays
+ * white through the right edge).
  *
  * @param w Popup window.
  * @return (none)
@@ -294,6 +375,7 @@ static void picker_draw_list(OricCharWin *w)
         cwin_putat_char(w, 0, y, selected ? A_BGYELLOW : A_BGCYAN);
         cwin_putat_char(w, 1, y, selected ? '-' : CH_SPACE);
         cwin_putat_string(w, 2, y, line);
+        cwin_putat_char(w, 2 + PICKER_NAME_COLS, y, A_BGWHITE);
     }
 }
 
@@ -359,10 +441,10 @@ static void picker_path_ascend(char *path)
 /**
  * Reset path to the root of drive (locifilemanager-v2's own next/prev-
  * drive convention -- "N:/", src/dir.c's dir_get_next_drive()/
- * dir_get_prev_drive()). No locicfg.validdev[] availability check (that
- * reference has one; this port deliberately doesn't, see this file's
- * header comment) -- cycling onto an invalid/empty drive just shows "no
- * files", the same as browsing into any other empty directory.
+ * dir_get_prev_drive()). The caller (picker_engine()'s '.'/',' handling)
+ * is responsible for only ever passing an already-validated drive number
+ * (locicfg.validdev[drive] true) -- this function itself does no
+ * validity check.
  *
  * @param path  Destination buffer, PICKER_PATH_MAXLEN bytes.
  * @param drive Drive number, 0-9.
@@ -408,7 +490,7 @@ static uint8_t picker_current_drive(const char *path)
  * @param w      Popup window.
  * @param title  Title row text.
  * @param path   Directory to list.
- * @param filter PICKER_FILTER_PLAIN or PICKER_FILTER_PROJECT.
+ * @param filter PICKER_FILTER_PROJECT or PICKER_FILTER_NONE.
  * @return (none)
  */
 static void picker_reload(OricCharWin *w, const char *title, const char *path, uint8_t filter)
@@ -541,7 +623,7 @@ static void picker_pageup(void)
  * @param w      Popup window.
  * @param title  Title row text.
  * @param path   Current directory (mkdir target's parent).
- * @param filter PICKER_FILTER_PLAIN or PICKER_FILTER_PROJECT.
+ * @param filter PICKER_FILTER_PROJECT or PICKER_FILTER_NONE.
  * @return (none)
  */
 // Module-static, not function locals: picker_make_dir() is called from
@@ -584,7 +666,7 @@ static void picker_make_dir(OricCharWin *w, const char *title, const char *path,
  * set), not a fixed root.
  *
  * @param title  Title row text.
- * @param filter PICKER_FILTER_PLAIN or PICKER_FILTER_PROJECT.
+ * @param filter PICKER_FILTER_PROJECT or PICKER_FILTER_NONE.
  * @param mode   PICKER_MODE_FILE or PICKER_MODE_DIR.
  * @return 1 on selection (app.filename set for FILE mode, app.filedir
  *         set for DIR mode), 0 if cancelled (ESC).
@@ -640,7 +722,10 @@ static uint8_t picker_engine(const char *title, uint8_t filter, uint8_t mode)
         if (key == '.' || key == ',')
         {
             uint8_t drive = picker_current_drive(path);
-            drive = (key == '.') ? (uint8_t)((drive + 1) % 10) : (uint8_t)((drive + 9) % 10);
+            do
+            {
+                drive = (key == '.') ? (uint8_t)((drive + 1) % 10) : (uint8_t)((drive + 9) % 10);
+            } while (!locicfg.validdev[drive]);
             picker_set_drive_root(path, drive);
             picker_reload(&win, title, path, filter);
             continue;
@@ -711,14 +796,24 @@ static uint8_t picker_engine(const char *title, uint8_t filter, uint8_t mode)
             xram_memcpy_from(name, (uint16_t)(picker_present + sizeof(meta)), meta.length);
             name[meta.length] = '\0';
 
-            // Strip the matched suffix so the base name fileio.c's
-            // sprintf(path, "%s<suffix>", app.filename)-style composition
-            // expects (see "LOCI file I/O" in CLAUDE.md, unchanged) is what's left.
-            suffix  = (filter == PICKER_FILTER_PROJECT) ? "PJ.BIN" : ".BIN";
-            suflen  = (uint8_t)strlen(suffix);
-            baselen = (uint8_t)(meta.length - suflen);
-            if (baselen > 63) baselen = 63;
-            name[baselen] = '\0';
+            // PICKER_FILTER_PROJECT strips "PJ.BIN" so the base name
+            // fileio.c's filedir_join_suffix(fullpath, "SC.BIN"/"CS.BIN"/
+            // "CA.BIN")-style composition expects is what's left (see
+            // "LOCI file I/O" in CLAUDE.md, unchanged). Every other
+            // filter (PICKER_FILTER_NONE, as of 2026-06-22 -- see
+            // picker_entry_matches()'s doc comment) stores the selected
+            // filename verbatim instead -- fileio.c's matching Load
+            // call sites now use filedir_join() directly on this, not
+            // filedir_join_suffix(), so an arbitrary filename (any
+            // extension, or none) round-trips unchanged.
+            if (filter == PICKER_FILTER_PROJECT)
+            {
+                suffix  = "PJ.BIN";
+                suflen  = (uint8_t)strlen(suffix);
+                baselen = (uint8_t)(meta.length - suflen);
+                if (baselen > 63) baselen = 63;
+                name[baselen] = '\0';
+            }
 
             strncpy(app.filename, name, FILENAME_MAXLEN);
             app.filename[FILENAME_MAXLEN] = '\0';
@@ -755,7 +850,7 @@ static uint8_t picker_engine(const char *title, uint8_t filter, uint8_t mode)
  * key set and contract.
  *
  * @param title  Title row text.
- * @param filter PICKER_FILTER_PLAIN or PICKER_FILTER_PROJECT.
+ * @param filter PICKER_FILTER_PROJECT or PICKER_FILTER_NONE.
  * @return 1 if a file was selected (app.filename/app.filedir set), 0 if
  *         cancelled or the starting directory has no matching entries.
  */

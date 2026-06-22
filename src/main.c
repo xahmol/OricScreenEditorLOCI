@@ -92,6 +92,14 @@ int main(void)
     // it -- don't move enable_overlay_ram() back above this block.
     homedir_init();
 
+    // Populates locicfg.validdev[]/devnr so the file picker's drive-switch
+    // keys (','/'.') can skip drives that don't actually exist, instead of
+    // cycling through all 10 unconditionally -- must run in this same
+    // pre-enable_overlay_ram() block (see the comment above) since it's
+    // itself a round of LOCI file ops, same as homedir_init()/the
+    // title-screen load.
+    get_locicfg();
+
     {
         char    path[HOMEDIR_MAXLEN + 16];
         int16_t fd;

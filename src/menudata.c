@@ -285,12 +285,14 @@ void menu_run(void)
             undo_snapshot(0, 0, app.canvas_width, app.canvas_height);
             canvas_clear();
             canvas_blit();
+            statusbar_draw();
             break;
 
         case 14:
             undo_snapshot(0, 0, app.canvas_width, app.canvas_height);
             canvas_fill(app.plotscreencode);
             canvas_blit();
+            statusbar_draw();
             break;
 
         case 21:

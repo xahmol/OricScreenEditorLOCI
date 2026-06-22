@@ -323,9 +323,13 @@ all file I/O instead of V1's tape commands. Both **Save** and **Load**
 actions now open the same file-picker directory browser first: **Save**
 actions let you browse to and confirm the directory to save into (press
 **S** once you're in the right place), then ask for a typed filename (up
-to 48 characters); **Load** actions browse and select the file directly,
-showing only the files relevant to the action you chose (e.g. Load
-Project only shows project files). If no LOCI device is detected, every
+to 48 characters); **Load** actions browse and select the file directly.
+Load Project shows only project files (`*PJ.BIN`) since the other three
+project files it needs (`SC.BIN`/`CS.BIN`/`CA.BIN`) are derived from that
+name; every other Load action (Screen/Combined/Charset) shows **every**
+file in the directory, with no filtering by name or extension, so you
+can load a raw binary dump that doesn't follow OSE's own naming
+convention. If no LOCI device is detected, every
 File/Charset menu item shows a "No LOCI device detected" message instead
 of attempting the operation, so the rest of the editor keeps working
 normally without one attached.

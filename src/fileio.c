@@ -17,6 +17,7 @@
 // what gets written).
 
 #include <stdio.h>
+#include <string.h>
 #include "oric.h"
 #include "charwin.h"
 #include "appstate.h"
@@ -69,6 +70,37 @@
 // against exactly that, not part of the real worst-case math.
 #define FILEIO_FULLPATH_MAXLEN (FILEDIR_MAXLEN + FILEIO_PATH_MAXLEN + 1 + 4)
 static char fullpath[FILEIO_FULLPATH_MAXLEN];
+
+/**
+ * Strip a trailing ".BIN" (case-sensitive) from app.filename in place, if
+ * present. PICKER_FILTER_NONE (see filepicker.h) stores the selected
+ * filename verbatim, extension included, so that arbitrary/non-OSE-
+ * convention files can be loaded -- but app.filename is documented
+ * (appstate.h) as a bare base name, and fileio_get_filename()'s Save
+ * popup pre-fills its typed-filename field directly from app.filename's
+ * current content, then unconditionally appends ".BIN" again
+ * (filedir_join_suffix(fullpath, ".BIN")) on confirm. Without this
+ * normalisation, loading "FOO.BIN" left app.filename holding "FOO.BIN"
+ * verbatim, so the very next Save action's default text was "FOO.BIN"
+ * and confirming it unedited wrote "FOO.BIN.BIN" instead of overwriting
+ * "FOO.BIN" -- found 2026-06-22 (user report: "save screen and save
+ * project are broken" right after loading/editing a *.BIN file). Called
+ * after every PICKER_FILTER_NONE Load action's filepicker_run() returns,
+ * restoring the bare-base-name invariant for the common case; a loaded
+ * file with a different extension (or none) keeps its full name in
+ * app.filename, since there's nothing canonical to strip -- the
+ * accepted cost for that corner case is an extra ".BIN" appended if the
+ * very next action is an unedited Save, same as it would have been
+ * before PICKER_FILTER_NONE existed for any non-".BIN" name.
+ *
+ * @return (none)
+ */
+static void fileio_strip_bin_suffix(void)
+{
+    uint8_t len = (uint8_t)strlen(app.filename);
+    if (len >= 4 && strcmp(app.filename + len - 4, ".BIN") == 0)
+        app.filename[len - 4] = '\0';
+}
 
 /**
  * Parse a NUL-terminated decimal digit string into a uint16_t. Stops at
@@ -240,7 +272,7 @@ void fileio_load_screen(void)
     uint16_t neww, newh;
 
     if (!loci_check_present()) return;
-    if (!filepicker_run(MSG_FILE_LOAD_SCREEN, PICKER_FILTER_PLAIN)) return;
+    if (!filepicker_run(MSG_FILE_LOAD_SCREEN, PICKER_FILTER_NONE)) return;
     if (!fileio_get_dimensions(MSG_FILE_LOAD_SCREEN, &neww, &newh)) return;
     if (!canvas_resize(neww, newh))
     {
@@ -248,7 +280,8 @@ void fileio_load_screen(void)
         return;
     }
 
-    filedir_join_suffix(fullpath, ".BIN");
+    filedir_join(fullpath, app.filename);
+    fileio_strip_bin_suffix();
 
     fd = loci_open(fullpath, O_RDONLY);
     if (fd < 0)
@@ -312,7 +345,7 @@ void fileio_load_combined(void)
     uint16_t neww, newh;
 
     if (!loci_check_present()) return;
-    if (!filepicker_run(MSG_FILE_LOAD_COMBINED, PICKER_FILTER_PLAIN)) return;
+    if (!filepicker_run(MSG_FILE_LOAD_COMBINED, PICKER_FILTER_NONE)) return;
     if (!fileio_get_dimensions(MSG_FILE_LOAD_COMBINED, &neww, &newh)) return;
     if (!canvas_resize(neww, newh))
     {
@@ -320,7 +353,8 @@ void fileio_load_combined(void)
         return;
     }
 
-    filedir_join_suffix(fullpath, ".BIN");
+    filedir_join(fullpath, app.filename);
+    fileio_strip_bin_suffix();
 
     fd = loci_open(fullpath, O_RDONLY);
     if (fd < 0)
@@ -615,9 +649,10 @@ void fileio_load_charset(uint8_t altorstd)
     const char *title = fileio_charset_title(altorstd, 0, &base);
 
     if (!loci_check_present()) return;
-    if (!filepicker_run(title, PICKER_FILTER_PLAIN)) return;
+    if (!filepicker_run(title, PICKER_FILTER_NONE)) return;
 
-    filedir_join_suffix(fullpath, ".BIN");
+    filedir_join(fullpath, app.filename);
+    fileio_strip_bin_suffix();
     if (file_load(fullpath, (void *)(base + CHARSET_GLYPH_AREA_OFFSET), charset_area_size(base)) < 0)
     {
         menu_messagepopup(MSG_FILE_NOT_FOUND);

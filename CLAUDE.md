@@ -1420,6 +1420,22 @@ Scenario 7 (which always exits the bar first) could never have caught
 it. Full suite: 182/182 → 185/185 (3 new assertions in this one script,
 no other script changed).
 
+**Follow-up: statusbar also needs restoring, not just the canvas
+(2026-06-22, user-reported)**: the fix above's `canvas_blit()` redraws
+the *entire* viewport including row 27 — which, since `VIEWPORT_HEIGHT`
+grew 27->28 (see "Main-mode attribute-selection keys and statusbar
+redesign" above), is the same screen row the statusbar overlays, not a
+row beyond it. `canvas_blit()` alone overwrites that row with the
+just-cleared/filled canvas content, wiping the statusbar box, and
+neither `case 13` nor `case 14` called `statusbar_draw()` afterward to
+restore it — every other destructive action's `canvas_blit()` site
+(`fileio.c`'s three Load actions) already pairs it with a
+`statusbar_draw()` call right after, a precedent Clear/Fill had still
+missed. Fixed by adding `statusbar_draw()` immediately after each
+`canvas_blit()` in `case 13`/`case 14`. No test changes needed (no
+existing assertion checked the statusbar row's content right after
+Clear/Fill); full suite stayed 185/185.
+
 **Popup background bleed-through fix (post-launch):**
 
 User report (2026-06-20): popups left background canvas content visibly
@@ -1800,18 +1816,71 @@ Save — browsing to pick a name to overwrite isn't the same UX problem).
   `picker_present` (XRAM addresses) + `picker_cursorrow` (visible-row
   index) follow `next`/`prev` pointers directly, exactly the bookkeeping
   locifilemanager-v2's `struct Directory` uses per pane.
-- **Type filtering** (`PICKER_FILTER_PLAIN`/`PICKER_FILTER_PROJECT`):
+- **Type filtering** (`PICKER_FILTER_PROJECT`/`PICKER_FILTER_NONE`):
   directories always match (so navigation works regardless of filter).
-  `PLAIN` covers Load Screen, Load Combined and all three Charset Load
-  actions — none of these are distinguishable from each other by filename
-  alone (matches V1: a "combined" file and a "screen" file are both bare
-  `<name>.BIN`, only the *content* differs), so they share one filter that
-  excludes the four Project sub-file suffixes (`PJ/SC/CS/CA.BIN`) to avoid
-  clutter/wrong-file-type mistakes. `PROJECT` (Load Project) matches only
-  `*PJ.BIN`. On selection, the matched suffix is stripped before storing
-  into `app.filename`, so `fileio.c`'s existing `sprintf(path,
-  "%s<suffix>", app.filename)`-style composition ("LOCI file I/O" above, unchanged)
-  keeps working without modification.
+  `PROJECT` (Load Project only) matches only `*PJ.BIN` — the four-file
+  PJ/SC/CS/CA.BIN scheme is OSE-specific and self-consistent, so
+  filtering to it there is still correct; on selection, the matched
+  `PJ.BIN` suffix is stripped before storing into `app.filename`, so
+  `fileio.c`'s `filedir_join_suffix(fullpath, "SC.BIN"/"CS.BIN"/
+  "CA.BIN")`-style composition (unchanged, "LOCI file I/O" above) keeps
+  working.
+
+  **`PICKER_FILTER_NONE` (2026-06-22, replaces the old `PICKER_FILTER_
+  PLAIN`, user-requested)**: Load Screen, Load Combined, and all three
+  Charset Load actions now show *every* file unconditionally — the
+  original `PLAIN` filter (`*.BIN`, excluding the four Project
+  suffixes) was found to be a real usability gap, not a helpful
+  narrowing: it silently hid any file that didn't end in `.BIN` (e.g. a
+  raw binary screen/charset dump produced by another tool, or saved
+  without that extension), with no way to load it at all. The user's
+  framing: file-type filtering by suffix should be reserved for Load
+  Project alone, where it's load-bearing (composing `SC.BIN`/`CS.BIN`/
+  `CA.BIN` from a stripped base name genuinely requires the `PJ.BIN`
+  suffix to have been there); every other Load action neither needs nor
+  benefits from filtering, since it's just opening one arbitrary file
+  and reading raw bytes — content interpretation, not the filename,
+  is what actually distinguishes a screen dump from a charset dump.
+  `PICKER_FILTER_NONE` selections store the picked filename **verbatim,
+  extension included** (no suffix stripping at all) — `fileio.c`'s three
+  affected Load functions (`fileio_load_screen()`/`_combined()`/
+  `_charset()`) switched from `filedir_join_suffix(fullpath, ".BIN")` to
+  plain `filedir_join(fullpath, app.filename)` accordingly, so whatever
+  name (or lack of a `.BIN` extension) the user picked round-trips
+  unchanged. `PICKER_FILTER_PLAIN` itself is kept (only
+  `filepicker_browse_dir()`'s Save-side context listing still passes it
+  — selection is disabled in that mode, so the filter only affects which
+  filenames are shown for context alongside the directories being
+  browsed, not selected).
+
+  **Regression found and fixed the same day (user report: "save screen
+  and save project are broken")**: storing the verbatim filename into
+  `app.filename` broke an invariant `fileio_get_filename()`'s Save popup
+  depends on — `app.filename` is documented (`appstate.h`) as a bare
+  base name with no extension, since that popup pre-fills its
+  typed-filename field directly from `app.filename`'s current content
+  and then *unconditionally appends* `".BIN"` again on confirm
+  (`filedir_join_suffix(fullpath, ".BIN")`). After loading e.g.
+  `t.BIN` via `PICKER_FILTER_NONE`, `app.filename` held `"t.BIN"`
+  verbatim; the very next Save action's default text was therefore
+  `"t.BIN"`, and confirming it unedited wrote `"t.BIN.BIN"` instead of
+  overwriting `"t.BIN"`. Fixed with `fileio_strip_bin_suffix()`
+  (`src/fileio.c`, new `static` helper) — called right after each of the
+  three `filedir_join(fullpath, app.filename)` call sites this session
+  added (Load Screen/Combined/Charset), it strips a trailing `".BIN"`
+  (case-sensitive) from `app.filename` in place if present, restoring
+  the bare-base-name invariant for the common case. A loaded file with
+  a different extension (or none) keeps its full name in `app.filename`
+  — there's nothing canonical to strip — so the accepted residual cost
+  is an extra `.BIN` appended if the very next action is an *unedited*
+  Save, the same outcome this corner case would always have had even
+  before `PICKER_FILTER_NONE` existed. Verified via a direct Phosphoric
+  `--loci-flash` round-trip (Save "T" -> Load t.BIN -> Save again with
+  the prefilled default unedited): only `t.BIN` exists afterward, no
+  `t.BIN.BIN`. No existing test caught this (none round-trips Load then
+  an unedited Save); full suite stayed 185/185 since the change is
+  purely additive normalisation, not a behaviour change to any already-
+  tested path.
 - **Full subdirectory navigation** (confirmed with the user — overrode the
   simpler flat-listing-only default I'd recommended): ENTER on a directory
   entry descends (`picker_path_descend()`, refusing rather than silently
@@ -2010,11 +2079,10 @@ delete, keep create-dir, and add directory browsing to the Save path too.
   `picker_bottom()` O(n) via repeated `picker_step_down()`); `'d'`/`'p'`
   page down/up (`picker_pagedown()`/`picker_pageup()`, `PICKER_PAGE_ROWS`
   steps via the same step helpers); `'\'` jumps to the current drive's
-  root; `'.'`/`','` cycle drives 0-9 (`picker_set_drive_root()`, builds
-  `"N:/"`, matching locifilemanager-v2's own next/prev-drive convention —
-  **no** `locicfg.validdev[]` availability check, unlike that reference;
-  cycling onto an empty/invalid drive just shows an empty listing, same
-  as any other empty directory, not specially handled); `'e'` creates a
+  root; `'.'`/`','` cycle drives, skipping any that don't actually exist
+  (`picker_set_drive_root()`, builds `"N:/"` — see "Drive-switch now
+  skips nonexistent drives" below for the validity check, added
+  2026-06-22 after originally shipping without one); `'e'` creates a
   subdirectory (`picker_make_dir()`, `cwin_textinput()` + `loci_mkdir()`,
   then reloads the listing so it shows up immediately). Copy/rename/
   delete were explicitly excluded, per the request.
@@ -2092,6 +2160,99 @@ delete, keep create-dir, and add directory browsing to the Save path too.
   descends into it; `'s'` then confirms it as the save directory, and the
   resulting file lands inside it on the host filesystem, exactly as
   expected end-to-end). Full suite: 182/182, unchanged in count (no new
+  scripts added this pass).
+
+### File picker key-overview hint + drive-switch validity (2026-06-22)
+
+User report after the full-navigation work above shipped: the on-screen
+key-overview row (`MSG_FILE_PICKER_KEYS`, see "Styling and key-overview
+row" below) still only documented `UpDn`/`Ent`/`Esc` — none of the
+2026-06-21 navigation additions (LEFT/RIGHT/top/bottom/pagedown/pageup/
+root/drive-switch/mkdir) were shown on screen, only in `README.md`. Separately,
+`'.'`/`','` cycled all 10 drive numbers unconditionally (this file's own
+"Full key set" bullet above explicitly called out skipping
+`locicfg.validdev[]`'s check as a deliberate simplification) — the user
+found landing on nonexistent drives confusing in practice, on real
+hardware, where the distinction between a populated and an absent drive
+slot is visible to the user in a way Phosphoric's `--loci-flash` mode
+(a single host directory, no multi-drive concept) never surfaced during
+development.
+
+**Key-overview hint, grown from 1 row to 3** (`MSG_FILE_PICKER_KEYS1/2/
+3`, replacing the single `MSG_FILE_PICKER_KEYS`): `PICKER_WIN_WY` grew
+15->17 to fit two extra rows (`PICKER_KEYS_Y1/Y2/Y3` = 14/15/16,
+`picker_draw_header()` now writes all three every redraw). Covers
+UpDn/Left/Right/Enter on row 1, Top/Bottom/PgDn/PgUp/NewDir on row 2,
+Root/Drive/Cancel on row 3 — every key `picker_engine()` actually
+handles, abbreviated to fit the existing 36-column row budget in both EN
+and FR (FR labels trimmed the same way `MSG_FILE_PICKER_KEYS` already
+was, e.g. "Deplacer"->"Dep", "Creer" for "NewDir" — `PgDn`/`PgUp`
+deliberately left untranslated, matching the existing
+`MSG_SELECT_ACTION_HINT` precedent for hints built from literal key
+abbreviations rather than full prose). `PICKER_PAGE_ROWS` (the list's
+own row count) is unchanged — the extra height came entirely from
+growing the window, not from shrinking the list.
+
+**Drive-switch now skips nonexistent drives**: added
+`get_locicfg()` (`include/loci.c`, already existed, never called from
+any `src/` file before this) to `src/main.c`'s boot sequence — called
+right after `homedir_init()`, **in the same pre-`enable_overlay_ram()`
+block** as `homedir_init()`/the title-screen load, not after, since it's
+itself a round of LOCI file ops and the "Homedir-relative LOCI paths"
+section's real-hardware finding (issuing LOCI ops immediately after the
+`MICRODISCCFG` overlay-RAM toggle write fails on real hardware) applies
+here just as much. `filepicker.c`'s `'.'`/`','` handling
+(`picker_engine()`) now loops `while (!locicfg.validdev[drive])`
+exactly like locifilemanager-v2's own `dir_get_next_drive()`/
+`dir_get_prev_drive()` (`src/dir.c`) — the validity check this port's
+"Full key set" bullet above had originally, deliberately, left out.
+`locicfg.validdev[0]` is always set by `get_locicfg()` itself, so the
+skip-loop is guaranteed to terminate even on a session with no other
+drives present. `picker_set_drive_root()` itself does no validation —
+the caller is responsible for only ever passing an already-checked
+drive number, same division of responsibility as the
+locifilemanager-v2 reference.
+
+**Not yet covered by an automated test**: Phosphoric's `--loci-flash`
+mode backs LOCI with a single host directory, with no multi-drive
+concept to validate against, so there's no headless way to assert
+`locicfg.validdev[]` actually reflects more than drive 0 — confirmed via
+build + the full `make test` suite (185/185, unchanged) that this
+doesn't regress anything `--loci-flash` already covers. Real hardware
+remains the authoritative check for the drive-switch fix itself, same
+status as every other LOCI-multi-drive-dependent feature in this
+project.
+
+**Path row stale-text bug (same session)**: navigating to a shorter
+path (e.g. ascending with LEFT, or switching drives) left trailing
+characters from the previous, longer path visible past the new one --
+`cwin_putat_string()` only overwrites as many columns as the string
+passed to it (it clips at the window's right edge but never pads), so a
+shorter string simply leaves whatever was already in the columns past
+its own end. Fixed by space-padding the path to the field's full
+clipped width (`PICKER_WIN_WX - 2` = 34 columns) before writing it
+(`picker_draw_header()`, new module-static `picker_path_padded[35]` --
+same static-stack-budget reasoning as this file's other module-static
+buffers). The title row needed no equivalent fix since its text never
+changes after the popup opens.
+
+**List row trailing-colour-stripe fix (2026-06-22, user-requested)**:
+each file-list row's cyan/yellow paper attribute (set at window-relative
+column 0, see "Styling and key-overview row" above) carried all the way
+to the popup's right edge (window-relative column 35) with nothing to
+reset it -- the ULA applies an attribute byte from the column it's
+written at onward until the next one on that row, and this row never
+had a second one. Fixed by shrinking `PICKER_NAME_COLS` 34->33 and
+writing a fresh `A_BGWHITE` byte at the now-freed last column right
+after the name text (`picker_draw_list()`) -- confirmed via a raw
+screen-RAM byte dump (`tests/out/capture.bin`, absolute column 37 =
+window-relative 35) that every list row's last column now reads `0x17`
+(`A_BGWHITE`) regardless of selected/unselected state, instead of
+carrying the row's `0x13`(yellow)/`0x16`(cyan) paper byte through to the
+edge. The colour change is immediate per-column (same ULA behaviour this
+project's "Oric Screen Model" section already documents) -- no
+additional redraw timing concern. No test changes needed (no existing
+assertion checked that column's bytes); full suite stayed 185/185.
   scripts added this pass).
 
 
