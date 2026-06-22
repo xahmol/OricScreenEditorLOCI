@@ -43,6 +43,16 @@
  * left/up -- the same direction-choice principle canvas_resize() uses for
  * its row reflow, src/canvas.c).
  *
+ * x1/y1 are clamped to the real canvas extent (`app.canvas_width/
+ * height - 1`), not just `app.xoffset/yoffset + VIEWPORT_WIDTH/HEIGHT -
+ * 1` -- needed since canvas_resize_loaded() (Load Project only) can
+ * produce a canvas *smaller* than the viewport (V1's genuine 27-row
+ * default); without this, shifting would read/write one row or column
+ * past the real canvas, into canvas_resize_loaded()'s blank
+ * display-only padding. For every canvas >= the viewport (the normal
+ * case, and the only case before this session), the clamp is a no-op --
+ * identical to the previous behaviour.
+ *
  * @param dx -1/0/+1 horizontal shift direction.
  * @param dy -1/0/+1 vertical shift direction.
  * @return (none)
@@ -53,7 +63,10 @@ static void move_shift(int8_t dx, int8_t dy)
     uint16_t x0 = app.xoffset, x1 = (uint16_t)(app.xoffset + VIEWPORT_WIDTH - 1);
     uint16_t y0 = app.yoffset, y1 = (uint16_t)(app.yoffset + VIEWPORT_HEIGHT - 1);
 
-    undo_snapshot(x0, y0, VIEWPORT_WIDTH, VIEWPORT_HEIGHT);
+    if (x1 > app.canvas_width  - 1) x1 = (uint16_t)(app.canvas_width  - 1);
+    if (y1 > app.canvas_height - 1) y1 = (uint16_t)(app.canvas_height - 1);
+
+    undo_snapshot(x0, y0, (uint16_t)(x1 - x0 + 1), (uint16_t)(y1 - y0 + 1));
 
     if (dx > 0)
     {

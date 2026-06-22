@@ -139,12 +139,28 @@ void canvas_cursor_hide(uint16_t x, uint16_t y)
  * reachable -- ported from V1's cursormove()/plotmove(), adapted to OSE's
  * pure-software canvas_blit() (no hardware-scroll patch step needed).
  *
+ * The forward bound is `min(VIEWPORT_WIDTH/HEIGHT, canvas_width/height)
+ * - 1`, not the bare viewport constant -- needed since
+ * canvas_resize_loaded() (Load Project only) can produce a canvas
+ * *smaller* than the viewport (V1's genuine 27-row default). Without
+ * this, the cursor could move one cell past the real canvas into
+ * canvas_resize_loaded()'s blank display-only padding (added so
+ * canvas_blit() doesn't show stale overlay-RAM content there) and plot
+ * into it -- a real edit that renders but is silently discarded on the
+ * next save, since Save only ever writes canvas_width*canvas_height
+ * bytes. For every canvas >= the viewport (the normal case, and the
+ * only case before this session), `min()` always picks the viewport
+ * constant -- identical to the previous behaviour.
+ *
  * @param dx -1/0/+1 horizontal direction.
  * @param dy -1/0/+1 vertical direction.
  * @return (none)
  */
 void cursor_move_scroll(int8_t dx, int8_t dy)
 {
+    uint16_t maxcursorx = (app.canvas_width  < VIEWPORT_WIDTH)  ? app.canvas_width  : VIEWPORT_WIDTH;
+    uint16_t maxcursory = (app.canvas_height < VIEWPORT_HEIGHT) ? app.canvas_height : VIEWPORT_HEIGHT;
+
     if (dx < 0)
     {
         if (app.cursor_x > 0) app.cursor_x--;
@@ -152,7 +168,7 @@ void cursor_move_scroll(int8_t dx, int8_t dy)
     }
     else if (dx > 0)
     {
-        if (app.cursor_x < VIEWPORT_WIDTH - 1) app.cursor_x++;
+        if (app.cursor_x < maxcursorx - 1) app.cursor_x++;
         else if (app.xoffset + VIEWPORT_WIDTH < app.canvas_width) { app.xoffset++; canvas_blit(); }
     }
 
@@ -163,7 +179,7 @@ void cursor_move_scroll(int8_t dx, int8_t dy)
     }
     else if (dy > 0)
     {
-        if (app.cursor_y < VIEWPORT_HEIGHT - 1) app.cursor_y++;
+        if (app.cursor_y < maxcursory - 1) app.cursor_y++;
         else if (app.yoffset + VIEWPORT_HEIGHT < app.canvas_height) { app.yoffset++; canvas_blit(); }
     }
 }

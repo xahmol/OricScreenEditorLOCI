@@ -1840,6 +1840,34 @@ byte respectively.
   content unchanged) exactly as expected -- the charset round-trip
   itself was never broken.
 
+  **Follow-up, same day, user-requested assessment**: "is the program
+  actually able to handle canvas sizes smaller than 40x28" -- checking
+  found the display path (above) was fine, but two *editing* paths
+  still assumed `canvas_height/width >= VIEWPORT_HEIGHT/WIDTH` and could
+  let the cursor wander one cell past the real canvas into
+  `canvas_resize_loaded()`'s blank padding, then plot there -- a real
+  edit that renders but is **silently discarded on the next save**
+  (Save only ever writes `canvas_width*canvas_height` bytes). Fixed
+  both: `cursor_move_scroll()` (`src/canvas.c`, used by every cursor-key
+  handler in Main/Select/Line-Box/Write mode) now bounds DOWN/RIGHT
+  movement to `min(VIEWPORT_HEIGHT/WIDTH, canvas_height/width) - 1`,
+  not the bare viewport constant; `move_shift()` (`src/move.c`, Move
+  mode's content-nudge) now clamps its shift rectangle's `x1`/`y1` to
+  `canvas_width/height - 1` the same way, and sizes its `undo_snapshot()`
+  call to the actual (possibly smaller) clamped rectangle instead of
+  the bare viewport dimensions. `canvas_goto()`/Home and Select/Line-Box/
+  Write's cursor handling needed no change (the former already clamped
+  correctly; the latter all route through `cursor_move_scroll()`, so
+  fixing that one function fixed all of them at once). For every canvas >= the viewport
+  (the normal case, and the only case before this
+  session), both `min()`/clamp operations are no-ops -- identical to
+  the previous behaviour. Verified directly in Phosphoric on the
+  27-row PETSCII project: repeated DOWN now stops the cursor at `XY
+  5,26` (the real last row), not 27; Move mode's DOWN shift no longer
+  touches the phantom row. No automated test added for this specific
+  follow-up (manual Phosphoric verification only) -- full suite
+  unaffected, still 187/187.
+
 ### File picker
 
 `src/filepicker.c/h`'s `filepicker_run(title, filter)` replaces
