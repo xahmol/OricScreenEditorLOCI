@@ -35,6 +35,11 @@ void canvas_blit(void);
 void canvas_cursor_show(uint16_t x, uint16_t y);
 void canvas_cursor_hide(uint16_t x, uint16_t y);
 uint8_t canvas_resize(uint16_t neww, uint16_t newh);
+// Floor-free variant for fileio_load_project() only -- see canvas.c's
+// doc comment for why Load Project must not enforce the VIEWPORT
+// minimum (V1 projects, including the checked-in PETSCII demo, are
+// genuinely 40x27).
+uint8_t canvas_resize_loaded(uint16_t neww, uint16_t newh);
 void cursor_move_scroll(int8_t dx, int8_t dy);
 
 // Jump the cursor + viewport directly to canvas-absolute (x, y): clamps

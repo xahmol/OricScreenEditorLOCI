@@ -216,10 +216,14 @@ uint8_t modifier_attr_byte(void)
 }
 
 /**
- * Resize the canvas to neww x newh cells, reflowing existing rows in place
- * via canvas_rowbuf[] when the width changes. Growing height just blanks the
- * new rows (row stride doesn't change); shrinking height needs no data
- * changes (trailing rows simply become unused).
+ * Shared resize logic for canvas_resize()/canvas_resize_loaded() --
+ * reflows existing rows in place via canvas_rowbuf[] when the width
+ * changes. Growing height just blanks the new rows (row stride doesn't
+ * change); shrinking height needs no data changes (trailing rows simply
+ * become unused). Does not itself enforce a floor beyond a basic 1x1
+ * sanity check -- callers apply whatever floor is appropriate for their
+ * own caller (see canvas_resize()'s VIEWPORT floor vs.
+ * canvas_resize_loaded()'s lack of one).
  *
  * Overlap safety for the width reflow: growing processes rows high-to-low
  * (each new row's write region starts strictly after the previous row's old
@@ -230,15 +234,15 @@ uint8_t modifier_attr_byte(void)
  *
  * @param neww New canvas width in cells.
  * @param newh New canvas height in cells.
- * @return 1 if applied, 0 if neww/newh are out of range (too small for the
- *         viewport, or neww*newh exceeds CANVAS_MAX_SIZE) -- canvas unchanged.
+ * @return 1 if applied, 0 if neww/newh are degenerate (0) or neww*newh
+ *         exceeds CANVAS_MAX_SIZE -- canvas unchanged.
  */
-uint8_t canvas_resize(uint16_t neww, uint16_t newh)
+static uint8_t canvas_resize_core(uint16_t neww, uint16_t newh)
 {
     uint16_t oldw = app.canvas_width;
     uint16_t oldh = app.canvas_height;
 
-    if (neww < VIEWPORT_WIDTH || newh < VIEWPORT_HEIGHT) return 0;
+    if (neww == 0 || newh == 0) return 0;
     if ((uint32_t)neww * newh > CANVAS_MAX_SIZE) return 0;
 
     if (neww > oldw)
@@ -265,5 +269,71 @@ uint8_t canvas_resize(uint16_t neww, uint16_t newh)
 
     app.canvas_width  = neww;
     app.canvas_height = newh;
+    return 1;
+}
+
+/**
+ * Resize the canvas to neww x newh cells (canvas_resize_core()), enforcing
+ * the VIEWPORT_WIDTH/HEIGHT floor -- used by every USER-TYPED resize
+ * (the interactive Screen > Width/Height dialog, and Load Screen/
+ * Combined's fileio_get_dimensions() prompt, which pre-fills the
+ * *current* canvas size but lets the user edit it) where a value smaller
+ * than this port's architectural minimum is almost certainly a typo, not
+ * an intentional small canvas.
+ *
+ * @param neww New canvas width in cells.
+ * @param newh New canvas height in cells.
+ * @return 1 if applied, 0 if neww/newh are too small for the viewport or
+ *         neww*newh exceeds CANVAS_MAX_SIZE -- canvas unchanged.
+ */
+uint8_t canvas_resize(uint16_t neww, uint16_t newh)
+{
+    if (neww < VIEWPORT_WIDTH || newh < VIEWPORT_HEIGHT) return 0;
+    return canvas_resize_core(neww, newh);
+}
+
+/**
+ * Resize the canvas to neww x newh cells (canvas_resize_core()), WITHOUT
+ * the VIEWPORT_WIDTH/HEIGHT floor canvas_resize() enforces -- used only
+ * by fileio_load_project() (src/fileio.c), where the dimensions come
+ * directly from the project file's own header, not from anything the
+ * user typed at a prompt. Found necessary 2026-06-23 (user report: "the
+ * PETSCII project is not recognised as a valid project") -- V1's own
+ * canvas was always 40x27 (VIEWPORT_HEIGHT was 27 before this port grew
+ * it to 28, see CLAUDE.md "VIEWPORT_HEIGHT 27->28"), so any genuine V1
+ * project -- including the checked-in PETSCII demo, deliberately kept
+ * byte-identical to V1's own output -- has canvas_height=27 in its
+ * PJ.BIN header. canvas_resize()'s floor rejected that as "invalid",
+ * even though the file is perfectly well-formed; the floor's actual
+ * purpose (catching an accidental too-small value the user just typed)
+ * doesn't apply here at all, since Load Project never prompts for a
+ * size. Still only allows neww*newh <= CANVAS_MAX_SIZE and rejects a
+ * fully degenerate 0-width/0-height file (canvas_resize_core()'s own
+ * sanity floor).
+ *
+ * Blank-pads screenmap[] from row `newh` through `VIEWPORT_HEIGHT-1`
+ * (using `neww` as the row stride) when `newh < VIEWPORT_HEIGHT` --
+ * canvas_blit() always reads a full VIEWPORT_HEIGHT rows with no bounds
+ * check against app.canvas_height, so without this, a sub-viewport
+ * canvas (e.g. V1's genuine 27-row default) would show stale overlay-
+ * RAM content as a phantom bottom row instead of blank cells. Assumes
+ * app.xoffset/yoffset are 0 at this point (true for every V1 project,
+ * which has no scrolling concept and always stores xoffset=yoffset=0)
+ * -- a project with both a sub-viewport canvas AND a nonzero stored
+ * offset is not a combination V1 (or this port) ever produces, so it's
+ * not specifically handled here.
+ *
+ * @param neww New canvas width in cells.
+ * @param newh New canvas height in cells.
+ * @return 1 if applied, 0 if neww/newh are 0 or neww*newh exceeds
+ *         CANVAS_MAX_SIZE -- canvas unchanged.
+ */
+uint8_t canvas_resize_loaded(uint16_t neww, uint16_t newh)
+{
+    if (!canvas_resize_core(neww, newh)) return 0;
+
+    if (newh < VIEWPORT_HEIGHT)
+        memset(&screenmap[(uint32_t)newh * neww], CH_SPACE, (uint32_t)(VIEWPORT_HEIGHT - newh) * neww);
+
     return 1;
 }

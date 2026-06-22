@@ -572,7 +572,7 @@ void fileio_load_project(void)
         fileio_parse_v1_project(v1buf, &proj);
     }
 
-    if (!canvas_resize(proj.canvas_width, proj.canvas_height))
+    if (!canvas_resize_loaded(proj.canvas_width, proj.canvas_height))
     {
         menu_messagepopup(MSG_FILE_INVALID_FORMAT);
         return;

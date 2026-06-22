@@ -248,6 +248,44 @@ echo "Load Project accepts V1's original 19-byte PJ.BIN layout"
 check_found "cursor/plot fields translated (XY 5,3 C42B I3 P2)" "XY 5, 3C42B S20I3P2" "$DUMP7"
 check_bytes "screen content loaded ('C'=0x43 at (0,0))" "0xBB80:1" "43" "$DUMP7"
 
+# --- Scenario 8: Load Project accepts a genuine sub-viewport (27-row) ------
+# canvas, matching V1's own default height -- regression test for
+# canvas_resize()'s VIEWPORT_HEIGHT floor rejecting this as "invalid"
+# (user report 2026-06-23: "the PETSCII project is not recognised as a
+# valid project" -- PETSCIIPJ.BIN's own canvas_height is genuinely 27).
+# fileio_load_project() must use canvas_resize_loaded() (no floor), not
+# canvas_resize(), for exactly this reason. Also confirms canvas_blit()'s
+# phantom 28th row (canvas_resize_loaded()'s blank-pad) renders as space,
+# not stale overlay-RAM content.
+reset_flash
+python3 -c "
+data = bytes([
+    0, 0,        # stdchanged, altchanged
+    0, 0,        # cursor_x, cursor_y
+    0, 40,       # width=40
+    0, 27,       # height=27 -- V1's own genuine default, below this
+                 # port's VIEWPORT_HEIGHT=28
+    0x04, 0x38,  # screentotal (ignored)
+    7, 0, 0, 0, 0, # plotink, plotpaper, plotblink, plotdouble, plotaltchar
+    0x40,        # plotscreencode = '@'
+    0xFF,        # dead byte
+    0, 0,        # xoffset, yoffset
+])
+open('$LOCIFLASH/H27PJ.BIN', 'wb').write(data)
+scr = bytearray(b' ' * (40 * 27))
+scr[5] = 0x58  # 'X' at (5,0) -- away from the default cursor at (0,0),
+               # whose own preview overlay (app.plotscreencode^0x80)
+               # would otherwise overwrite whatever this test checks
+open('$LOCIFLASH/H27SC.BIN', 'wb').write(bytes(scr))
+"
+DUMP8="$OUT/capture_fileio_load_subviewport.bin"
+run_capture 21000000 \
+    '\p1\f1\p1\r\p1\n\p1\d\p1\d\p1\d\p1\n\p1\n\p1\e' "$DUMP8"
+echo ""
+echo "Load Project accepts a genuine 27-row (sub-viewport) canvas"
+check_bytes "screen content loaded ('X'=0x58 at (5,0))" "0xBB85:1" "58" "$DUMP8"
+check_bytes "phantom row 27 is blank, not stale overlay RAM" "0xBF38:1" "20" "$DUMP8"
+
 echo ""
 echo "==========================================================="
 echo "  Results: $pass passed, $fail failed"

@@ -1771,13 +1771,74 @@ byte respectively.
   from `assets/Petscii.{prj,scr,css,csa}.bin`, carried over early in
   this project but never wired into anything) are V1's actual original
   PETSCII demo project files — confirmed byte-identical to what V1
-  itself wrote, and confirmed to load correctly end-to-end through the
-  real `fileio_load_project()` path (cursor position, plot attributes,
-  and the rendered PETSCII border artwork all came through correctly).
-  `make usb` now distributes these 4 files alongside the built `.tap`s
-  so a fresh build's File > Load project has something real to try
-  immediately — not embedded in the binary, distributed as separate
-  files, matching how V1 itself shipped them.
+  itself wrote, and confirmed (at the time) to load correctly end-to-end
+  through the real `fileio_load_project()` path (cursor position, plot
+  attributes, and the rendered PETSCII border artwork all came through
+  correctly). `make usb` now distributes these 4 files alongside the
+  built `.tap`s so a fresh build's File > Load project has something
+  real to try immediately — not embedded in the binary, distributed as
+  separate files, matching how V1 itself shipped them.
+
+  **Regressed, then fixed (2026-06-23, user report: "the PETSCII
+  project is not recognised as a valid project")**: the "loads
+  correctly" claim above stopped holding once `VIEWPORT_HEIGHT` grew
+  27->28 (see "VIEWPORT_HEIGHT 27->28 + statusbar auto-hide" below) --
+  `canvas_resize()`'s floor (`neww < VIEWPORT_WIDTH || newh <
+  VIEWPORT_HEIGHT`) started rejecting `fileio_load_project()`'s call
+  with the file's own genuine `canvas_height=27` (V1's own default,
+  confirmed via a direct hex dump of `PETSCIIPJ.BIN`: bytes 6-7 =
+  `00 1b` = 27) as "Invalid or incompatible file." That same regression
+  pass already caught and repatched `OSELOGOPJ`/`OSEDEMO.BIN` (see
+  "Demo assets VIEWPORT_HEIGHT regression" in memory) but missed
+  `PETSCII*.BIN` -- a real, deliberate gap, not an oversight at the
+  time: `PETSCII*.BIN` is meant to stay byte-identical to V1's own
+  output (the whole point of keeping it around, per the "V1
+  file-format compatibility" audit above), so *patching the asset* the
+  way `OSELOGOPJ`/`OSEDEMO` were isn't an option here -- the fix has to
+  be in the loader, not the file.
+
+  Fixed with a new `canvas_resize_loaded()` (`src/canvas.c/h`) --
+  shares `canvas_resize()`'s core reflow logic (factored into a new
+  static `canvas_resize_core()`) but skips the `VIEWPORT_WIDTH/HEIGHT`
+  floor entirely, since that floor's actual purpose (catching an
+  accidental too-small value the user just typed at a prompt) doesn't
+  apply to Load Project at all -- its dimensions come straight from the
+  file's own header, never from a user-editable prompt, unlike Load
+  Screen/Combined's `fileio_get_dimensions()` (which keeps the floor,
+  correctly -- a user *can* mistype a value there). Only
+  `fileio_load_project()` calls the new function; every other
+  `canvas_resize()` call site is unaffected. Still rejects a fully
+  degenerate 0-width/0-height file and still enforces the
+  `CANVAS_MAX_SIZE` ceiling.
+
+  **A second, related fix bundled in**: `canvas_blit()` always reads a
+  full `VIEWPORT_HEIGHT` rows with no bounds check against
+  `app.canvas_height` -- harmless before this change (canvas_height was
+  always >= VIEWPORT_HEIGHT), but once a genuinely sub-viewport canvas
+  became loadable, the phantom row(s) below the real canvas would have
+  shown stale overlay-RAM content instead of blank cells. Fixed by
+  having `canvas_resize_loaded()` blank-pad `screenmap[]` from row
+  `newh` through `VIEWPORT_HEIGHT-1` (using `neww` as the row stride)
+  whenever `newh < VIEWPORT_HEIGHT` -- assumes `app.xoffset`/`yoffset`
+  are 0 at this point, true for every V1 project (no scrolling concept,
+  always stores 0/0), so not handled further for the combination of
+  sub-viewport canvas *and* a nonzero stored offset, which V1 (or this
+  port) never actually produces.
+
+  **The originally-reported "charset not saved" turned out to be the
+  same bug, not a second one**: the user's other observation --
+  "saving a project does not seem to save altered charsets... or
+  loading a project with charsets the charsets are not marked as
+  changed" -- was traced to the *same* root cause: `fileio_load_project()`
+  already correctly sets `app.stdchanged`/`altchanged` when `CS.BIN`/
+  `CA.BIN` are present (confirmed by re-reading the existing code), but
+  the PETSCII project (the one being tested) never got that far, since
+  it was rejected by the canvas-height floor before ever reaching the
+  charset-file checks. Confirmed via direct Phosphoric testing: after
+  this fix, loading PETSCII then immediately re-saving under the same
+  name rewrote `PETSCIICS.BIN`/`PETSCIICA.BIN` (timestamps updated,
+  content unchanged) exactly as expected -- the charset round-trip
+  itself was never broken.
 
 ### File picker
 
