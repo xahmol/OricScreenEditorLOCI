@@ -87,11 +87,19 @@
                                // picker_draw_header()'s doc comment)
 
 // Internal mode for picker_engine() -- not part of the public API
-// (filepicker_run()/filepicker_browse_dir() below are the two public
+// (filepicker_run()/filepicker_run_save() below are the two public
 // entry points, each fixing one of these).
 #define PICKER_MODE_FILE 0   // ENTER on a file selects it (Load actions)
-#define PICKER_MODE_DIR  1   // 's' confirms the current directory (Save actions);
-                              // ENTER never selects a file, only descends dirs
+#define PICKER_MODE_SAVE 1   // ENTER on the pinned "<new file>" sentinel or
+                              // an existing file picks a Save target (see
+                              // picker_engine()'s doc comment for the
+                              // tri-state return) -- replaces the old
+                              // PICKER_MODE_DIR (2026-06-22 redesign,
+                              // user-reported: "can never end as enter
+                              // does not work" -- the old mode showed
+                              // files for context only, never selectable,
+                              // with the only way to finish being an
+                              // undocumented 's' key)
 
 // XRAM layout for the directory linked list -- matches
 // locifilemanager-v2's DIR1BASE/DIRSIZE (dir.h), but only one list (OSE's
@@ -117,6 +125,51 @@ static uint16_t picker_firstelement;  // XRAM addr of the list head, 0 = empty
 static uint16_t picker_firstprint;    // XRAM addr of the row-0 entry
 static uint16_t picker_present;       // XRAM addr of the highlighted entry
 static uint8_t  picker_cursorrow;     // highlighted entry's visible row
+
+// SAVE-mode state (2026-06-22 redesign) -- module-static rather than
+// threaded through every helper's parameter list, matching this file's
+// existing pattern (picker_firstelement etc. above). The "<new file>"
+// sentinel is deliberately NOT a real XRAM/PickerMeta entry -- it's a
+// fixed display row drawn by picker_draw_newfile_row(), tracked purely
+// by picker_on_newfile, so none of the XRAM-list scroll/page helpers
+// need to know it exists.
+static uint8_t picker_mode;          // current picker_engine() mode
+static uint8_t picker_on_newfile;    // 1 = cursor is on the sentinel row
+static uint8_t picker_listrows;      // PICKER_PAGE_ROWS, or one less in
+                                      // SAVE mode (the sentinel takes a
+                                      // fixed row above the scrollable list)
+static uint8_t picker_list_y0_eff;   // PICKER_LIST_Y0, or +1 in SAVE mode
+static char    picker_save_match[64]; // app.filename + this action's
+                                       // suffix, built once at SAVE-mode
+                                       // entry -- the target basename
+                                       // picker_apply_save_default() looks
+                                       // for to default the cursor onto
+                                       // the previously-used file
+
+// Genuinely-reserved scratch buffer for picker_engine()'s register-
+// pressure workaround (see that function's own comment) -- NOT a magic
+// address. A real, linker-allocated static array, unlike the pre-
+// existing src/menu.c precedent's literal `(uint8_t *)0xA000`: that
+// address was documented as "unused scratch space in the heap region",
+// which turned out to be wrong for this project's actual memory map
+// (build/oseloci.map: `10000 - 0000 : HEAP, heap` -- an empty/degenerate
+// heap, since malloc/free are fully stubbed; 0xA000 actually falls
+// inside the program's own live BSS, `9438 - ac7c`). Confirmed the hard
+// way (2026-06-22): reusing that same pattern at 0xA200/0xA300 for this
+// function's own workaround silently corrupted real static data and
+// hung the picker mid-session, with no compiler warning -- a fixed-size
+// static array sidesteps the whole class of bug by construction. The
+// pre-existing menu.c 0xA000 write happens to land on a byte that's
+// apparently harmless in practice, but is the same kind of landmine and
+// is flagged separately for follow-up, not fixed here (out of scope for
+// this change).
+// Sized generously above the dummy sprintf's own worst-case formatted
+// length (title <=15 chars, path up to PICKER_PATH_MAXLEN-1=63 chars,
+// the rest are 1-3 digit numbers + ~66 bytes of literal text -- about
+// 160 bytes worst case) so that call can never overflow this buffer,
+// the same way an out-of-bounds magic address could silently corrupt
+// whatever followed it.
+static uint8_t picker_regpressure_scratch[176];
 
 // Module-static, not picker_engine() locals: picker_engine() already
 // calls picker_make_dir() (its own static buffers, above) on the same
@@ -150,44 +203,30 @@ static uint8_t picker_name_ends_with(const char *name, const char *suffix)
 }
 
 /**
- * Check whether a directory entry matches filter (PICKER_FILTER_PLAIN/
- * PROJECT/NONE). Directories always match, so navigation works
- * regardless of which file-type filter is active.
- *
- * PICKER_FILTER_NONE matches every file unconditionally -- added
- * 2026-06-22 (user-requested): suffix-based filtering is reserved for
- * Load Project alone now (the four-file PJ/SC/CS/CA.BIN scheme is
+ * Check whether a directory entry matches filter (PICKER_FILTER_PROJECT/
+ * NONE). Directories always match, so navigation works regardless of
+ * which file-type filter is active. PICKER_FILTER_NONE matches every
+ * file unconditionally -- suffix-based filtering is reserved for the
+ * Project family alone (the four-file PJ/SC/CS/CA.BIN scheme is
  * OSE-specific and self-consistent, so filtering to *PJ.BIN there is
- * still correct); every other Load action (Screen/Combined/Charset)
- * needs to be able to pick *any* file, including ones that don't follow
- * OSE's own naming convention at all (e.g. a raw binary screen dump
- * saved by another tool, or one missing the `.BIN` extension).
- * PICKER_FILTER_PLAIN (the old *.BIN-excluding-project-suffixes filter)
- * is unused by any filepicker_run() call site as of this change -- kept
- * only because filepicker_browse_dir() still passes it for its
- * context-only file listing (selection is disabled in that mode, so the
- * filter only affects which filenames are shown alongside the
- * directories being browsed).
+ * still correct); every other Load/Save action needs to be able to
+ * pick *any* file, including ones that don't follow OSE's own naming
+ * convention at all (e.g. a raw binary dump saved by another tool, or
+ * one missing the `.BIN` extension). The old PICKER_FILTER_PLAIN
+ * (*.BIN-excluding-project-suffixes) branch was removed 2026-06-22
+ * alongside filepicker_browse_dir(), its only caller.
  *
  * @param de     Directory entry to check.
- * @param filter PICKER_FILTER_PLAIN, PICKER_FILTER_PROJECT, or
- *               PICKER_FILTER_NONE.
+ * @param filter PICKER_FILTER_PROJECT or PICKER_FILTER_NONE.
  * @return 1 if de should be shown, 0 otherwise.
  */
 static uint8_t picker_entry_matches(const LociDirent *de, uint8_t filter)
 {
     if (de->d_attrib & DIR_ATTR_DIR) return 1;
 
-    if (filter == PICKER_FILTER_NONE) return 1;
-
     if (filter == PICKER_FILTER_PROJECT)
         return picker_name_ends_with(de->d_name, "PJ.BIN");
 
-    if (!picker_name_ends_with(de->d_name, ".BIN")) return 0;
-    if (picker_name_ends_with(de->d_name, "PJ.BIN")) return 0;
-    if (picker_name_ends_with(de->d_name, "SC.BIN")) return 0;
-    if (picker_name_ends_with(de->d_name, "CS.BIN")) return 0;
-    if (picker_name_ends_with(de->d_name, "CA.BIN")) return 0;
     return 1;
 }
 
@@ -347,7 +386,7 @@ static void picker_draw_list(OricCharWin *w)
     uint8_t    row, i, len, y;
     uint8_t    selected;
 
-    for (row = 0; row < PICKER_PAGE_ROWS; row++)
+    for (row = 0; row < picker_listrows; row++)
     {
         if (addr)
         {
@@ -369,14 +408,43 @@ static void picker_draw_list(OricCharWin *w)
         for (i = len; i < PICKER_NAME_COLS; i++) line[i] = CH_SPACE;
         line[PICKER_NAME_COLS] = '\0';
 
-        selected = (row == picker_cursorrow);
-        y = (uint8_t)(PICKER_LIST_Y0 + row);
+        selected = (row == picker_cursorrow) && !picker_on_newfile;
+        y = (uint8_t)(picker_list_y0_eff + row);
 
         cwin_putat_char(w, 0, y, selected ? A_BGYELLOW : A_BGCYAN);
         cwin_putat_char(w, 1, y, selected ? '-' : CH_SPACE);
         cwin_putat_string(w, 2, y, line);
         cwin_putat_char(w, 2 + PICKER_NAME_COLS, y, A_BGWHITE);
     }
+}
+
+/**
+ * Draw the pinned "<new file>" sentinel row (SAVE mode only,
+ * 2026-06-22), always at PICKER_LIST_Y0 -- one fixed display row above
+ * the scrollable list, which is why picker_list_y0_eff/picker_listrows
+ * shrink by 1 in this mode rather than the window growing. Same
+ * yellow/cyan-paper + '-'/' '-indicator + trailing white-reset-column
+ * convention as picker_draw_list()'s real rows, so it reads as part of
+ * the same list rather than a separate UI element.
+ *
+ * @param w Popup window.
+ * @return (none)
+ */
+static void picker_draw_newfile_row(OricCharWin *w)
+{
+    char    line[PICKER_NAME_COLS + 1];
+    uint8_t i, len;
+
+    len = (uint8_t)strlen(MSG_FILE_PICKER_NEWFILE);
+    if (len > PICKER_NAME_COLS) len = PICKER_NAME_COLS;
+    memcpy(line, MSG_FILE_PICKER_NEWFILE, len);
+    for (i = len; i < PICKER_NAME_COLS; i++) line[i] = CH_SPACE;
+    line[PICKER_NAME_COLS] = '\0';
+
+    cwin_putat_char(w, 0, PICKER_LIST_Y0, picker_on_newfile ? A_BGYELLOW : A_BGCYAN);
+    cwin_putat_char(w, 1, PICKER_LIST_Y0, picker_on_newfile ? '-' : CH_SPACE);
+    cwin_putat_string(w, 2, PICKER_LIST_Y0, line);
+    cwin_putat_char(w, 2 + PICKER_NAME_COLS, PICKER_LIST_Y0, A_BGWHITE);
 }
 
 /**
@@ -475,7 +543,7 @@ static uint8_t picker_current_drive(const char *path)
  * Rebuild the listing for path and redraw the popup -- always succeeds
  * visually, even if path turns out to have no matching entries (an empty
  * directory is a completely normal thing to navigate into or choose as a
- * save destination, see filepicker_browse_dir(); it just renders as a
+ * save destination, see filepicker_run_save(); it just renders as a
  * blank list, picker_present left at 0/"no entry", and ENTER/UP/DOWN/etc
  * become no-ops there until the user navigates elsewhere). Earlier
  * versions of this function treated an empty result as failure and
@@ -498,9 +566,72 @@ static void picker_reload(OricCharWin *w, const char *title, const char *path, u
     picker_build_list(path, filter);
     picker_firstprint = picker_present = picker_firstelement;
     picker_cursorrow   = 0;
+    // Every directory change defaults back onto the sentinel in SAVE
+    // mode -- "previous file" context (picker_apply_save_default())
+    // only ever applies once, to the starting directory, never re-shown
+    // here on subsequent navigation.
+    picker_on_newfile  = (picker_mode == PICKER_MODE_SAVE) ? 1 : 0;
 
     picker_draw_header(w, title, path);
     picker_draw_list(w);
+    if (picker_mode == PICKER_MODE_SAVE) picker_draw_newfile_row(w);
+}
+
+/**
+ * One-time-only default-cursor positioning for SAVE mode (2026-06-22,
+ * user-requested: "default should be saving to the previously opened
+ * file if applicable"). Called exactly once in picker_engine(), right
+ * after its startup picker_reload() call -- not from inside
+ * picker_reload() itself, so subsequent navigation to a different
+ * directory does NOT re-apply this (there's no "previous file" context
+ * anywhere but the starting directory). Scans the just-built listing
+ * for picker_save_match (app.filename + this action's suffix, built by
+ * the caller); if found, moves the cursor there instead of leaving it
+ * on the sentinel, scrolling picker_firstprint if the match is beyond
+ * the first visible page. No-op if picker_save_match is empty or
+ * nothing matches -- the sentinel (already set by picker_reload())
+ * stays the default.
+ *
+ * @param w Popup window (redrawn if a match was found).
+ * @return (none)
+ */
+static void picker_apply_save_default(OricCharWin *w)
+{
+    uint16_t   addr = picker_firstelement;
+    PickerMeta meta;
+    char       name[64];
+    uint8_t    row = 0;
+
+    if (!picker_save_match[0]) return;
+
+    while (addr)
+    {
+        xram_memcpy_from(&meta, addr, sizeof(meta));
+        xram_memcpy_from(name, (uint16_t)(addr + sizeof(meta)), meta.length);
+        name[meta.length] = '\0';
+
+        if (!meta.isdir && strcmp(name, picker_save_match) == 0)
+        {
+            picker_present    = addr;
+            picker_cursorrow  = row;
+            picker_on_newfile = 0;
+            picker_draw_list(w);
+            picker_draw_newfile_row(w);
+            return;
+        }
+
+        if (row + 1 < picker_listrows)
+        {
+            row++;
+        }
+        else
+        {
+            PickerMeta firstmeta;
+            xram_memcpy_from(&firstmeta, picker_firstprint, sizeof(firstmeta));
+            picker_firstprint = firstmeta.next;
+        }
+        addr = meta.next;
+    }
 }
 
 /**
@@ -520,7 +651,7 @@ static uint8_t picker_step_down(void)
     xram_memcpy_from(&meta, picker_present, sizeof(meta));
     if (!meta.next) return 0;
 
-    if (picker_cursorrow + 1 < PICKER_PAGE_ROWS)
+    if (picker_cursorrow + 1 < picker_listrows)
     {
         picker_cursorrow++;
     }
@@ -596,7 +727,7 @@ static void picker_bottom(void)
 static void picker_pagedown(void)
 {
     uint8_t i;
-    for (i = 0; i < PICKER_PAGE_ROWS; i++)
+    for (i = 0; i < picker_listrows; i++)
         if (!picker_step_down()) break;
 }
 
@@ -608,7 +739,7 @@ static void picker_pagedown(void)
 static void picker_pageup(void)
 {
     uint8_t i;
-    for (i = 0; i < PICKER_PAGE_ROWS; i++)
+    for (i = 0; i < picker_listrows; i++)
         if (!picker_step_up()) break;
 }
 
@@ -659,18 +790,134 @@ static void picker_make_dir(OricCharWin *w, const char *title, const char *path,
 }
 
 /**
- * Shared navigation engine for both filepicker_run() (PICKER_MODE_FILE)
- * and filepicker_browse_dir() (PICKER_MODE_DIR) -- see this file's
- * header comment for the 2026-06-21 full-traversal redesign. Starts
- * browsing at app.filedir (filedir_init_default()'d if not already
- * set), not a fixed root.
+ * Shared navigation engine for filepicker_run() (PICKER_MODE_FILE) and
+ * filepicker_run_save() (PICKER_MODE_SAVE) -- see this file's header
+ * comment for the 2026-06-21 full-traversal redesign and
+ * filepicker_run_save()'s doc comment for the 2026-06-22 SAVE-mode
+ * redesign. Starts browsing at app.filedir (filedir_init_default()'d if
+ * not already set), not a fixed root.
  *
  * @param title  Title row text.
  * @param filter PICKER_FILTER_PROJECT or PICKER_FILTER_NONE.
- * @param mode   PICKER_MODE_FILE or PICKER_MODE_DIR.
- * @return 1 on selection (app.filename set for FILE mode, app.filedir
- *         set for DIR mode), 0 if cancelled (ESC).
+ * @param mode   PICKER_MODE_FILE or PICKER_MODE_SAVE.
+ * @return FILE mode: 1 on selection (app.filename/app.filedir set), 0 if
+ *         cancelled (ESC). SAVE mode: 0 if cancelled; 1 if an existing
+ *         file was picked and overwrite-confirmed (app.filename/
+ *         app.filedir set); 2 if the "<new file>" sentinel was picked
+ *         (app.filedir set, app.filename still needs a typed name).
  */
+/**
+ * Initialize all SAVE-mode module-static state for picker_engine() --
+ * factored out of picker_engine() itself (2026-06-22) to keep that
+ * function's own local-variable footprint small. Oscar64's -O2
+ * whole-program register allocator computes each function's prologue
+ * save/restore set from its own peak live-range pressure; the original
+ * inline version of this setup (mode-dependent picker_listrows/
+ * picker_list_y0_eff assignment plus the picker_save_match strncpy/
+ * strcat block) pushed picker_engine()'s own pressure high enough to
+ * under-count its save-set, corrupting unrelated screen RAM elsewhere
+ * (src/menu.c's menu_draw_item(), see oscar64manual.md's "-O2
+ * whole-program register allocator" entry) -- confirmed via a `-g` asm
+ * diff against a build without this session's SAVE-mode additions.
+ * Moving the logic into its own small function (rather than padding
+ * picker_engine() with a dummy call, which only relocated the symptom
+ * to a different corrupted register in testing) reduces picker_engine()'s
+ * own pressure directly instead of fighting the allocator's heuristics.
+ *
+ * @param filter PICKER_FILTER_PROJECT or PICKER_FILTER_NONE.
+ * @param mode   PICKER_MODE_FILE or PICKER_MODE_SAVE.
+ * @return (none)
+ */
+static void picker_init_save_state(uint8_t filter, uint8_t mode)
+{
+    picker_mode        = mode;
+    picker_listrows    = (mode == PICKER_MODE_SAVE) ? (PICKER_PAGE_ROWS - 1) : PICKER_PAGE_ROWS;
+    picker_list_y0_eff = (mode == PICKER_MODE_SAVE) ? (PICKER_LIST_Y0 + 1) : PICKER_LIST_Y0;
+
+    if (mode == PICKER_MODE_SAVE)
+    {
+        strncpy(picker_save_match, app.filename, sizeof(picker_save_match) - 7);
+        picker_save_match[sizeof(picker_save_match) - 7] = '\0';
+        strcat(picker_save_match, (filter == PICKER_FILTER_PROJECT) ? "PJ.BIN" : ".BIN");
+    }
+    else
+    {
+        picker_save_match[0] = '\0';
+    }
+}
+
+/**
+ * Commit picker_present (a real file, not a directory) as the picker's
+ * result: extracts the name from XRAM, applies filter-specific suffix
+ * stripping, and (SAVE mode only) the overwrite-confirm prompt before
+ * assigning app.filename/app.filedir. Factored out of picker_engine()'s
+ * ENTER-key handling (2026-06-22) to reduce that function's own local-
+ * variable footprint -- the original inline version pushed
+ * picker_engine()'s register pressure high enough that Oscar64's -O2
+ * whole-program register allocator under-counted its prologue save/
+ * restore set, corrupting unrelated screen RAM elsewhere (src/menu.c's
+ * menu_draw_item(), confirmed via a `-g` asm diff -- see
+ * oscar64manual.md's "-O2 whole-program register allocator" entry, and
+ * picker_init_save_state()'s doc comment for the same fix applied to a
+ * different part of this function).
+ *
+ * @param path   Current directory (set into app.filedir on commit).
+ * @param filter PICKER_FILTER_PROJECT or PICKER_FILTER_NONE.
+ * @param mode   PICKER_MODE_FILE or PICKER_MODE_SAVE.
+ * @return 1 if committed (app.filename/app.filedir set), 0 if the user
+ *         declined an overwrite confirmation (SAVE mode only -- FILE
+ *         mode never returns 0 here).
+ */
+static uint8_t picker_commit_file(const char *path, uint8_t filter, uint8_t mode)
+{
+    char       *name = picker_name;
+    const char *suffix;
+    uint8_t     suflen, baselen;
+    PickerMeta  meta;
+
+    xram_memcpy_from(&meta, picker_present, sizeof(meta));
+    xram_memcpy_from(name, (uint16_t)(picker_present + sizeof(meta)), meta.length);
+    name[meta.length] = '\0';
+
+    // PICKER_FILTER_PROJECT strips "PJ.BIN" so the base name fileio.c's
+    // filedir_join_suffix(fullpath, "SC.BIN"/"CS.BIN"/"CA.BIN")-style
+    // composition expects is what's left (see "LOCI file I/O" in
+    // CLAUDE.md, unchanged). Every other filter (PICKER_FILTER_NONE --
+    // see picker_entry_matches()'s doc comment) stores the selected
+    // filename verbatim instead; in SAVE mode this still needs the same
+    // trailing-".BIN" strip fileio_strip_bin_suffix() applies for Load,
+    // so the eventual filedir_join_suffix(fullpath, ".BIN") doesn't
+    // double it -- done inline here since app.filename isn't assigned
+    // yet at this point.
+    if (filter == PICKER_FILTER_PROJECT)
+    {
+        suffix  = "PJ.BIN";
+        suflen  = (uint8_t)strlen(suffix);
+        baselen = (uint8_t)(meta.length - suflen);
+        if (baselen > 63) baselen = 63;
+        name[baselen] = '\0';
+    }
+    else if (mode == PICKER_MODE_SAVE)
+    {
+        uint8_t len = (uint8_t)strlen(name);
+        if (len >= 4 && strcmp(name + len - 4, ".BIN") == 0)
+            name[len - 4] = '\0';
+    }
+
+    // SAVE mode: confirm before overwriting an existing file (2026-06-22,
+    // user-requested, referencing locifilemanager-v2's menu_confirm_
+    // file()/"File exists. Overwrite?" pattern). "No" leaves the picker
+    // open (caller redraws) so the user is free to pick again.
+    if (mode == PICKER_MODE_SAVE && menu_areyousure(MSG_FILE_OVERWRITE_Q) != 1)
+        return 0;
+
+    strncpy(app.filename, name, FILENAME_MAXLEN);
+    app.filename[FILENAME_MAXLEN] = '\0';
+    strncpy(app.filedir, path, FILEDIR_MAXLEN);
+    app.filedir[FILEDIR_MAXLEN] = '\0';
+    return 1;
+}
+
 static uint8_t picker_engine(const char *title, uint8_t filter, uint8_t mode)
 {
     OricCharWin win;
@@ -682,11 +929,28 @@ static uint8_t picker_engine(const char *title, uint8_t filter, uint8_t mode)
     strncpy(path, app.filedir, PICKER_PATH_MAXLEN - 1);
     path[PICKER_PATH_MAXLEN - 1] = '\0';
 
+    picker_init_save_state(filter, mode);
+
+    // WORKAROUND for an Oscar64 -O2 whole-program register-allocator bug
+    // (see oscar64manual.md "-O2 whole-program register allocator:
+    // caller-save set can be under-counted", and picker_regpressure_
+    // scratch's own doc comment for why this uses a real static buffer
+    // rather than a magic address). Confirmed via a `-g` asm diff:
+    // picker_engine()'s own prologue save-set shrank once this function
+    // grew with this session's SAVE-mode additions, under-protecting a
+    // live caller variable and corrupting unrelated screen RAM elsewhere
+    // (src/menu.c's menu_draw_item()). This dummy sprintf's register
+    // pressure restores a large enough save set. Do not remove without
+    // re-testing every Save action in the emulator (corruption/hangs can
+    // reappear in a different place entirely, not just here).
+    sprintf((char *)picker_regpressure_scratch, "picker_engine: title=%s, filter=%u, mode=%u, path=%s, key=%u, meta=%u, isdir=%u", title, filter, mode, path, key, meta.length, meta.isdir);
+
     menu_winsave(PICKER_WIN_SY, PICKER_WIN_WY, 1);
 
     cwin_init(&win, PICKER_WIN_SX, PICKER_WIN_SY, PICKER_WIN_WX, PICKER_WIN_WY, A_FWBLACK, A_BGWHITE);
     cwin_clear(&win);
     picker_reload(&win, title, path, filter);
+    if (mode == PICKER_MODE_SAVE) picker_apply_save_default(&win);
 
     for (;;)
     {
@@ -696,14 +960,6 @@ static uint8_t picker_engine(const char *title, uint8_t filter, uint8_t mode)
         {
             menu_winrestore();
             return 0;
-        }
-
-        if (mode == PICKER_MODE_DIR && key == 's')
-        {
-            strncpy(app.filedir, path, FILEDIR_MAXLEN);
-            app.filedir[FILEDIR_MAXLEN] = '\0';
-            menu_winrestore();
-            return 1;
         }
 
         if (key == 'e')
@@ -756,9 +1012,18 @@ static uint8_t picker_engine(const char *title, uint8_t filter, uint8_t mode)
         }
         else if (key == KEY_ENTER || key == KEY_RIGHT)
         {
-            char       *name = picker_name;
-            const char *suffix;
-            uint8_t     suflen, baselen;
+            // SAVE mode's pinned "<new file>" sentinel -- persist the
+            // browsed directory (parity with the old 's' behavior) and
+            // tell the caller a typed name is still needed. Checked
+            // before the empty-listing guard below since the sentinel
+            // is always present/selectable even in an empty directory.
+            if (mode == PICKER_MODE_SAVE && picker_on_newfile)
+            {
+                strncpy(app.filedir, path, FILEDIR_MAXLEN);
+                app.filedir[FILEDIR_MAXLEN] = '\0';
+                menu_winrestore();
+                return 2;
+            }
 
             // An empty listing (no entries at all in the current
             // directory -- a completely normal thing to navigate into,
@@ -770,6 +1035,7 @@ static uint8_t picker_engine(const char *title, uint8_t filter, uint8_t mode)
 
             if (meta.isdir)
             {
+                char *name    = picker_name;
                 char *newpath = picker_newpath;
 
                 xram_memcpy_from(name, (uint16_t)(picker_present + sizeof(meta)), meta.length);
@@ -789,47 +1055,45 @@ static uint8_t picker_engine(const char *title, uint8_t filter, uint8_t mode)
 
             // RIGHT only ever descends into directories (handled above);
             // on a file entry it's a no-op, matching the user's own
-            // framing ("right to enter a dir"). Only ENTER can select a
-            // file, and only in PICKER_MODE_FILE.
-            if (key == KEY_RIGHT || mode == PICKER_MODE_DIR) continue;
+            // framing ("right to enter a dir"). Only ENTER can select/
+            // overwrite a file.
+            if (key == KEY_RIGHT) continue;
 
-            xram_memcpy_from(name, (uint16_t)(picker_present + sizeof(meta)), meta.length);
-            name[meta.length] = '\0';
-
-            // PICKER_FILTER_PROJECT strips "PJ.BIN" so the base name
-            // fileio.c's filedir_join_suffix(fullpath, "SC.BIN"/"CS.BIN"/
-            // "CA.BIN")-style composition expects is what's left (see
-            // "LOCI file I/O" in CLAUDE.md, unchanged). Every other
-            // filter (PICKER_FILTER_NONE, as of 2026-06-22 -- see
-            // picker_entry_matches()'s doc comment) stores the selected
-            // filename verbatim instead -- fileio.c's matching Load
-            // call sites now use filedir_join() directly on this, not
-            // filedir_join_suffix(), so an arbitrary filename (any
-            // extension, or none) round-trips unchanged.
-            if (filter == PICKER_FILTER_PROJECT)
+            if (!picker_commit_file(path, filter, mode))
             {
-                suffix  = "PJ.BIN";
-                suflen  = (uint8_t)strlen(suffix);
-                baselen = (uint8_t)(meta.length - suflen);
-                if (baselen > 63) baselen = 63;
-                name[baselen] = '\0';
+                picker_reload(&win, title, path, filter);
+                continue;
             }
-
-            strncpy(app.filename, name, FILENAME_MAXLEN);
-            app.filename[FILENAME_MAXLEN] = '\0';
-            strncpy(app.filedir, path, FILEDIR_MAXLEN);
-            app.filedir[FILEDIR_MAXLEN] = '\0';
 
             menu_winrestore();
             return 1;
         }
         else if (key == KEY_DOWN)
         {
-            if (!picker_step_down()) continue;
+            if (mode == PICKER_MODE_SAVE && picker_on_newfile)
+            {
+                if (picker_firstelement) picker_on_newfile = 0;
+                else continue;
+            }
+            else if (!picker_step_down())
+            {
+                continue;
+            }
         }
         else if (key == KEY_UP)
         {
-            if (!picker_step_up()) continue;
+            if (mode == PICKER_MODE_SAVE && !picker_on_newfile)
+            {
+                if (!picker_step_up()) picker_on_newfile = 1;
+            }
+            else if (mode != PICKER_MODE_SAVE)
+            {
+                if (!picker_step_up()) continue;
+            }
+            else
+            {
+                continue;  // already on the sentinel, UP is a no-op
+            }
         }
         else if (key == KEY_F6)
         {
@@ -841,6 +1105,7 @@ static uint8_t picker_engine(const char *title, uint8_t filter, uint8_t mode)
         }
 
         picker_draw_list(&win);
+        if (mode == PICKER_MODE_SAVE) picker_draw_newfile_row(&win);
     }
 }
 
@@ -860,17 +1125,17 @@ uint8_t filepicker_run(const char *title, uint8_t filter)
 }
 
 /**
- * Browse the LOCI device, starting at app.filedir, to choose a directory
- * to save into (added 2026-06-21) -- same navigation as filepicker_run(),
- * but 's' confirms the currently-browsed directory itself (app.filedir
- * set, app.filename untouched) instead of ENTER selecting a file (files
- * are still shown, for context, but not selectable in this mode).
+ * Pick a Save target, starting at app.filedir -- same navigation as
+ * filepicker_run(), but see filepicker.h's doc comment for the full
+ * tri-state contract (2026-06-22 redesign, replacing the old
+ * filepicker_browse_dir()/'s'-confirms-directory-only flow).
  *
  * @param title  Title row text.
- * @return 1 if a directory was confirmed (app.filedir set), 0 if
- *         cancelled or the starting directory has no matching entries.
+ * @param filter PICKER_FILTER_PROJECT or PICKER_FILTER_NONE.
+ * @return 0 cancelled; 1 existing file overwrite-confirmed; 2 "<new
+ *         file>" picked (caller must still prompt for a name).
  */
-uint8_t filepicker_browse_dir(const char *title)
+uint8_t filepicker_run_save(const char *title, uint8_t filter)
 {
-    return picker_engine(title, PICKER_FILTER_PLAIN, PICKER_MODE_DIR);
+    return picker_engine(title, filter, PICKER_MODE_SAVE);
 }

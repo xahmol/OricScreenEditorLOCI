@@ -2253,7 +2253,118 @@ edge. The colour change is immediate per-column (same ULA behaviour this
 project's "Oric Screen Model" section already documents) -- no
 additional redraw timing concern. No test changes needed (no existing
 assertion checked that column's bytes); full suite stayed 185/185.
-  scripts added this pass).
+
+### Unified Save-target picker (2026-06-22 redesign)
+
+User report: "dir picker now gives a browser, showing all files, but
+can never end as enter does not work" -- the old `PICKER_MODE_DIR`
+("`'s'` confirms the directory; files shown for context only, ENTER
+does nothing on them") was confusing UX with no obvious way to finish.
+Replaced with `PICKER_MODE_SAVE`: a synthetic `"<new file>"` entry is
+always pinned above the real listing in every directory. ENTER on it
+returns `2` (caller must still prompt for a typed name); ENTER on a
+real file shows an overwrite-confirm popup (`menu_areyousure()`,
+`MSG_FILE_OVERWRITE_Q` = `"File exists. Overwrite?"`, matching
+locifilemanager-v2's own `menu_confirm_file()`/wording) and, on Yes,
+returns `1` with `app.filename`/`app.filedir` already set (suffix-
+stripped the same way Load does); ENTER/RIGHT on a directory still just
+descends, unchanged. The sentinel is deliberately **not** a real XRAM/
+`PickerMeta` entry — it's a fixed display row (`picker_draw_newfile_
+row()`) tracked by a new `picker_on_newfile` flag, so none of the
+existing XRAM-list scroll/page helpers need to know it exists; the
+visible list page shrinks by 1 row (`picker_listrows`/`picker_list_y0_
+eff`) to make room for it rather than growing the window.
+
+**Default-cursor positioning** (`picker_apply_save_default()`, called
+once right after `picker_engine()`'s startup `picker_reload()`, not
+from inside `picker_reload()` itself): if `app.filename` + the action's
+suffix (`picker_save_match`, built once at SAVE-mode entry) matches an
+entry already in the starting directory, the cursor defaults there
+instead of on the sentinel — "save back to the file I just opened"
+needs no extra navigation. Navigating to a *different* directory
+afterward always falls back to the sentinel (no "previous file"
+context anywhere but the starting directory).
+
+`fileio_get_filename()` (`src/fileio.c`) gained a `filter` parameter
+and now calls `filepicker_run_save()`'s tri-state contract: `0`
+cancelled, `1` already resolved (existing-file path), `2` still needs
+the typed-name popup it always showed unconditionally before. `PICKER_
+MODE_DIR`, `filepicker_browse_dir()`, and `PICKER_FILTER_PLAIN` (the
+old *.BIN-excluding-project-suffixes filter, only ever passed by that
+function) are deleted entirely — confirmed via `grep` that nothing
+references any of them any more.
+
+**Refinement (user-confirmed real-hardware repro, same day)**: typing a
+name that already ends in `.BIN` into the typed-name popup (stale
+pre-fill, or just typed that way) produced a doubled `name.BIN.BIN` on
+disk with no overwrite-confirm to flag it (the doubled name never
+matched any existing file). `fileio_strip_bin_suffix()` (already added
+earlier this session for the Load side, see "File picker key-overview
+hint" above) was made case-insensitive and is now also called after the
+typed-name popup confirms, defending both paths.
+
+#### Oscar64 whole-program register-allocator bug, triggered by this change
+
+Adding the SAVE-mode logic above (entirely within `src/filepicker.c`)
+caused garbage text to render on screen during every Save action,
+**despite never touching `src/menu.c`** — confirmed via a `-g` asm diff
+against a build without this session's changes that this is exactly the
+documented "-O2 whole-program register allocator: caller-save set can
+be under-counted" bug class (`oscar64manual.md`) already worked around
+once in `menu.c`'s `menu_draw_item()`: `picker_engine()`'s own prologue
+save-set shrank from 7 to 4 bytes once the function grew, under-
+protecting a live caller variable and corrupting `menu_draw_item()`'s
+own debug-scratch write so it landed on the visible screen instead.
+
+**Fix, two parts**: (1) genuine refactor — extracted `picker_init_save_
+state()` (the mode-dependent `picker_listrows`/`picker_save_match`
+setup) and `picker_commit_file()` (the existing-file-selected commit
+path, including the overwrite-confirm) out of `picker_engine()` into
+their own functions, directly reducing that function's own register
+pressure rather than fighting the allocator's heuristics; (2) a tuned
+dummy `sprintf()` call inside `picker_engine()` (same workaround
+*class* as `menu_draw_item()`'s, calibrated separately) to nudge the
+remaining pressure to a save-set size that doesn't corrupt anything,
+confirmed empirically in Phosphoric (the manual is explicit that this
+is unpredictable and must be verified by testing, not derived) — two
+earlier attempts at tuning this dummy call *alone*, without the
+refactor, each "fixed" the visible symptom only by relocating the
+corruption somewhere else (first back to `menu_draw_item()`'s own
+write, then to the window-stack restore mechanism, causing leftover
+picker content to bleed through under the next popup) — confirming
+single-function under-counting was the right diagnosis, just requiring
+both levers together to land somewhere safe.
+
+**A second, more serious bug found during this investigation**: the
+*existing* `menu_draw_item()` workaround's comment claims `0xA000` is
+"unused scratch space in the heap region" — checking `build/oseloci.map`
+shows this project's heap is degenerate (`10000 - 0000 : HEAP, heap`,
+since `malloc`/`free` are fully stubbed) and `0xA000` actually falls
+inside the program's own live BSS (`9438 - ac7c`). Copying that same
+`(uint8_t *)0xA000`-style pattern for `picker_engine()`'s own workaround
+(at `0xA200`/`0xA300`) silently corrupted real static data and hung the
+picker mid-session, with no compiler warning — confirmed by testing.
+Fixed for the new workaround with a genuinely linker-allocated static
+buffer (`picker_regpressure_scratch[176]`, sized above the dummy call's
+own worst-case formatted length so it can never itself overflow) instead
+of a magic address. **The pre-existing `menu.c` `0xA000` write is the
+same kind of landmine** — it happens to land on a byte that's apparently
+harmless in this build, but that could change with any future code
+size shift; flagged here for follow-up, not fixed (out of scope for
+this change, and changing it risks re-triggering the very bug it
+currently happens to avoid without a fresh round of `-g` verification).
+
+**Test impact**: `tests/scripts/test_fileio_traffic.sh`'s 6 Save
+scenarios each need one `\p1\n` in the same position the old `\p1s`
+occupied (confirming the sentinel, not removing a step — an earlier
+attempt at this fix incorrectly *removed* the keystroke entirely,
+which left every Save scenario hung indefinitely waiting on a
+keypress the test never sent, confirmed by testing with cycle budgets
+up to 80M with no progress). Same total keystroke count as before,
+just ENTER instead of `'s'`. Verified all three picker outcomes
+manually in Phosphoric (new-file path, existing-file Yes, existing-file
+No) in addition to the automated suite. Full suite: 185/185, unchanged
+in count.
 
 
 ## Boot, Help & Information

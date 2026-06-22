@@ -72,8 +72,8 @@
 static char fullpath[FILEIO_FULLPATH_MAXLEN];
 
 /**
- * Strip a trailing ".BIN" (case-sensitive) from app.filename in place, if
- * present. PICKER_FILTER_NONE (see filepicker.h) stores the selected
+ * Strip a trailing ".BIN" (case-insensitive) from app.filename in place,
+ * if present. PICKER_FILTER_NONE (see filepicker.h) stores the selected
  * filename verbatim, extension included, so that arbitrary/non-OSE-
  * convention files can be loaded -- but app.filename is documented
  * (appstate.h) as a bare base name, and fileio_get_filename()'s Save
@@ -93,13 +93,32 @@ static char fullpath[FILEIO_FULLPATH_MAXLEN];
  * very next action is an unedited Save, same as it would have been
  * before PICKER_FILTER_NONE existed for any non-".BIN" name.
  *
+ * Also called from fileio_get_filename()'s typed-name popup (2026-06-22,
+ * second round, user-confirmed real-hardware repro) -- a user can type
+ * (or a stale pre-fill can still hold) a name that already ends in
+ * ".bin"/".Bin"/".BIN" in any case; without stripping it there too, the
+ * same doubled-suffix bug reappears, this time without even an
+ * overwrite-confirm to flag it (the doubled name never matches any
+ * existing file). Case-insensitive (the user can type any case; the
+ * filesystem itself normalises the base name but keeps ".BIN"
+ * uppercase) -- a plain strcmp() would miss "foo.bin".
+ *
  * @return (none)
  */
 static void fileio_strip_bin_suffix(void)
 {
     uint8_t len = (uint8_t)strlen(app.filename);
-    if (len >= 4 && strcmp(app.filename + len - 4, ".BIN") == 0)
-        app.filename[len - 4] = '\0';
+    uint8_t i;
+
+    if (len < 4) return;
+
+    for (i = 0; i < 4; i++)
+    {
+        char c = app.filename[len - 4 + i];
+        if (c >= 'a' && c <= 'z') c = (char)(c - 'a' + 'A');
+        if (c != ".BIN"[i]) return;
+    }
+    app.filename[len - 4] = '\0';
 }
 
 /**
@@ -186,34 +205,38 @@ uint8_t loci_check_present(void)
 }
 
 /**
- * Prompt for a LOCI base filename in a small popup: title (the calling
- * action's MSG_FILE_.../MSG_CHARSET_... label) on row 1, MSG_FILE_PROMPT_
- * FILENAME on row 3, then a cwin_textinput field pre-filled with
- * app.filename (persisting the last-used name as the next prompt's
- * default, matching V1's UX).
+ * Pick a LOCI base filename to save to: one unified picker
+ * (filepicker_run_save(), src/filepicker.c, 2026-06-22 redesign --
+ * replaces the old two-stage "browse for a directory with 's', then
+ * type a name in a separate popup, always silently overwriting"
+ * flow) lets the user navigate directories, pick an existing file as
+ * an overwrite target (confirmed via menu_areyousure()), or pick the
+ * picker's pinned "<new file>" entry to type a brand new name instead.
  *
- * Browses for a save directory first (added 2026-06-21, user-requested:
- * "on save user should be enabled to first browse to and select save
- * directory") via filepicker_browse_dir() -- app.filedir is updated to
- * wherever the user confirms ('s'), and every Save action downstream
- * resolves its path against that (filedir_join_suffix(), not
- * homedir_join_suffix() any more). ESC at the directory-browse step
- * cancels the whole Save action (the filename prompt is never shown);
- * ESC at the filename step still cancels too, but by then app.filedir
- * has already been updated to the browsed directory -- intentional, the
- * same way app.filename already persists across a cancelled prompt.
+ * filepicker_run_save() returns a tri-state: 0 = cancelled entirely;
+ * 1 = an existing file was picked and overwrite-confirmed --
+ * app.filename/app.filedir are already set, nothing more to do here;
+ * 2 = the "<new file>" entry was picked -- app.filedir is set, but
+ * app.filename still needs a typed name, via the same small
+ * cwin_textinput() popup this function always used to show
+ * unconditionally (title row 1, MSG_FILE_PROMPT_FILENAME row 3,
+ * pre-filled with app.filename's current value).
  *
- * @param title Title line (the calling action's label).
- * @return 1 if ENTER accepted (app.filename updated), 0 if either step
- *         was cancelled (app.filename unchanged on a filename-step
- *         cancel).
+ * @param title  Title line (the calling action's label).
+ * @param filter PICKER_FILTER_PROJECT (Save Project only) or
+ *               PICKER_FILTER_NONE (every other Save action).
+ * @return 1 if a target is ready (app.filename/app.filedir set), 0 if
+ *         cancelled at any step.
  */
-uint8_t fileio_get_filename(const char *title)
+uint8_t fileio_get_filename(const char *title, uint8_t filter)
 {
     OricCharWin win;
-    uint8_t result;
+    uint8_t     picked;
+    uint8_t     result;
 
-    if (!filepicker_browse_dir(MSG_FILE_PICKER_SAVEDIR)) return 0;
+    picked = filepicker_run_save(title, filter);
+    if (picked == 0) return 0;
+    if (picked == 1) return 1;
 
     menu_winsave(8, 7, 1);
     cwin_init(&win, 5, 8, 30, 7, A_FWBLACK, A_BGWHITE);
@@ -223,6 +246,7 @@ uint8_t fileio_get_filename(const char *title)
     cwin_putat_string(&win, 2, 3, MSG_FILE_PROMPT_FILENAME);
 
     result = (cwin_textinput(&win, 2, 4, 24, app.filename, FILENAME_MAXLEN, VINPUT_ALPHA) >= 0) ? 1 : 0;
+    if (result) fileio_strip_bin_suffix();
 
     menu_winrestore();
     return result;
@@ -241,7 +265,7 @@ void fileio_save_screen(void)
     int16_t fd;
 
     if (!loci_check_present()) return;
-    if (!fileio_get_filename(MSG_FILE_SAVE_SCREEN)) return;
+    if (!fileio_get_filename(MSG_FILE_SAVE_SCREEN, PICKER_FILTER_NONE)) return;
 
     filedir_join_suffix(fullpath, ".BIN");
 
@@ -315,7 +339,7 @@ void fileio_save_combined(void)
     int16_t fd;
 
     if (!loci_check_present()) return;
-    if (!fileio_get_filename(MSG_FILE_SAVE_COMBINED)) return;
+    if (!fileio_get_filename(MSG_FILE_SAVE_COMBINED, PICKER_FILTER_NONE)) return;
 
     filedir_join_suffix(fullpath, ".BIN");
 
@@ -416,7 +440,7 @@ void fileio_save_project(void)
     int16_t       fd;
 
     if (!loci_check_present()) return;
-    if (!fileio_get_filename(MSG_FILE_SAVE_PROJECT)) return;
+    if (!fileio_get_filename(MSG_FILE_SAVE_PROJECT, PICKER_FILTER_PROJECT)) return;
 
     proj.magic          = FILEIO_MAGIC;
     proj.canvas_width    = app.canvas_width;
@@ -694,7 +718,7 @@ void fileio_save_charset(uint8_t altorstd)
     const char *title = fileio_charset_title(altorstd, 1, &base);
 
     if (!loci_check_present()) return;
-    if (!fileio_get_filename(title)) return;
+    if (!fileio_get_filename(title, PICKER_FILTER_NONE)) return;
 
     filedir_join_suffix(fullpath, ".BIN");
     if (file_save(fullpath, (const void *)(base + CHARSET_GLYPH_AREA_OFFSET), charset_area_size(base)) < 0)

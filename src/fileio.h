@@ -8,11 +8,12 @@
 // Returns 1 if present, 0 if absent (caller should abort the action).
 uint8_t loci_check_present(void);
 
-// Prompt for a LOCI base filename (popup, cwin_textinput, VINPUT_ALPHA),
-// pre-filled with app.filename (persisted across calls) and a title line.
-// Returns 1 if ENTER accepted (app.filename updated), 0 if ESC cancelled
-// (app.filename unchanged).
-uint8_t fileio_get_filename(const char *title);
+// Pick a Save target via the unified filepicker_run_save() (existing
+// file to overwrite, confirmed, or the "<new file>" entry, prompting
+// for a typed name). filter is PICKER_FILTER_PROJECT (Save Project) or
+// PICKER_FILTER_NONE (every other Save action). Returns 1 if a target
+// is ready (app.filename/app.filedir set), 0 if cancelled at any step.
+uint8_t fileio_get_filename(const char *title, uint8_t filter);
 
 // File > Save/Load Screen: app.filename+".BIN", a bare raw dump of
 // screenmap[] -- no header, no metadata, by design (matches V1 exactly):

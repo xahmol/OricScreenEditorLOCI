@@ -126,14 +126,16 @@ fi
 # screen is meant to be a portable, tool-agnostic raw dump, loadable from
 # any source, not just OSE's own saves).
 #
-# Every Save action now browses for a save directory first
-# (filepicker_browse_dir(), src/fileio.c's fileio_get_filename() --
-# 2026-06-21, "on save user should be enabled to first browse to and
-# select save directory"): the extra `\p1s` confirms the default/current
-# directory in that popup before the filename prompt appears.
+# Every Save action goes through the unified Save-target picker
+# (filepicker_run_save(), src/fileio.c's fileio_get_filename() --
+# 2026-06-22 redesign, replacing the old 's'-confirms-directory-then-
+# type-a-name flow): with the flash root empty, the cursor defaults to
+# the pinned "<new file>" sentinel, so the extra `\p1\n` (in the same
+# position the old `\p1s` occupied) confirms it and opens the typed-name
+# popup -- same keystroke count as before, just ENTER instead of 's'.
 reset_flash
 DUMP1="$OUT/capture_fileio_save_screen.bin"
-run_capture 25200000 '\p1 \p1\f1\p1\r\p1\n\p1\n\p1s\p1T\p1\n' "$DUMP1"
+run_capture 25200000 '\p1 \p1\f1\p1\r\p1\n\p1\n\p1\n\p1T\p1\n' "$DUMP1"
 echo ""
 echo "File > Save Screen writes a bare screenmap[] dump (no header)"
 check_found "statusbar shows '@' plotted" "Main      XY 0, 0C40@ S40I7P0S" "$DUMP1"
@@ -151,7 +153,7 @@ check_file_bytes "t.BIN: '@' (0x40) at screen offset 0" "$LOCIFLASH/t.BIN" \
 # (fileio_get_dimensions(), see fileio.c).
 DUMP2="$OUT/capture_fileio_load_screen.bin"
 run_capture 36100000 \
-    '\p1 \p1\f1\p1\r\p1\n\p1\n\p1s\p1T\p1\n\p1\e\p1\f1\p1\n\p1\d\p1\d\p1\n\p1\e\p1\f1\p1\r\p1\n\p1\d\p1\n\p1\n\p1\n\p1\n' "$DUMP2"
+    '\p1 \p1\f1\p1\r\p1\n\p1\n\p1\n\p1T\p1\n\p1\e\p1\f1\p1\n\p1\d\p1\d\p1\n\p1\e\p1\f1\p1\r\p1\n\p1\d\p1\n\p1\n\p1\n\p1\n' "$DUMP2"
 echo ""
 echo "File > Load Screen restores a saved canvas after Screen > Clear"
 check_found "statusbar shows '@' restored" "Main      XY 0, 0C40@ S40I7P0S" "$DUMP2"
@@ -160,7 +162,7 @@ check_found "statusbar shows '@' restored" "Main      XY 0, 0C40@ S40I7P0S" "$DU
 reset_flash
 DUMP3="$OUT/capture_fileio_save_combined.bin"
 run_capture 31100000 \
-    '\p1 \p1\f1\p1\r\p1\n\p1\d\p1\d\p1\d\p1\d\p1\n\p1s\p1C\p1\n' "$DUMP3"
+    '\p1 \p1\f1\p1\r\p1\n\p1\d\p1\d\p1\d\p1\d\p1\n\p1\n\p1C\p1\n' "$DUMP3"
 echo ""
 echo "File > Save Combined writes 768B charset + screenmap[] (no header)"
 check_found "statusbar shows '@' plotted" "Main      XY 0, 0C40@ S40I7P0S" "$DUMP3"
@@ -173,7 +175,7 @@ check_file_bytes "c.BIN: '@' at screen-section offset 768" "$LOCIFLASH/c.BIN" \
 reset_flash
 DUMP4="$OUT/capture_fileio_save_project.bin"
 run_capture 29100000 \
-    '\p1 \p1\f1\p1\r\p1\n\p1\d\p1\d\p1\n\p1s\p1P\p1\n' "$DUMP4"
+    '\p1 \p1\f1\p1\r\p1\n\p1\d\p1\d\p1\n\p1\n\p1P\p1\n' "$DUMP4"
 echo ""
 echo "File > Save Project writes <name>PJ.BIN + <name>SC.BIN"
 check_found "statusbar shows '@' plotted" "Main      XY 0, 0C40@ S40I7P0S" "$DUMP4"
@@ -194,7 +196,7 @@ check_file_bytes "pSC.BIN: size 1120, '@' at offset 0 (no header)" "$LOCIFLASH/p
 reset_flash
 DUMP5="$OUT/capture_fileio_save_charset.bin"
 run_capture 23100000 \
-    '\p1\f1\p1\r\p1\r\p1\n\p1\d\p1\d\p1\n\p1s\p1S\p1\n' "$DUMP5"
+    '\p1\f1\p1\r\p1\r\p1\n\p1\d\p1\d\p1\n\p1\n\p1S\p1\n' "$DUMP5"
 echo ""
 echo "Charset > Save Standard writes a raw 768-byte charset dump"
 check_file_bytes "s.BIN: size 768" "$LOCIFLASH/s.BIN" "len(data) == 768"
@@ -209,7 +211,7 @@ check_file_bytes "s.BIN: size 768" "$LOCIFLASH/s.BIN" "len(data) == 768"
 reset_flash
 DUMP6="$OUT/capture_fileio_save_charset_alt.bin"
 run_capture 24100000 \
-    '\p1\f1\p1\r\p1\r\p1\n\p1\d\p1\d\p1\d\p1\n\p1s\p1A\p1\n' "$DUMP6"
+    '\p1\f1\p1\r\p1\r\p1\n\p1\d\p1\d\p1\d\p1\n\p1\n\p1A\p1\n' "$DUMP6"
 echo ""
 echo "Charset > Save Alternate writes exactly 640 bytes (not 768)"
 check_file_bytes "a.BIN: size 640" "$LOCIFLASH/a.BIN" "len(data) == 640"
