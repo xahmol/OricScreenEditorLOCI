@@ -115,9 +115,10 @@ static void resize_dialog(uint8_t is_height)
 {
     OricCharWin win;
     char        buf[6];
-    uint16_t    curw = app.canvas_width;
-    uint16_t    curh = app.canvas_height;
-    uint16_t    cur  = is_height ? curh : curw;
+    uint16_t    curw     = app.canvas_width;
+    uint16_t    curh     = app.canvas_height;
+    uint16_t    cur      = is_height ? curh : curw;
+    uint8_t     resized  = 0;
 
     menu_winsave(5, 12, 1);
     cwin_init(&win, 5, 5, 35, 12, A_FWBLACK, A_BGWHITE);
@@ -154,11 +155,31 @@ static void resize_dialog(uint8_t is_height)
                 canvas_goto((uint16_t)(app.cursor_x + app.xoffset), (uint16_t)(app.cursor_y + app.yoffset));
                 statusbar_draw();
                 update_size_titles();
+                resized = 1;
             }
         }
     }
 
     menu_winrestore();
+
+    // menu_winrestore() repaints the popup's covered rows from the
+    // menu_winsave() snapshot taken BEFORE the resize above -- a shrink
+    // leaves stale, wider/taller pre-resize canvas content in the part of
+    // those rows the new (smaller) canvas no longer occupies, undoing the
+    // canvas_goto()-triggered blit that already correctly blanked it.
+    // Found 2026-06-23 (user report: shrinking width/height via this
+    // dialog "leaves part of the old screen visible... screen is
+    // actually properly redrawn after menu exit" -- exactly this:
+    // menu_run()'s own end-of-session canvas_blit() was masking the bug
+    // by repainting everything again once the whole bar closed). Only
+    // needed when a resize actually happened -- if the dialog was
+    // cancelled/invalid/declined, the canvas never changed, so the
+    // restored snapshot is already correct.
+    if (resized)
+    {
+        canvas_blit();
+        statusbar_draw();
+    }
 }
 
 /**

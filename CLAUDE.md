@@ -1554,6 +1554,52 @@ path at all (any decrease from the 28 default was rejected outright), so
 this is also the first test coverage of that path for height. Full
 suite: 187/187 → 191/191 (this scenario, plus the charset-save fix below).
 
+**Follow-up: the redraw left stale content visible until the bar fully
+closed (post-launch, user-requested 2026-06-23)**: user report — "After
+resize of the screen width from 40 to 20 in the menu, the redraw leaves
+part of the old screen visible, screen is not cleared for the part that
+is now no longer used. Same for resize height. The screen is actually
+properly redrawn after menu exit." Root cause: `resize_dialog()`'s own
+`canvas_resize()`/`canvas_goto()` (which blits) run *while its own popup
+is still open*, but `menu_winrestore()` — called right after — repaints
+the popup's covered rows from the `menu_winsave()` snapshot taken
+*before* the resize, i.e. the stale, wider/taller pre-resize canvas
+content, undoing the correct redraw. `menu_run()`'s own end-of-session
+`canvas_blit()` (after the whole bar closes via ESC) repaints everything
+correctly one more time afterward, which is exactly why the bug only
+ever showed up transiently while the bar was still open — "properly
+redrawn after menu exit" was the giveaway in the report.
+
+**Fix**: `resize_dialog()` now tracks whether a resize actually happened
+(`resized`, set only in the `if (proceed)` branch that calls
+`canvas_resize()`) and, after `menu_winrestore()` returns, calls
+`canvas_blit()`/`statusbar_draw()` again if it did — repainting over the
+just-restored stale rows with the real, post-resize canvas. A no-op
+(cancelled/invalid/declined-shrink) dialog skips this extra pass
+entirely, since the canvas never changed and the restored snapshot is
+already correct in that case. Confirmed via a direct Phosphoric
+before/after comparison (reverting the fix and re-running the same
+keystroke sequence reproduced the bug exactly: row 5's columns 20-39
+showed the stale `'@'` fill instead of blanks) that this was the actual
+mechanism, not a guess.
+
+**Why no other `canvas_resize()` call site needed the same fix**:
+`fileio_load_screen()`/`fileio_load_combined()`/`fileio_load_project()`
+(`src/fileio.c`) all call their own helper popups
+(`fileio_get_dimensions()`/`filepicker_run()`) to completion — and those
+popups' own `menu_winrestore()` calls happen *before* `canvas_resize()`/
+`canvas_blit()` ever run, not after — so there's no later restore left to
+clobber the freshly-blitted canvas. `resize_dialog()` was the only call
+site where the resize+blit happens *inside* a still-open popup that gets
+restored afterward.
+
+**Test coverage**: `tests/scripts/test_screenresize.sh` gained Scenario 5
+— Screen > Fill (fills the whole canvas, bar stays open, same precedent as
+`test_menus.sh`'s Scenario 7/8), then Screen > Width 40→20 with no
+trailing ESC; dumps with the bar still open and asserts row 5 (inside the
+popup's own covered rows) shows columns 0-19 still filled but 20-39
+blanked, not the stale full-width fill. Suite: 195/195 → 196/196.
+
 **Screen > Clear/Fill redraw timing fix (post-launch, user-requested
 2026-06-21):**
 
@@ -3221,7 +3267,7 @@ make test         # full automated Phosphoric test suite (test-boot, test-menus,
                   # path) and test-fileio-traffic (uses --loci-flash DIR
                   # instead, a real host filesystem directory for
                   # byte-level LOCI file I/O assertions).
-                  # Current total: 195/195.
+                  # Current total: 196/196.
 make test-boot    # headless boot smoke test (splash + canvas/statusbar render)
 make test-capture CYCLES=N TYPEKEYS='...'
                   # calibration helper: dumps tests/out/capture.bin + .png

@@ -171,6 +171,38 @@ run_capture 24000000 \
 echo "Height 28 -> 10 (below VIEWPORT_HEIGHT, no longer rejected)"
 check_found "Height pulldown shows 10" "Height:  10" "$DUMP4H"
 
+# --- Scenario 5: shrinking redraws immediately, not just after bar exit ----
+# Regression test for a bug found 2026-06-23 (user report: "the redraw
+# leaves part of the old screen visible, screen is not cleared for the
+# part that is now no longer used... screen is actually properly redrawn
+# after menu exit"). Root cause: resize_dialog() resized+reblitted the
+# canvas WHILE its own popup was still open, then menu_winrestore()
+# (called right after) repainted the popup's covered rows from the
+# menu_winsave() snapshot taken BEFORE the resize -- stale, wider/taller
+# pre-resize canvas content -- undoing the correct redraw. menu_run()'s
+# own end-of-session canvas_blit() (after the bar fully closes) masked
+# the bug by repainting everything correctly one more time, which is
+# exactly why it only ever showed up transiently, while the bar was
+# still open.
+#
+# Sequence: Screen > Fill (fills the whole 40x28 canvas with '@', bar
+# stays open per the Scenario 7/8 precedent in test_menus.sh), then
+# Screen > Width: dialog shows "40", left/left, type "20", ENTER
+# (-> shrink-confirm, 20 < 40), ENTER (Yes) -- NO trailing ESC, so the
+# dump happens with the bar still open, right after resize_dialog()
+# returns. Row 5 (inside the popup's own covered rows 5-16) must already
+# show columns 20-39 blanked, not stale '@' fill.
+DUMP5="$OUT/capture_resize_redraw_immediate.bin"
+run_capture 25000000 \
+    '\p1\f1\p1\n\p1\d\p1\d\p1\d\p1\n\p1\n\p1\n\p1\l\p1\l\p12\p10\p1\n\p1\n' \
+    "$DUMP5"
+echo ""
+echo "Shrinking width redraws immediately, while the menu bar is still open"
+check_found "bar still open" "Screen File  Charset  Information" "$DUMP5"
+check_found "row 5 cols 0-19 still filled" "@@@@@@@@@@@@@@@@@@@@" "$DUMP5"
+check_not_found "row 5 cols 20-39 blanked, not stale fill" \
+    "@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@" "$DUMP5"
+
 echo ""
 echo "==========================================================="
 echo "  Results: $pass passed, $fail failed"
