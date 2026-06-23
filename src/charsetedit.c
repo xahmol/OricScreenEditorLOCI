@@ -35,36 +35,60 @@
 // Popup window layout (13 cols x 15 rows, screen cols 27-39, rows 0-14)
 // -------------------------------------------------------------------------
 
-#define CE_WIN_SX  27
+#define CE_WIN_SX  26
 #define CE_WIN_SY   0
-#define CE_WIN_WX  13
+#define CE_WIN_WX  14
 #define CE_WIN_WY  15
 
-// Window-relative columns 0-1 are reserved for this popup's OWN ink/paper
-// attribute pair (ce_clear(), below) -- all real content starts at
-// CE_CONTENT_X0 instead of 0. Needed because cwin_clear()'s row_setattr()
-// always writes the ink/paper pair at ABSOLUTE screen columns 0-1,
-// regardless of the window's own sx -- correct for every sx=2/sx=5 popup
-// in this codebase (where columns 0-1 ARE the window's own reserved
-// border), but wrong for this one sidebar popup, whose sx=27 is chosen
-// specifically so canvas columns 0-26 stay visible underneath. Writing
-// the attribute pair at literal column 0/1 doesn't erase anything there
-// (cwin_clear()'s own content-fill loop correctly only touches sx..sx+
-// wx-1), but the Oric ULA holds an ink/paper attribute active from the
-// column it's written at onward until the next attribute change -- so
-// with nothing else on the row to reset it, the white PAPER byte at
-// column 1 was visibly bleeding the popup's white background all the
-// way across the visible canvas (columns 2-26) too, not just its own
-// 27-39 (user report 2026-06-23: "popup makes the whole width white, not
-// only the right part of the screen it actually uses"). Matches V1's own
-// approach in spirit (V1's chareditor() reserves 3 of its own panel's
-// columns, 27-29, as an attribute-transition strip immediately before its
-// real content at column 30 -- local reference at
+// Window-relative columns 0-2 are reserved for this popup's OWN ink/
+// paper/charset-mode attribute triplet (ce_clear(), below) -- all real
+// content starts at CE_CONTENT_X0 instead of 0. Needed because
+// cwin_clear()'s row_setattr() always writes the ink/paper pair at
+// ABSOLUTE screen columns 0-1, regardless of the window's own sx --
+// correct for every sx=2/sx=5 popup in this codebase (where columns 0-1
+// ARE the window's own reserved border), but wrong for this one sidebar
+// popup, whose sx is chosen specifically so canvas columns to its left
+// stay visible underneath. Writing the attribute pair at literal column
+// 0/1 doesn't erase anything there (cwin_clear()'s own content-fill loop
+// correctly only touches sx..sx+wx-1), but the Oric ULA holds an
+// ink/paper attribute active from the column it's written at onward
+// until the next attribute change -- so with nothing else on the row to
+// reset it, the white PAPER byte at column 1 was visibly bleeding the
+// popup's white background all the way across the visible canvas too,
+// not just its own columns (user report 2026-06-23: "popup makes the
+// whole width white, not only the right part of the screen it actually
+// uses"). Matches V1's own approach (V1's chareditor() reserves 3 of its
+// own panel's columns as an attribute-transition strip immediately
+// before its real content -- local reference at
 // showchareditfield()/showchareditgrid(),
-// /home/xahmol/git/OricScreenEditor/src/main.c) -- this port only needs
-// 2 reserved columns (ink, paper), not V1's 3rd byte resetting to the
-// standard charset, since nothing this popup draws ever uses A_ALT.
-#define CE_CONTENT_X0      2
+// /home/xahmol/git/OricScreenEditor/src/main.c).
+//
+// The 3rd reserved column (charset-mode reset to A_STD) was ADDED
+// 2026-06-23 (user report: "Charset editor does not set attribute code
+// for std charset before the popup, causing it to show illegible if
+// printed over lines that use alternate charset"). Unlike ink/paper,
+// which the ULA resets to white-ink/black-paper at the START of every
+// raster line automatically (see CLAUDE.md "Oric Screen Model"), the
+// charset-mode latch (A_STD/A_ALT/etc, values 8-15) does NOT reset per
+// line -- it persists across rows too, from wherever it was last set,
+// until the next charset-mode attribute byte anywhere to its right (on
+// any later row) changes it again. So if the canvas underneath this
+// popup (or even this popup's own live-preview swatch, see
+// CE_PREVIEW_ATTR_X below, which deliberately sets A_ALT for one cell)
+// ever set A_ALT and nothing further right/down ever reset it, every
+// later row's content from that column onward silently inherited Alt
+// charset rendering too -- illegible, since this popup's own text is
+// authored assuming Standard charset glyphs. Originally omitted on the
+// (wrong) assumption that "nothing this popup draws ever uses A_ALT"
+// was sufficient -- it isn't: the popup must explicitly assert A_STD
+// for its own content regardless of what charset mode was active
+// outside it or earlier within it. Widening CE_WIN_WX by 1 (and moving
+// CE_WIN_SX 1 column left to compensate) keeps every other CE_*_X
+// constant's ABSOLUTE screen column unchanged (they're all defined
+// relative to CE_CONTENT_X0, which also shifts by 1) -- the only
+// observable effect is the popup now also covers 1 more canvas column
+// underneath (was 0-26 visible, now 0-25).
+#define CE_CONTENT_X0      3
 
 #define CE_HEADER_Y        0   // "Code:$xx" + live preview
 #define CE_PREVIEW_ATTR_X  (CE_CONTENT_X0 + 9)   // charset-mode attribute byte (live preview)
@@ -109,12 +133,13 @@ static uint8_t     ce_copy_valid;
 // -------------------------------------------------------------------------
 
 /**
- * Clear the popup, like cwin_clear(&ce_win) -- except the ink/paper
- * attribute pair is written at the window's OWN first two relative
- * columns (CE_WIN_SX+0/+1, i.e. absolute columns 27/28) instead of at
- * literal screen columns 0/1, and the content fill starts at
- * CE_CONTENT_X0 rather than column 0. See CE_CONTENT_X0's doc comment
- * for why cwin_clear() itself is wrong for this one sidebar popup.
+ * Clear the popup, like cwin_clear(&ce_win) -- except the ink/paper/
+ * charset-mode attribute triplet is written at the window's OWN first
+ * three relative columns (CE_WIN_SX+0/+1/+2) instead of at literal
+ * screen columns 0/1, and the content fill starts at CE_CONTENT_X0
+ * rather than column 0. See CE_CONTENT_X0's doc comment for why
+ * cwin_clear() itself is wrong for this one sidebar popup, and why the
+ * charset-mode (A_STD) byte is needed on every row, not just once.
  *
  * @return (none)
  */
@@ -124,6 +149,7 @@ static void ce_clear(void)
     {
         cwin_putat_char(&ce_win, 0, y, ce_win.ink);
         cwin_putat_char(&ce_win, 1, y, ce_win.paper);
+        cwin_putat_char(&ce_win, 2, y, A_STD);
     }
     cwin_fill_rect(&ce_win, CE_CONTENT_X0, 0, (uint8_t)(CE_WIN_WX - CE_CONTENT_X0), CE_WIN_WY, CH_SPACE);
     ce_win.cx = 0;

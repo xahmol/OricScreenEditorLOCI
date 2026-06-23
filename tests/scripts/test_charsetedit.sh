@@ -191,6 +191,47 @@ DUMP8C="$OUT/capture_ce_hexedit_commit.bin"
 run_capture 18200000 '\p1e\p1h\p1\l\p1\l\p13\p19\p1\n\p1\e' "$DUMP8C"
 check_bytes "row0 committed via 'h' (0x1c -> 0x39)" "39 22 2a 2e 2c 20 1e 00" "$DUMP8C"
 
+# --- Scenario 9: popup resets charset mode to Std for its own content -----
+# Regression test for a bug found 2026-06-23 (user report: "Charset
+# editor does not set attribute code for std charset before the popup,
+# causing it to show illegible if printed over lines that use alternate
+# charset"). The Oric ULA's charset-mode latch (A_STD/A_ALT, values 8-9)
+# does NOT reset at the start of each raster line the way ink/paper do
+# (see CLAUDE.md "Oric Screen Model") -- it persists across rows from
+# wherever it was last set, until the next charset-mode attribute byte
+# anywhere later resets it. ce_clear() originally only wrote ink/paper
+# at the popup's own first 2 columns, never a charset-mode reset, on the
+# wrong assumption that "nothing this popup draws ever uses A_ALT" was
+# sufficient -- it wasn't: an A_ALT byte set anywhere earlier on the
+# canvas (e.g. via Main mode's 'u', which plots the raw modifier-
+# attribute byte) silently carried into the popup's own header text,
+# rendering it with Alt-charset glyphs instead of the intended Standard
+# ones.
+#
+# Sequence: 'a' toggles plotaltchar on, RIGHT x20 moves the cursor to
+# column 20, 'u' plots the modifier-attribute byte (8|altchar=9=A_ALT)
+# there and advances down a row, 'e' opens the character editor. Checks
+# the popup's own 3rd reserved column (absolute column 28, CE_WIN_SX=26
+# + CE_CONTENT_X0's charset-mode byte at relative column 2) is A_STD
+# (0x08) -- the fix -- and that it sits BEFORE the header text starts
+# (absolute column 29), so the text itself is guaranteed Std regardless
+# of the A_ALT byte planted earlier in the same row.
+RIGHTS20=""
+for i in $(seq 1 20); do RIGHTS20+='\p1\r'; done
+DUMP9="$OUT/capture_ce_charset_reset.bin"
+run_capture 36000000 "\p1 \p1a${RIGHTS20}\p1u\p1e" "$DUMP9"
+echo ""
+echo "Popup resets charset mode to Std before its own content (V1 parity)"
+CE_RESET_BYTE=$(python3 "$SCREEN" "$DUMP9" --bytes "$((0xBB80 + 28)):1")
+if [ "$CE_RESET_BYTE" = "08" ]; then
+    echo "  [PASS] popup's own column 28 carries an explicit A_STD reset byte"
+    pass=$((pass+1))
+else
+    echo "  [FAIL] popup column 28 -- expected '08' (A_STD), got '$CE_RESET_BYTE'"
+    fail=$((fail+1))
+fi
+check_found "header text still renders (\"Code:\$40\")" "Code:\$40" "$DUMP9"
+
 echo ""
 echo "==========================================================="
 echo "  Results: $pass passed, $fail failed"

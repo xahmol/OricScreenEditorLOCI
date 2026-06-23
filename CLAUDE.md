@@ -894,11 +894,12 @@ glyph for `app.plotscreencode`/`app.plotaltchar`.
   The 4 lines of key-binding hints from the earlier 38x16 popup were dropped
   (no room in 13 cols) — key bindings move to the `FUNCT+8` help system
   instead.
-- **Window-relative columns 0-1 are reserved for the popup's own ink/paper
-  attribute pair** (`CE_CONTENT_X0=2`, `ce_clear()`) — fixed 2026-06-23,
-  see "Popup white-bleed fix" below; every other `CE_*_X` constant above
-  is `CE_CONTENT_X0` further right than its literal value would suggest
-  from the names alone (e.g. `CE_FAV_X` is really column 30, not 27+1).
+- **Window-relative columns 0-2 are reserved for the popup's own ink/
+  paper/charset-mode attribute triplet** (`CE_CONTENT_X0=3`, `ce_clear()`)
+  — see "Popup white-bleed fix" and "Popup illegible over Alt-charset
+  canvas content" below; every other `CE_*_X` constant above is
+  `CE_CONTENT_X0` further right than its literal value would suggest from
+  the names alone (e.g. `CE_FAV_X` is really column 30, not 26+1).
 
 **Popup white-bleed fix (2026-06-23, user-requested)**: user report —
 "chareditor popup makes the whole width white, not only the right part
@@ -930,6 +931,56 @@ columns 0-26 now carry zero attribute bytes. No test changes needed (the
 existing suite's assertions are all `--find` text-search or direct
 charset-RAM checks, both position-independent); full suite stayed
 191/191.
+
+**Popup illegible over Alt-charset canvas content (2026-06-23,
+user-requested, follow-up to the white-bleed fix above)**: user report
+— "Charset editor does not set attribute code for std charset before
+the popup, causing it to show illegible if printed over lines that use
+alternate charset." The white-bleed fix above only reserved 2 columns
+(ink, paper) on the stated assumption that "nothing this popup draws
+ever uses `A_ALT`" — true for the popup's own *content*, but the wrong
+test: per "Oric Screen Model" above, the Oric ULA resets ink/paper to
+white-ink/black-paper at the start of every raster line automatically,
+but the **charset-mode latch (`A_STD`/`A_ALT`, values 8-9) does not get
+this automatic per-line reset** — it persists across rows from wherever
+it was last set, until the next charset-mode attribute byte anywhere
+later changes it. So if the canvas underneath/around this popup ever
+set `A_ALT` (e.g. via Main mode's `u`, which plots the raw modifier-
+attribute byte directly) with nothing later resetting it, that mode
+silently carried into the popup's own header/grid text, rendering V1-
+authored Standard-charset text (`"Code:$40"`, etc.) as Alt-charset
+glyphs instead — illegible. V1 avoids this by reserving a 3rd panel
+column specifically for a charset-mode reset (see the white-bleed fix's
+own V1 comparison above); this port had only ported 2 of V1's 3
+reserved columns.
+
+**Fix**: `CE_CONTENT_X0` grew from 2 to 3 (a 3rd reserved column,
+`A_STD` written every row by `ce_clear()`, same per-row loop as the
+existing ink/paper writes); `CE_WIN_SX` moved 1 column left (27→26) and
+`CE_WIN_WX` grew by 1 (13→14) to compensate — since every other
+`CE_*_X` constant is defined *relative* to `CE_CONTENT_X0`, this
+combination keeps every constant's **absolute** screen column exactly
+unchanged (confirmed: `CE_FAV_X`'s absolute column is still 30, computed
+as `26+(3+1)` vs. the old `27+(2+1)`), so no existing test assertion
+needed updating. The only observable effect is the popup now also
+covers 1 more canvas column underneath (was cols 0-26 visible, now
+0-25) — an accepted, minimal trade-off since the popup's row already
+used every column from its content start to the screen's right edge
+(the 10-favourite-digit row, `CE_FAV_X..+9`, already filled exactly to
+column 39), leaving no spare column to add the reset byte into without
+widening.
+
+Verified via a direct Phosphoric repro and a `git stash`-based before/
+after comparison (per this session's established verification
+convention — confirm the actual mechanism, not just a plausible-
+sounding fix): planting an `A_ALT` byte (Main mode's `u`, with
+`plotaltchar` toggled on) at column 20 of row 0, then opening the
+character editor, showed the pre-fix byte stream had no charset-reset
+attribute anywhere between column 20 and the header text at column 29
+(text rendered under whatever charset-mode was last set — Alt, in this
+repro); post-fix, column 28 correctly holds `0x08` (`A_STD`) immediately
+before the text. Test coverage: `tests/scripts/test_charsetedit.sh`
+Scenario 9 (2 new checks, same repro). Suite: 196/196 → 198/198.
 
 **Per-row hex column + inline `h` edit (2026-06-23, user-requested, V1
 parity)**: user report — "chareditor should always show the hex values of
@@ -3267,7 +3318,7 @@ make test         # full automated Phosphoric test suite (test-boot, test-menus,
                   # path) and test-fileio-traffic (uses --loci-flash DIR
                   # instead, a real host filesystem directory for
                   # byte-level LOCI file I/O assertions).
-                  # Current total: 196/196.
+                  # Current total: 198/198.
 make test-boot    # headless boot smoke test (splash + canvas/statusbar render)
 make test-capture CYCLES=N TYPEKEYS='...'
                   # calibration helper: dumps tests/out/capture.bin + .png
