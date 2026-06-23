@@ -283,10 +283,14 @@ void fileio_save_screen(void)
  * Load a canvas-only file saved by fileio_save_screen() (or any bare raw
  * screen dump from elsewhere -- see fileio.h): prompts for width/height
  * (fileio_get_dimensions(), V1's exact UX, since there is no embedded
- * size to auto-detect), applies it via canvas_resize(), then reads the
- * raw bytes directly. Shows MSG_RESIZE_INVALID and aborts (canvas
- * unchanged) if the entered size is out of bounds, MSG_FILE_NOT_FOUND if
- * the file can't be opened.
+ * size to auto-detect), applies it via canvas_resize() (no
+ * VIEWPORT_WIDTH/HEIGHT floor -- a typed-in size smaller than the
+ * viewport is a legitimate sub-viewport canvas, not necessarily a typo,
+ * now that the architecture fully supports one in both dimensions, see
+ * canvas_blit()), then reads the raw bytes directly. Shows
+ * MSG_RESIZE_INVALID and aborts (canvas unchanged) if the entered size is
+ * degenerate (0) or exceeds CANVAS_MAX_SIZE, MSG_FILE_NOT_FOUND if the
+ * file can't be opened.
  *
  * @return (none)
  */
@@ -349,7 +353,7 @@ void fileio_save_combined(void)
         menu_messagepopup(MSG_FILE_INVALID_FORMAT);
         return;
     }
-    loci_write(fd, (const void *)(CHARSET_STD + CHARSET_GLYPH_AREA_OFFSET), CHARSET_GLYPH_AREA_SIZE);
+    loci_write(fd, charsetswap_real_std(), CHARSET_GLYPH_AREA_SIZE);
     loci_write(fd, screenmap, (uint16_t)(app.canvas_width * app.canvas_height));
     loci_close(fd);
 }
@@ -478,12 +482,12 @@ void fileio_save_project(void)
     if (app.stdchanged)
     {
         filedir_join_suffix(fullpath, "CS.BIN");
-        file_save(fullpath, (const void *)(CHARSET_STD + CHARSET_GLYPH_AREA_OFFSET), charset_area_size(CHARSET_STD));
+        file_save(fullpath, charsetswap_real_std(), charset_area_size(CHARSET_STD));
     }
     if (app.altchanged)
     {
         filedir_join_suffix(fullpath, "CA.BIN");
-        file_save(fullpath, (const void *)(CHARSET_ALT + CHARSET_GLYPH_AREA_OFFSET), charset_area_size(CHARSET_ALT));
+        file_save(fullpath, charsetswap_real_alt(), charset_area_size(CHARSET_ALT));
     }
 }
 
@@ -572,7 +576,7 @@ void fileio_load_project(void)
         fileio_parse_v1_project(v1buf, &proj);
     }
 
-    if (!canvas_resize_loaded(proj.canvas_width, proj.canvas_height))
+    if (!canvas_resize(proj.canvas_width, proj.canvas_height))
     {
         menu_messagepopup(MSG_FILE_INVALID_FORMAT);
         return;
@@ -721,6 +725,7 @@ void fileio_save_charset(uint8_t altorstd)
     if (!fileio_get_filename(title, PICKER_FILTER_NONE)) return;
 
     filedir_join_suffix(fullpath, ".BIN");
-    if (file_save(fullpath, (const void *)(base + CHARSET_GLYPH_AREA_OFFSET), charset_area_size(base)) < 0)
+    if (file_save(fullpath, (base == CHARSET_ALT) ? charsetswap_real_alt() : charsetswap_real_std(),
+                  charset_area_size(base)) < 0)
         menu_messagepopup(MSG_FILE_INVALID_FORMAT);
 }

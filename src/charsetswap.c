@@ -104,6 +104,48 @@ void charsetswap_reset_alt_from_boot(void)
 }
 
 /**
+ * Return a pointer to CHARSET_STD's genuine, un-swapped displayable range
+ * (CHARSET_GLYPH_AREA_SIZE bytes). If a swap session currently has Std
+ * swapped to chrome glyphs (std_swap_active), the real content is sitting
+ * in backup_std, not live CHARSET_STD -- point there instead. Found
+ * 2026-06-23 (user report: saving a project's charset, then loading it
+ * back, didn't actually restore the edited glyphs): every fileio.c Save
+ * action that touched CHARSET_STD read live charset RAM directly, which
+ * silently saved the swapped-in ROM chrome glyphs instead of the user's
+ * real edits whenever the save was triggered from inside an active
+ * charsetswap_enter() session -- which is *always* the case for any
+ * menu-invoked Save, since src/menudata.c's menu_run() keeps one swap
+ * session open for its entire bar-level lifetime. Returns a pointer
+ * rather than copying into a caller buffer to avoid a 768-byte static
+ * buffer that didn't fit the FR build's smaller remaining BSS budget.
+ *
+ * @return Pointer to CHARSET_GLYPH_AREA_SIZE bytes of real Std content.
+ */
+const uint8_t *charsetswap_real_std(void)
+{
+    if (std_swap_active)
+        return backup_std;
+    return (const uint8_t *)(CHARSET_STD + CHARSET_GLYPH_AREA_OFFSET);
+}
+
+/**
+ * Return a pointer to CHARSET_ALT's genuine, un-swapped displayable range
+ * (CHARSET_ALT_GLYPH_AREA_SIZE bytes). Unlike Std, Alt is swapped
+ * unconditionally on every charsetswap_enter() (regardless of
+ * charset_changed), so the real content lives in backup_alt_current
+ * whenever swap_depth > 0 -- see charsetswap_real_std()'s doc comment for
+ * the bug this fixes.
+ *
+ * @return Pointer to CHARSET_ALT_GLYPH_AREA_SIZE bytes of real Alt content.
+ */
+const uint8_t *charsetswap_real_alt(void)
+{
+    if (swap_depth > 0)
+        return backup_alt_current;
+    return (const uint8_t *)(CHARSET_ALT + CHARSET_GLYPH_AREA_OFFSET);
+}
+
+/**
  * Opt-in: back up CHARSET_STD's displayable glyph range and overwrite it
  * with the ROM-standard glyphs (CHARSETROM) if it's ever been changed
  * (see charsetswap_mark_changed()), and unconditionally back up

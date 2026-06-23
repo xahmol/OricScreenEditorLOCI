@@ -133,7 +133,6 @@
 #define MSG_CE_CODE_FMT   "Code:$%02x"
 #define MSG_CE_SET_STD    "Set:Std"
 #define MSG_CE_SET_ALT    "Set:Alt"
-#define MSG_CE_HEX_LABEL  "Hex:$"
 
 // ── Palette popup (src/palette.c) ───────────────────────────────────────────
 // Fixed 4-char labels (PAL_LABEL_X..PAL_LABEL_X+3) -- must stay 4 chars in

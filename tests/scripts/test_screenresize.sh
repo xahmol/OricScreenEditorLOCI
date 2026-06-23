@@ -10,13 +10,23 @@
 #   - shrinking back below the previous size (60 -> 40) shows a Yes/No
 #     confirmation; selecting Yes applies the shrink
 #   - selecting No on the same confirmation leaves the size unchanged
+#   - shrinking below VIEWPORT_WIDTH/HEIGHT (40/28) itself now succeeds
+#     (Scenario 4) -- regression test for a bug found 2026-06-23 (user
+#     report: "gives error on making canvas smaller than 40x28"):
+#     resize_dialog() used to hard-floor both dimensions at
+#     VIEWPORT_WIDTH/HEIGHT, rejecting any such resize as "unsupported",
+#     even though Load Project already fully supported a sub-viewport
+#     canvas (see CLAUDE.md "Sub-viewport canvas support"). The floor was
+#     dropped once canvas_blit() learned to handle a narrower-than-
+#     viewport canvas too (it already handled a shorter one), so
+#     canvas_resize() (merged with the old floor-free canvas_resize_
+#     loaded()) now only rejects a degenerate 0-sized dimension or
+#     exceeding CANVAS_MAX_SIZE.
 #
-# Note: height is NOT separately exercised here. VIEWPORT_HEIGHT (27) equals
-# the default canvas height, so resize_dialog()'s `minval` for height is 27
-# -- any height *decrease* from the default is < minval and therefore
-# invalid, meaning the shrink-confirm path can never be reached for height
-# without first growing it. Width exercises the exact same shared
-# resize_dialog()/menu_areyousure() code path, so it is sufficient.
+# Height is otherwise NOT separately exercised for Scenarios 1-3 (the
+# grow/shrink-confirm Yes/No round trip) -- Width exercises the exact same
+# shared resize_dialog()/menu_areyousure() code path, so it is sufficient
+# there.
 #
 # --type-keys notes (see CLAUDE.md "Phosphoric testing notes"):
 #   \pN = pause N sec (releases all keys). A \p1 MUST precede every distinct
@@ -136,6 +146,30 @@ run_capture 28200000 \
     '\p1\f1\p1\n\p1\n\p1\l\p1\l\p16\p1\n\p1\n\p1\n\p1\l\p1\l\p14\p1\n\p1\d\p1\n\p1\e\p1\f1\p1\n' \
     "$DUMP3W"
 check_found "Width pulldown shows 60" "Width:   60" "$DUMP3W"
+
+# --- Scenario 4: shrink below the viewport (40 -> 20, 28 -> 10) -------------
+# Width: FUNCT+1, ENTER (Screen pulldown, Width selected), ENTER (dialog,
+# "40"), left, left, "20" (overwrite), ENTER (-> shrink-confirm, 20 < 40),
+# ENTER (Yes), ESC closes the bar, reopen + ENTER to view the pulldown
+# (Width item already selected by default) and confirm "20".
+DUMP4W="$OUT/capture_resize_subviewport_width.bin"
+run_capture 25000000 \
+    '\p1\f1\p1\n\p1\n\p1\l\p1\l\p12\p10\p1\n\p1\n\p1\e\p1\f1\p1\n' \
+    "$DUMP4W"
+echo ""
+echo "Width 40 -> 20 (below VIEWPORT_WIDTH, no longer rejected)"
+check_found "Width pulldown shows 20" "Width:   20" "$DUMP4W"
+
+# Height: same shape, but DOWN once after opening the pulldown to reach
+# the Height item (index 1) before ENTER opens its dialog ("28"); after
+# the round trip, reopen + DOWN (no ENTER -- just viewing the pulldown,
+# not re-opening the dialog) to confirm "10" without disturbing it again.
+DUMP4H="$OUT/capture_resize_subviewport_height.bin"
+run_capture 24000000 \
+    '\p1\f1\p1\n\p1\d\p1\n\p1\l\p1\l\p11\p10\p1\n\p1\n\p1\e\p1\f1\p1\n\p1\d' \
+    "$DUMP4H"
+echo "Height 28 -> 10 (below VIEWPORT_HEIGHT, no longer rejected)"
+check_found "Height pulldown shows 10" "Height:  10" "$DUMP4H"
 
 echo ""
 echo "==========================================================="

@@ -894,6 +894,112 @@ glyph for `app.plotscreencode`/`app.plotaltchar`.
   The 4 lines of key-binding hints from the earlier 38x16 popup were dropped
   (no room in 13 cols) — key bindings move to the `FUNCT+8` help system
   instead.
+- **Window-relative columns 0-1 are reserved for the popup's own ink/paper
+  attribute pair** (`CE_CONTENT_X0=2`, `ce_clear()`) — fixed 2026-06-23,
+  see "Popup white-bleed fix" below; every other `CE_*_X` constant above
+  is `CE_CONTENT_X0` further right than its literal value would suggest
+  from the names alone (e.g. `CE_FAV_X` is really column 30, not 27+1).
+
+**Popup white-bleed fix (2026-06-23, user-requested)**: user report —
+"chareditor popup makes the whole width white, not only the right part
+of the screen it actually uses." Root cause: `cwin_clear()`'s
+`row_setattr()` (`include/charwin.c`) always writes the ink/paper
+attribute pair at **literal** screen columns 0-1, regardless of the
+window's own `sx` — correct for every other popup in this codebase
+(`sx=2`/`sx=5`, where columns 0-1 genuinely *are* the window's own
+reserved border), but wrong for this one sidebar popup, whose `sx=27` is
+chosen specifically so canvas columns 0-26 stay visible underneath. The
+Oric ULA holds an ink/paper attribute active from the column it's
+written at onward until the next attribute change — with nothing else on
+a blank canvas row to reset it, the white PAPER byte at column 1 bled the
+popup's white background all the way to column 39, not just its own
+27-39. Checked V1 (`showchareditfield()`/`showchareditgrid()`, local
+reference at `/home/xahmol/git/OricScreenEditor/src/main.c`) for how it
+avoids this: V1's own panel reserves 3 of its **own** columns (27-29 — an
+attribute-transition strip: reset-to-std-charset, white paper, black ink)
+immediately before its real content at column 30, never touching
+anything left of column 27 at all. OSE's bug was using its *entire*
+27-39 footprint for content, leaving no room within its own panel for a
+transition strip of its own. Fixed with `ce_clear()` (replacing both
+`cwin_clear(&ce_win)` call sites), which writes the ink/paper pair at the
+window's own first two relative columns (absolute 27/28) instead of
+literal 0/1, with every content constant shifted `+2` accordingly (only 2
+reserved columns needed, not V1's 3, since nothing this popup draws ever
+uses `A_ALT`). Verified via a raw byte dump and a Phosphoric screenshot:
+columns 0-26 now carry zero attribute bytes. No test changes needed (the
+existing suite's assertions are all `--find` text-search or direct
+charset-RAM checks, both position-independent); full suite stayed
+191/191.
+
+**Per-row hex column + inline `h` edit (2026-06-23, user-requested, V1
+parity)**: user report — "chareditor should always show the hex values of
+each byte line left of the edit matrix like in v1. On hex edit, input
+should be placed on this value, taking the old input as default value.
+Also presently length of input seems to short with 1 only." Checked V1
+(`chareditor()`/`showchareditgrid()`, local reference at
+`/home/xahmol/git/OricScreenEditor/src/main.c`) directly per this
+project's "verify against the actual reference, don't assume" convention:
+V1's `showchareditgrid()` always draws each of the 8 grid rows' 2-digit
+hex byte value immediately left of that row's pixel grid (`gotoxy(30,
+y+3); cprintf("%2X", char_byte);`, right before that row's own grid at
+column 33) — a permanent readout, not a one-off popup. V1's `'h'` case
+edits *inline*, directly on top of the cursor's current row's hex value
+(`textInput(30, ypos+3, buffer, 2, 3)`), pre-filled from
+`sprintf(buffer,"%2x", char_present[ypos])` — the row's current value, not
+an empty string. The earlier OSE port had neither: no permanent per-row
+hex readout, and `'h'` opened a separate fixed-row prompt (row 14,
+`CE_HEX_LABEL_X`/`CE_HEX_INPUT_X`/`CE_HEX_Y`, all removed) with an empty
+starting buffer, unrelated to whichever row the cursor was actually on.
+
+**Two genuine bugs found while investigating, fixed alongside the
+redesign**:
+1. The "input length too short with 1 only" complaint traced to
+   `cwin_textinput(..., vwidth=2, ..., maxlen=2, ...)` — every *other*
+   `cwin_textinput()` call site in this codebase uses `vwidth > maxlen`
+   (room for the cursor's own display slot); this was the one exception.
+   With `vwidth == maxlen`, `cwin_textinput()`'s viewport-scrolling logic
+   (`offs = idx+1 > vwidth ? idx+1-vwidth : 0`) pushes the first typed
+   digit out of view the moment a second digit is typed — confirmed both
+   digits were still correctly *accepted* into the buffer (committing
+   "39" did write `0x39`), it was purely a display bug. Fixed by using
+   `vwidth=4` for the new inline field.
+2. `cwin_putat_printf()`'s format-spec parser (`_cwin_vformat()`,
+   `include/charwin.c`) only recognises **lowercase** `%x` — passing
+   `"%02X"` (uppercase) for the new per-row hex column silently emitted
+   nothing at all (the parser doesn't match `'X'` against any known
+   spec, so the conversion — and its argument — is just skipped). The
+   project convention note ("`%x`/`%02x` produce UPPERCASE hex digits")
+   describes the *output* digits, not the format string's own case,
+   which must stay lowercase `x` regardless of the rendered case. Easy
+   to get wrong by analogy with the C standard library's `%X`/`%x`
+   distinction, which doesn't apply here. Existing call sites (e.g.
+   `MSG_CE_CODE_FMT = "Code:$%02x"`) were already correctly lowercase;
+   only this new call needed the fix.
+
+**Implementation**: `CE_HEX_VAL_X` (`= CE_CONTENT_X0`, 2 columns) reserves
+window-relative columns 2-3 for the hex value, immediately before
+`CE_GRID_X` (5) — fits exactly in the gap `CE_CONTENT_X0`'s own fix
+already opened up on grid rows (column 4 left as a 1-column gap before
+the grid). `ce_draw_grid()` now draws `"%02x"` of each row's byte at
+`(CE_HEX_VAL_X, CE_GRID_Y+y)` alongside the existing pixel loop, every
+redraw — so it updates live the same way the grid already does (Strategy
+A, direct charset-RAM reads, no separate buffer). The `'h'` case now
+reads the cursor row's current byte, formats it into a 2-char buffer
+itself (no `sprintf()`/`<stdio.h>` dependency, just a `"0123456789ABCDEF"`
+lookup table — matching this codebase's existing no-`<stdio.h>`-in-
+`charsetedit.c` convention), and calls `cwin_textinput()` at the row's own
+on-screen position instead of a separate fixed row. `MSG_CE_HEX_LABEL`
+(`"Hex:$"`/`"Hex:$"` EN/FR — unused once the separate label is gone) was
+deleted from both string tables.
+
+**Test coverage**: `tests/scripts/test_charsetedit.sh` gained Scenario 8
+(3 checks): the hex column shows `'1C'` for `'@'`'s unmodified row0;
+typing two new digits over the pre-filled default keeps both visible
+(no scrolling — the regression check for bug 1 above); `ENTER` commits
+the typed value to the glyph (`0x1c` → `0x39`). Verified visually too via
+a Phosphoric screenshot (all 8 rows' hex values rendering correctly
+alongside their grids). Full suite: 191/191 → 194/194.
+
 - **Pixel/cursor 4-state grid rendering** (`ce_draw_grid`): pixel=0,cursor=0
   -> `CH_SPACE` (0x20); pixel=1,cursor=0 -> `CE_PIXEL_CHAR` `'#'` (0x23);
   pixel=0,cursor=1 -> `CH_INVSPACE` (0xA0, = `CH_SPACE ^ 0x80`); pixel=1,
@@ -908,8 +1014,9 @@ glyph for `app.plotscreencode`/`app.plotaltchar`.
   (XOR 0x3F); `z` undoes the last destructive edit (single-level snapshot,
   `ce_undo[]`); `s` restores from `CHARSETROM` (std only); `c`/`v`
   copy/paste a glyph (`ce_copy[]`); `x`/`y` mirror horizontally/vertically;
-  `u`/`d`/`l`/`r` scroll the glyph up/down/left/right (wrapping); `h` opens a
-  2-digit hex-row input for the cursor's row; `a` toggles Std/Alt; `FUNCT+6`
+  `u`/`d`/`l`/`r` scroll the glyph up/down/left/right (wrapping); `h` inline-
+  edits the cursor's current row's hex value (see "Per-row hex column" below);
+  `a` toggles Std/Alt; `FUNCT+6`
   toggles the statusbar; `ESC` commits `ce_code`/`ce_altorstd` back to
   `app.plotscreencode`/`app.plotaltchar` and closes the popup
   (`menu_winsave`/`menu_winrestore`, main-RAM window stack — no residue).
@@ -1377,13 +1484,75 @@ Yes/No confirm dialog, `PULLDOWN_MAXOPTIONS=6`) → popup dialogs.
   so enter/exit can't drift out of sync. Every current call site passes `1`
   except `charsetedit_run()`, which passes `0`.
 - **Canvas resize** (`canvas_resize()`, dispatched from `menudata.c`
-  `resize_dialog()`): new size validated as
-  `(newval >= minval) && (neww*newh <= CANVAS_MAX_SIZE=8192)`, where
-  `minval = VIEWPORT_WIDTH` (40) for width, `VIEWPORT_HEIGHT` (28) for height
-  — both equal the *default* canvas size, so a dimension can only be shrunk
-  below its default after first being grown above it. Shrinking below the
-  *current* (already-grown) size triggers `menu_areyousure()` (Yes applies,
-  No leaves the size unchanged).
+  `resize_dialog()`): new size validated as `neww*newh <= CANVAS_MAX_SIZE`
+  (10240) and both dimensions non-zero. Shrinking below the *current* size
+  triggers `menu_areyousure()` (Yes applies, No leaves the size unchanged).
+  **No longer floors either dimension at `VIEWPORT_WIDTH`/`HEIGHT`** (see
+  "Screen > Width/Height shrink below the viewport" below) — `canvas_resize()`
+  is the single merged function used by every resize path (the interactive
+  dialog, Load Screen/Combined's typed-dimensions prompt, and Load Project's
+  file-header-driven resize); an earlier two-function split
+  (`canvas_resize()` with a floor, `canvas_resize_loaded()` without one) was
+  merged back into one once the floor's last remaining justification went
+  away.
+
+**Screen > Width/Height shrink below the viewport (post-launch fix,
+2026-06-23, user-requested)**:
+
+User report: "Resizing canvas via file menu gives error on making canvas
+smaller than 40x28." Root cause: `resize_dialog()`'s `minval` was
+hardcoded to `VIEWPORT_WIDTH`/`VIEWPORT_HEIGHT`, so *no* interactive
+resize could ever go below 40x28 at all — not even after the canvas had
+already been resized down once via Load Project (see "Sub-viewport
+canvas support" above), which already proved the architecture could
+display and edit a smaller-than-viewport canvas correctly. The floor's
+original rationale ("a value smaller than this port's architectural
+minimum is almost certainly a typo") stopped holding once that
+architecture existed; there was no remaining reason for the interactive
+dialog to be more restrictive than what Load Project already supported.
+
+**Fix, two parts**:
+1. `canvas_blit()` (`src/canvas.c`) gained a column bound to match its
+   existing row bound — `canvas_resize_loaded()`'s one-time blank-pad
+   only ever covered *height* (a canvas shorter than the viewport), since
+   that was the only sub-viewport case Load Project could produce (V1
+   projects are never narrower than 40 columns). A canvas *narrower* than
+   the viewport has no such pre-existing padding, and worse, has no
+   "spare" bytes to pad at all: `screenmap[]` rows are packed tightly at
+   `stride=canvas_width`, so naively reading `VIEWPORT_WIDTH` (40) bytes
+   from a narrower row would spill into the *next* row's real data
+   instead of blank space — a genuine rendering bug, not just an
+   oversight. Fixed by computing `validcols`/`validrows` from the real
+   canvas extent each call and writing `CH_SPACE` for anything beyond
+   it, symmetric in both dimensions; this makes canvas_resize_loaded()'s
+   original height-only blank-pad belt-and-braces rather than load-bearing
+   (kept anyway, costs nothing).
+2. `resize_dialog()`'s `minval` floor was dropped entirely (now just
+   `newval >= 1`, matching `canvas_resize()`'s own degenerate-zero
+   check), and it now calls `canvas_resize()` (still — see above, the two
+   functions were merged once this was the last difference between
+   them) instead of going through a separate floored path. After a
+   successful resize, `canvas_goto((uint16_t)(app.cursor_x + app.xoffset),
+   (uint16_t)(app.cursor_y + app.yoffset))` re-derives the cursor's
+   absolute canvas position and re-clamps it into the new (possibly
+   smaller) extent — necessary since a shrink can otherwise leave
+   `xoffset`/`yoffset`/`cursor_x`/`cursor_y` pointing past the new
+   bounds; `canvas_goto()` already does exactly this clamping and
+   re-blits as a side effect, so no new helper was needed.
+   `fileio_load_screen()`/`fileio_load_combined()` (`src/fileio.c`) also
+   switched from the old floored resize to the same merged
+   `canvas_resize()`, for the same reason ("via file menu" in the user's
+   report could equally mean these two actions' typed-width/height
+   prompt) — a typed-in screen/combined-load size smaller than the
+   viewport is no longer treated as an assumed typo either.
+
+**Test coverage**: `tests/scripts/test_screenresize.sh` gained Scenario 4
+(shrink 40→20 width, 28→10 height, both via the normal shrink-confirm
+Yes path, reopening the pulldown afterward to confirm the smaller size
+stuck) — previously, height could never even reach the shrink-confirm
+path at all (any decrease from the 28 default was rejected outright), so
+this is also the first test coverage of that path for height. Full
+suite: 187/187 → 191/191 (this scenario, plus the charset-save fix below).
 
 **Screen > Clear/Fill redraw timing fix (post-launch, user-requested
 2026-06-21):**
@@ -2443,6 +2612,33 @@ size shift; flagged here for follow-up, not fixed (out of scope for
 this change, and changing it risks re-triggering the very bug it
 currently happens to avoid without a fresh round of `-g` verification).
 
+**The flagged landmine went live (2026-06-23, user report: "Charset
+save on save project now creates garbled chars in the Standard charset
+for lowercase q-z")**: this session's other changes (resize-floor
+removal, charset-save chrome-swap fix, charsetedit popup/hex-column
+redesign) shifted BSS layout enough that `0xA000` started landing
+*inside* `charsetswap.c`'s `backup_std[768]` array — confirmed by
+saving a project with an edited Std charset and finding `menu_draw_
+item()`'s own debug format string (`"draw_item: y=3, menunumber=1,
+item=2, sel=0, title=\"Save project\", width=13"`) sitting in the
+saved `CS.BIN` at the byte offset for codes `q`-`z` (0x71-0x7A), instead
+of glyph bitmaps — every pulldown-item redraw was silently overwriting
+part of the real backed-up Std charset with this debug string, and
+`charsetswap_real_std()` (see "Save actions were writing chrome-swapped
+charset glyphs" above) was faithfully saving that corruption since it
+*is* the real content as far as that function knows. **Fixed**: `menu.c`
+gained its own `menu_regpressure_scratch[100]` static buffer (same
+pattern as `picker_regpressure_scratch[]`), and `menu_draw_item()`'s
+`debug` pointer now points there instead of the literal address — this
+closes the landmine flagged above for good, not just documents it.
+Regression test added: `tests/scripts/test_fileio_traffic.sh` Scenario
+9 gained a check that `qCS.BIN`'s q-z byte range (768-byte buffer,
+offset 648-727) still holds the genuine ROM glyph bitmaps, not the
+debug string — this would have caught the corruption directly (the
+existing Scenario 9 only ever checked the `'@'` glyph, at a different
+offset that happened not to be hit by this particular BSS placement).
+Suite: 194/194 -> 195/195.
+
 **Test impact**: `tests/scripts/test_fileio_traffic.sh`'s 6 Save
 scenarios each need one `\p1\n` in the same position the old `\p1s`
 occupied (confirming the sentinel, not removing a step — an earlier
@@ -2454,6 +2650,83 @@ just ENTER instead of `'s'`. Verified all three picker outcomes
 manually in Phosphoric (new-file path, existing-file Yes, existing-file
 No) in addition to the automated suite. Full suite: 185/185, unchanged
 in count.
+
+### Save actions were writing chrome-swapped charset glyphs, not the real charset (2026-06-23)
+
+User report: "saving a project with charsets... does not load... or set
+the charsets as redefined" — also reported as "the PETSCII project is
+not recognised" in the same message, but that part was the already-fixed
+sub-viewport canvas issue (see "V1 file-format compatibility" above);
+this section covers the genuinely new charset-save bug underneath it.
+
+**Root cause**: every Save action that read `CHARSET_STD`/`CHARSET_ALT`
+directly — `fileio_save_project()`'s `CS.BIN`/`CA.BIN`,
+`fileio_save_combined()`'s embedded charset section, and
+`fileio_save_charset()` (Charset > Save Standard/Alternate/Combined) —
+read **live charset RAM**, via the same bank address the character
+editor edits. That's wrong specifically when the Save is dispatched from
+inside the menu bar (i.e. *always*, for every menu-invoked Save), because
+`menudata.c`'s `menu_run()` keeps a `charsetswap_enter()` session active
+for its entire bar-level lifetime (see "Charset-swap mechanism" above) —
+which, the moment the user has ever edited/loaded a charset this
+session, has already overwritten live `CHARSET_STD` with safe ROM chrome
+glyphs (and *always* overwrites live `CHARSET_ALT` with its boot
+snapshot, regardless of whether Alt was ever touched) for the popup
+chrome's own readability. So every menu-invoked Save was silently
+writing the **swapped-in chrome glyphs** to LOCI, never the user's real
+edited charset — confirmed directly: after editing `'@'`'s glyph and
+saving a project, the written `CS.BIN`'s `'@'` byte was the ROM value
+(`0x1c`), not the edited one (`0x3c`).
+
+This also explains the "or set the charsets as redefined" half of the
+report on its own, with no further bug needed: even though
+`fileio_load_project()` correctly loads `CS.BIN`/`CA.BIN` back and calls
+`charsetswap_mark_changed()` to re-sync the swap session (see "Charset-
+swap mechanism"'s "Mid-popup-load re-sync" above, which already handles
+this case correctly), there was nothing useful to load back — the saved
+file never held the real edited content in the first place.
+
+**Fix**: `charsetswap_real_std()`/`charsetswap_real_alt()`
+(`src/charsetswap.c/h`, new) each return a `const uint8_t *` to the
+*genuine* current charset content, regardless of whether a swap is
+active — `backup_std`/`backup_alt_current` (the buffers `charsetswap_
+enter()`/`charsetswap_mark_changed()` already maintain as "restore on
+exit" targets) if a swap has the corresponding bank currently overwritten,
+or the live bank address otherwise. The three Save call sites above now
+read through these instead of the bank address directly; everything else
+(Load actions, the character editor, `charsetswap_enter()`/`exit()`
+themselves) is unchanged, since those either already go through the
+swap's own backup mechanism or run with `charset-swap` opted out
+(`charsetedit_run()`).
+
+**Returns a pointer, not a copy, on purpose**: an earlier version of this
+fix had `charsetswap_save_real_std()`/`_alt()` *copy* into a caller-
+supplied buffer instead. That needed a 768-byte module-static staging
+buffer in `fileio.c` (matching this codebase's established "module-
+static, not a function-local, to avoid blowing Oscar64's static-stack
+budget" convention for buffers this size) — which built fine for the EN
+target but failed the FR build with `error 3034: Could not place object
+'charset_save_buf'` / `Size 768 Available 644 in section 'bss'`: FR's
+slightly larger string tables left less BSS headroom, and 768 bytes just
+didn't fit either way. Since the "real" content is *already* sitting in
+an existing buffer (`backup_std`/`backup_alt_current`) or live RAM
+whenever this is called, a copy was never actually necessary — switching
+to a pointer-returning API removed the new buffer requirement entirely,
+fixing the FR build without sacrificing anything (the returned pointer is
+only used immediately, passed straight to `loci_write()`/`file_save()`,
+never held past the next `charsetswap_*` call, so there's no real
+lifetime concern).
+
+**Test coverage**: `tests/scripts/test_fileio_traffic.sh` gained Scenario
+9 — edits `'@'`'s glyph (toggle pixel (0,0) via the character editor),
+saves a project, Charset > Reset Std->ROM (simulating the user
+"restoring" the charset before reloading, per their own report wording),
+reloads the project, and asserts both that the saved `CS.BIN`'s glyph
+byte is the edited value (not the ROM one — this is what actually catches
+the bug, since a passing reload alone wouldn't distinguish "saved
+correctly" from "saved wrong but happened to look unaffected") and that
+live `CHARSET_STD` shows the edited glyph again after the reload. Full
+suite: 187/187 → 191/191 (combined with the resize-floor fix above).
 
 
 ## Boot, Help & Information
@@ -2948,7 +3221,7 @@ make test         # full automated Phosphoric test suite (test-boot, test-menus,
                   # path) and test-fileio-traffic (uses --loci-flash DIR
                   # instead, a real host filesystem directory for
                   # byte-level LOCI file I/O assertions).
-                  # Current total: 185/185.
+                  # Current total: 195/195.
 make test-boot    # headless boot smoke test (splash + canvas/statusbar render)
 make test-capture CYCLES=N TYPEKEYS='...'
                   # calibration helper: dumps tests/out/capture.bin + .png

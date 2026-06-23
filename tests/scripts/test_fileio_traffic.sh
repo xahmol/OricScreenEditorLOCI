@@ -286,6 +286,63 @@ echo "Load Project accepts a genuine 27-row (sub-viewport) canvas"
 check_bytes "screen content loaded ('X'=0x58 at (5,0))" "0xBB85:1" "58" "$DUMP8"
 check_bytes "phantom row 27 is blank, not stale overlay RAM" "0xBF38:1" "20" "$DUMP8"
 
+# --- Scenario 9: Save Project writes the REAL charset, not the swapped --
+# chrome glyphs -- regression test for a bug found 2026-06-23 (user
+# report: "saving a project with charsets... does not load... or set the
+# charsets as redefined"). Root cause: every Save action that read
+# CHARSET_STD/CHARSET_ALT directly (fileio_save_project()/_combined()/
+# fileio_save_charset()) was invoked from inside menu_run()'s own
+# charsetswap_enter() session, which had already swapped live CHARSET_STD
+# to safe ROM chrome glyphs for the whole bar-level session -- so the Save
+# silently wrote the chrome glyphs, never the user's actual edited
+# charset. Fixed with charsetswap_real_std()/_alt() (src/charsetswap.h),
+# which point Save actions at the genuine backed-up content instead of
+# live (possibly swapped) charset RAM.
+#
+# Sequence: dismiss splash, 'e' opens the character editor (default
+# plotscreencode '@'), SPACE toggles pixel (0,0) of '@' (a destructive
+# edit -> app.stdchanged=1), ESC commits and closes the editor; open the
+# menu and Save Project as "Q" (2 downs to File pulldown item 2); ESC
+# closes the bar; reopen the menu, Charset > Reset Std->ROM (2 rights to
+# the Charset bar item, 6 downs to pulldown item 6), confirm Yes (resets
+# live CHARSET_STD back to ROM, simulating the user "restoring" the
+# charset before reloading); ESC closes the bar; reopen the menu, File >
+# Load Project (3 downs to pulldown item 3), select the only entry
+# (QPJ.BIN), ESC closes the bar. The '@' glyph's first byte ($B400 +
+# CHARSET_GLYPH_AREA_OFFSET(0x100) + (0x40-0x20)*8 = $B600) must read back
+# as the edited value (0x3c -- pixel (0,0) toggled on in ROM's '@' bitmap,
+# which starts 0x1c), not the ROM value -- if Save had written the
+# swapped ROM glyphs instead, qCS.BIN itself would hold 0x1c and this
+# assertion would fail even after a successful load.
+reset_flash
+DUMP9="$OUT/capture_fileio_charset_real_save.bin"
+run_capture 50000000 \
+    '\p1 \p1e\p1 \p1\e \p1\f1\p1\r\p1\n\p1\d\p1\d\p1\n\p1\n\p1Q\p1\n\p1\e \p1\f1\p1\r\p1\r\p1\n\p1\d\p1\d\p1\d\p1\d\p1\d\p1\d\p1\n\p1\n\p1\e \p1\f1\p1\r\p1\n\p1\d\p1\d\p1\d\p1\n\p1\n\p1\e' \
+    "$DUMP9"
+echo ""
+echo "Save Project writes the real charset, not chrome-swapped ROM glyphs"
+check_file_bytes "qCS.BIN: '@' glyph byte0 is the edited value (0x3c)" "$LOCIFLASH/qCS.BIN" \
+    "data[256] == 0x3c"
+check_bytes "live CHARSET_STD restored to the edited glyph after reload" "0xB600:1" "3c" "$DUMP9"
+
+# Regression test for the menu.c 0xA000 register-pressure-workaround
+# landmine (found 2026-06-23, user report: "Charset save on save project
+# now creates garbled chars in the Standard charset for lowercase q-z"):
+# that literal address happened to fall inside charsetswap.c's
+# backup_std[768] array once this session's other changes shifted BSS
+# layout, so every pulldown-item redraw (menu_draw_item()'s dummy
+# sprintf debug call) silently overwrote part of the real backed-up
+# Std charset with its own debug string -- bytes 648-727 of qCS.BIN
+# (codes 'q'-'z') held literal ASCII text from that format string
+# instead of glyph bitmaps. Fixed with a real static scratch buffer
+# (menu_regpressure_scratch[], src/menu.c), matching the precedent
+# src/filepicker.c's own analogous workaround already used. This
+# checks the untouched q-z range is still the genuine ROM glyph data,
+# not corrupted by any future BSS shift reintroducing the same clash.
+check_file_bytes "qCS.BIN: q-z glyphs intact (not overwritten by debug text)" \
+    "$LOCIFLASH/qCS.BIN" \
+    "data[648:728] == bytes.fromhex('00001e22221e020200002e302020200000001e201c023c0010103c1010120c000000222222261a000000222222140800000022222a2a3600000022140814220000002222221e021c00003e0408103e00')"
+
 echo ""
 echo "==========================================================="
 echo "  Results: $pass passed, $fail failed"

@@ -150,6 +150,47 @@ echo "a toggles the active charset bank (Std -> Alt)"
 check_found "header still shows Code:\$40" "Code:\$40" "$DUMP7"
 check_found "Set row shows Set:Alt"        "Set:Alt"   "$DUMP7"
 
+# --- Scenario 8: per-row hex column + 'h' inline edit (2026-06-23) --------
+# Always-visible 2-digit hex readout to the left of each grid row (V1
+# parity, user-requested) -- check_found can't distinguish "1c" (row0's
+# real value) from a coincidental match elsewhere, so this checks the raw
+# bytes at the popup's own screen position instead (CE_HEX_VAL_X=2,
+# CE_GRID_Y=6 window-relative -> absolute column 27+2=29, row 6).
+DUMP8A="$OUT/capture_ce_hexcol.bin"
+run_capture 9480000 '\p1e' "$DUMP8A"
+echo ""
+echo "Grid rows always show their hex byte value to the left (V1 parity)"
+HEX_ROW0=$(python3 "$SCREEN" "$DUMP8A" --bytes "$((0xBB80 + 6*40 + 29)):2")
+if [ "$HEX_ROW0" = "31 43" ]; then
+    echo "  [PASS] row0 hex column shows '1C' (0x1c)"
+    pass=$((pass+1))
+else
+    echo "  [FAIL] row0 hex column -- expected '31 43' ('1C'), got '$HEX_ROW0'"
+    fail=$((fail+1))
+fi
+
+# 'h' prefills from the cursor row's CURRENT value (not empty), and both
+# typed digits stay visible while editing (vwidth=4 fixes the vwidth==
+# maxlen scrolling bug, "length of input seems too short with 1 only").
+# \l\l moves the cursor from end-of-prefill (idx=2) to idx=0 so typing
+# overwrites both digits instead of appending past maxlen.
+DUMP8B="$OUT/capture_ce_hexedit_typing.bin"
+run_capture 16000000 '\p1e\p1h\p1\l\p1\l\p13\p19' "$DUMP8B"
+HEX_TYPING=$(python3 "$SCREEN" "$DUMP8B" --bytes "$((0xBB80 + 6*40 + 29)):2")
+if [ "$HEX_TYPING" = "33 39" ]; then
+    echo "  [PASS] both typed digits visible while editing ('39', no scroll)"
+    pass=$((pass+1))
+else
+    echo "  [FAIL] hex-edit typing -- expected '33 39' ('39'), got '$HEX_TYPING'"
+    fail=$((fail+1))
+fi
+
+# ENTER commits the typed value to the glyph row, ESC then commits the
+# popup back to plotscreencode/canvas as usual.
+DUMP8C="$OUT/capture_ce_hexedit_commit.bin"
+run_capture 18200000 '\p1e\p1h\p1\l\p1\l\p13\p19\p1\n\p1\e' "$DUMP8C"
+check_bytes "row0 committed via 'h' (0x1c -> 0x39)" "39 22 2a 2e 2c 20 1e 00" "$DUMP8C"
+
 echo ""
 echo "==========================================================="
 echo "  Results: $pass passed, $fail failed"

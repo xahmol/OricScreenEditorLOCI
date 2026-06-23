@@ -83,6 +83,30 @@ static MenuWinRecord menu_win_stack[MENU_WIN_DEPTH];
 static uint8_t       menu_win_depth;
 static uint16_t      menu_win_ptr;
 
+// Real, linker-allocated scratch buffer for menu_draw_item()'s Oscar64
+// register-pressure workaround (see that function's own comment) -- NOT
+// the literal `(uint8_t *)0xA000` this used to be. That address was
+// documented as "unused scratch space in the heap region", which was
+// wrong for this project's actual memory map (build/oseloci.map: a
+// degenerate `HEAP, heap` section since malloc/free are fully stubbed;
+// 0xA000 falls inside the program's own live BSS) -- flagged as exactly
+// this landmine in src/filepicker.c's own analogous workaround, and
+// confirmed live 2026-06-23 (user report: "Charset save on save project
+// now creates garbled chars in the Standard charset for lowercase
+// q-z"): this session's code-size changes shifted BSS layout enough
+// that 0xA000 started landing inside charsetswap.c's backup_std[768]
+// array, so every pulldown-item redraw silently overwrote part of the
+// real backed-up Standard charset with this debug string -- exactly
+// reproduced by dumping a saved project's CS.BIN and finding this
+// function's own format string instead of glyph bytes at the q-z
+// offset. Fixed the same way src/filepicker.c's picker_regpressure_
+// scratch[] already was: a real static array can never alias another
+// object's storage. Sized above the dummy sprintf's own worst-case
+// formatted length (~58 bytes of literal text + 5 numeric fields up to
+// 3 digits each (15) + a title up to PULLDOWN_MAXLENGTH-1=16 chars =
+// 89 bytes, rounded up).
+static uint8_t menu_regpressure_scratch[100];
+
 /**
  * Push a record onto the window-save stack for height rows starting at
  * screen row ypos, and copy those rows from screen RAM into menu_winbuf[] at
@@ -268,12 +292,12 @@ static void menu_draw_item(uint8_t y, uint8_t xpos, uint8_t menunumber,
     // without this dummy sprintf, menu_pulldown()'s call-site save/restore
     // set can be under-counted, clobbering a live caller variable and
     // producing stray garbage on screen. The sprintf call's register
-    // pressure forces the correct (larger) save set. 0xA000 is scratch space
-    // in the unused heap region (see oscar64manual.md, "-O2 whole-program
-    // register allocator: caller-save set can be under-counted")
+    // pressure forces the correct (larger) save set. Writes into
+    // menu_regpressure_scratch[] (a real static buffer, see its own
+    // declaration above for why this is no longer a magic address)
     // -- do not remove or "clean up" this call without re-testing every
     // pulldown in the emulator (corruption appears immediately on open).
-    uint8_t *debug = (uint8_t *)0xA000;
+    uint8_t *debug = menu_regpressure_scratch;
     uint8_t  paper = selected ? A_BGYELLOW : A_BGCYAN;
     uint8_t  pfx   = selected ? '-' : ' ';
     const char *title = pulldown_titles[menunumber][item];

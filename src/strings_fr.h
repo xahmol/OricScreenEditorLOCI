@@ -136,7 +136,6 @@
 #define MSG_CE_CODE_FMT   "Code:$%02x"
 #define MSG_CE_SET_STD    "Jeu:Std"
 #define MSG_CE_SET_ALT    "Jeu:Alt"
-#define MSG_CE_HEX_LABEL  "Hex:$"
 
 // ── Palette popup (src/palette.c) ───────────────────────────────────────────
 // Same abbreviations as English -- "Fav:"/"Std:"/"Alt:" are short enough and

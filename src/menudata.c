@@ -90,10 +90,23 @@ static uint16_t parse_uint(const char *s)
 
 /**
  * Shared implementation of Screen > Width and Screen > Height: opens a
- * popup, lets the user type a new size, validates it against the viewport
- * minimum and the CANVAS_MAX_SIZE budget, asks for confirmation
- * (menu_areyousure()) if the change would shrink the canvas, then applies it
- * via canvas_resize() and refreshes the pulldown titles.
+ * popup, lets the user type a new size, validates it against the
+ * CANVAS_MAX_SIZE budget, asks for confirmation (menu_areyousure()) if
+ * the change would shrink the canvas, then applies it via
+ * canvas_resize() and refreshes the pulldown titles.
+ *
+ * No longer enforces a VIEWPORT_WIDTH/HEIGHT floor (2026-06-23, user
+ * report: shrinking below 40x28 gave an "unsupported" error) -- now that
+ * canvas_blit()/canvas_resize() fully support a sub-viewport
+ * canvas in both dimensions (see their own doc comments; originally added
+ * for Load Project's V1-compatible 27-row default, now generalised to
+ * width too), there's no remaining reason for the interactive dialog to
+ * be more restrictive than what the architecture already supports. Only
+ * a degenerate 0-sized dimension is still rejected (canvas_resize_core()'s
+ * own sanity floor). On success, re-derives the cursor's absolute canvas
+ * position and re-clamps it (canvas_goto(), which also re-blits) -- a
+ * shrink can otherwise leave the cursor/viewport offset pointing past the
+ * new, smaller extent.
  *
  * @param is_height Zero to resize width, non-zero to resize height.
  * @return (none)
@@ -105,7 +118,6 @@ static void resize_dialog(uint8_t is_height)
     uint16_t    curw = app.canvas_width;
     uint16_t    curh = app.canvas_height;
     uint16_t    cur  = is_height ? curh : curw;
-    uint16_t    minval = is_height ? VIEWPORT_HEIGHT : VIEWPORT_WIDTH;
 
     menu_winsave(5, 12, 1);
     cwin_init(&win, 5, 5, 35, 12, A_FWBLACK, A_BGWHITE);
@@ -120,7 +132,7 @@ static void resize_dialog(uint8_t is_height)
         uint16_t newval = parse_uint(buf);
         uint16_t neww   = is_height ? curw : newval;
         uint16_t newh   = is_height ? newval : curh;
-        uint8_t  valid  = (newval >= minval) &&
+        uint8_t  valid  = (newval >= 1) &&
                           ((uint32_t)neww * (uint32_t)newh <= CANVAS_MAX_SIZE);
 
         if (!valid)
@@ -139,6 +151,8 @@ static void resize_dialog(uint8_t is_height)
             if (proceed)
             {
                 canvas_resize(neww, newh);
+                canvas_goto((uint16_t)(app.cursor_x + app.xoffset), (uint16_t)(app.cursor_y + app.yoffset));
+                statusbar_draw();
                 update_size_titles();
             }
         }

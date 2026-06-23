@@ -40,22 +40,55 @@
 #define CE_WIN_WX  13
 #define CE_WIN_WY  15
 
+// Window-relative columns 0-1 are reserved for this popup's OWN ink/paper
+// attribute pair (ce_clear(), below) -- all real content starts at
+// CE_CONTENT_X0 instead of 0. Needed because cwin_clear()'s row_setattr()
+// always writes the ink/paper pair at ABSOLUTE screen columns 0-1,
+// regardless of the window's own sx -- correct for every sx=2/sx=5 popup
+// in this codebase (where columns 0-1 ARE the window's own reserved
+// border), but wrong for this one sidebar popup, whose sx=27 is chosen
+// specifically so canvas columns 0-26 stay visible underneath. Writing
+// the attribute pair at literal column 0/1 doesn't erase anything there
+// (cwin_clear()'s own content-fill loop correctly only touches sx..sx+
+// wx-1), but the Oric ULA holds an ink/paper attribute active from the
+// column it's written at onward until the next attribute change -- so
+// with nothing else on the row to reset it, the white PAPER byte at
+// column 1 was visibly bleeding the popup's white background all the
+// way across the visible canvas (columns 2-26) too, not just its own
+// 27-39 (user report 2026-06-23: "popup makes the whole width white, not
+// only the right part of the screen it actually uses"). Matches V1's own
+// approach in spirit (V1's chareditor() reserves 3 of its own panel's
+// columns, 27-29, as an attribute-transition strip immediately before its
+// real content at column 30 -- local reference at
+// showchareditfield()/showchareditgrid(),
+// /home/xahmol/git/OricScreenEditor/src/main.c) -- this port only needs
+// 2 reserved columns (ink, paper), not V1's 3rd byte resetting to the
+// standard charset, since nothing this popup draws ever uses A_ALT.
+#define CE_CONTENT_X0      2
+
 #define CE_HEADER_Y        0   // "Code:$xx" + live preview
-#define CE_PREVIEW_ATTR_X  9   // charset-mode attribute byte (live preview)
-#define CE_PREVIEW_CHAR_X 10   // live-preview character cell
+#define CE_PREVIEW_ATTR_X  (CE_CONTENT_X0 + 9)   // charset-mode attribute byte (live preview)
+#define CE_PREVIEW_CHAR_X  (CE_CONTENT_X0 + 10)  // live-preview character cell
 
 #define CE_SET_Y           1   // "Set:Std" / "Set:Alt"
 
 #define CE_FAV_Y           3   // favourite digit labels ('0'-'9')
 #define CE_FAV_VALUE_Y     4   // favourite screencodes
-#define CE_FAV_X           1   // first favourite column
+#define CE_FAV_X           (CE_CONTENT_X0 + 1)   // first favourite column
 
-#define CE_GRID_X          3   // window-relative x of grid column 0
+// Per-row 2-digit hex byte value, always visible immediately left of the
+// grid (CE_HEX_VAL_X..+1, same row as that grid row) -- matches V1's
+// showchareditgrid() exactly (local reference at
+// /home/xahmol/git/OricScreenEditor/src/main.c: `gotoxy(30,y+3);
+// cprintf("%2X",char_byte);` immediately before that row's own pixel
+// grid at column 33). User-requested 2026-06-23 ("chareditor should
+// always show the hex values of each byte line left of the edit matrix
+// like in v1") -- the earlier OSE port only had a one-off hex-input
+// prompt on a separate fixed row (CE_HEX_LABEL_X/CE_HEX_INPUT_X/CE_HEX_Y,
+// removed) with no permanent per-row readout at all.
+#define CE_HEX_VAL_X       CE_CONTENT_X0   // 2 digits, columns CE_CONTENT_X0/+1
+#define CE_GRID_X          (CE_CONTENT_X0 + 3)   // window-relative x of grid column 0
 #define CE_GRID_Y          6   // window-relative y of grid row 0
-
-#define CE_HEX_LABEL_X     0
-#define CE_HEX_INPUT_X     5
-#define CE_HEX_Y          14
 
 #define CE_PIXEL_CHAR  '#'   // grid: pixel-set marker (XOR 0x80 = cursor highlight)
 
@@ -74,6 +107,28 @@ static uint8_t     ce_copy_valid;
 // -------------------------------------------------------------------------
 // Helpers
 // -------------------------------------------------------------------------
+
+/**
+ * Clear the popup, like cwin_clear(&ce_win) -- except the ink/paper
+ * attribute pair is written at the window's OWN first two relative
+ * columns (CE_WIN_SX+0/+1, i.e. absolute columns 27/28) instead of at
+ * literal screen columns 0/1, and the content fill starts at
+ * CE_CONTENT_X0 rather than column 0. See CE_CONTENT_X0's doc comment
+ * for why cwin_clear() itself is wrong for this one sidebar popup.
+ *
+ * @return (none)
+ */
+static void ce_clear(void)
+{
+    for (uint8_t y = 0; y < CE_WIN_WY; y++)
+    {
+        cwin_putat_char(&ce_win, 0, y, ce_win.ink);
+        cwin_putat_char(&ce_win, 1, y, ce_win.paper);
+    }
+    cwin_fill_rect(&ce_win, CE_CONTENT_X0, 0, (uint8_t)(CE_WIN_WX - CE_CONTENT_X0), CE_WIN_WY, CH_SPACE);
+    ce_win.cx = 0;
+    ce_win.cy = 0;
+}
 
 /**
  * Pointer to the 8-byte glyph currently being edited, in live charset RAM
@@ -165,8 +220,8 @@ static uint8_t ce_parse_hex(const char *s)
  */
 static void ce_draw_header(void)
 {
-    cwin_putat_printf(&ce_win, 0, CE_HEADER_Y, MSG_CE_CODE_FMT, ce_code);
-    cwin_putat_string(&ce_win, 0, CE_SET_Y, ce_altorstd ? MSG_CE_SET_ALT : MSG_CE_SET_STD);
+    cwin_putat_printf(&ce_win, CE_CONTENT_X0, CE_HEADER_Y, MSG_CE_CODE_FMT, ce_code);
+    cwin_putat_string(&ce_win, CE_CONTENT_X0, CE_SET_Y, ce_altorstd ? MSG_CE_SET_ALT : MSG_CE_SET_STD);
 
     // Live preview: charset-mode attribute + the screencode itself. Reads
     // back the SAME charset-RAM bytes the grid edits, so it updates as soon
@@ -195,7 +250,9 @@ static void ce_draw_favourites(void)
 /**
  * Draw the 6x8 pixel grid for the glyph being edited, using the 4-state
  * pixel/cursor rendering (CH_SPACE / CE_PIXEL_CHAR / their inverse-video
- * variants) -- see CLAUDE.md "Character editor".
+ * variants) -- see CLAUDE.md "Character editor" -- plus each row's raw
+ * byte value as 2 hex digits immediately to its left (CE_HEX_VAL_X),
+ * matching V1's showchareditgrid() (see CE_HEX_VAL_X's doc comment).
  *
  * @return (none)
  */
@@ -207,6 +264,7 @@ static void ce_draw_grid(void)
     for (y = 0; y < CHAREDIT_GRID_H; y++)
     {
         uint8_t row = g[y];
+        cwin_putat_printf(&ce_win, CE_HEX_VAL_X, CE_GRID_Y + y, "%02x", row);
         for (x = 0; x < CHAREDIT_GRID_W; x++)
         {
             uint8_t ch = (row & (1 << (5 - x))) ? CE_PIXEL_CHAR : CH_SPACE;
@@ -247,7 +305,7 @@ void charsetedit_run(void)
 
     menu_winsave(CE_WIN_SY, CE_WIN_WY, 0);
     cwin_init(&ce_win, CE_WIN_SX, CE_WIN_SY, CE_WIN_WX, CE_WIN_WY, A_FWBLACK, A_BGWHITE);
-    cwin_clear(&ce_win);
+    ce_clear();
 
     ce_snapshot();
     ce_draw_header();
@@ -416,24 +474,40 @@ void charsetedit_run(void)
 
         case 'h':
         {
+            // Inline-edits the cursor's current row (ce_cy) directly on
+            // top of its own always-visible hex readout (CE_HEX_VAL_X,
+            // ce_draw_grid()) -- matches V1's chareditor() 'h' case
+            // exactly (local reference at
+            // /home/xahmol/git/OricScreenEditor/src/main.c:
+            // `sprintf(buffer,"%2x",char_present[ypos]);
+            // textInput(30,ypos+3,buffer,2,3);`), including taking the
+            // row's current value as the input's pre-filled default
+            // (2026-06-23 user request -- the earlier OSE port started
+            // from an empty buffer on a separate fixed-row prompt
+            // instead). vwidth=4 (not 2) leaves room for the cursor slot
+            // cwin_textinput() needs alongside both digits -- vwidth==
+            // maxlen was the root cause of a separate reported bug
+            // (typing a 2nd hex digit scrolled the 1st out of view,
+            // "length of input seems too short with 1 only"); every
+            // other cwin_textinput() call site in this codebase already
+            // uses vwidth > maxlen, this was the one exception.
             char hexbuf[3];
-            hexbuf[0] = '\0';
-            cwin_putat_string(&ce_win, CE_HEX_LABEL_X, CE_HEX_Y, MSG_CE_HEX_LABEL);
+            uint8_t val;
+            g = ce_glyph();
+            val = g[ce_cy];
+            hexbuf[0] = "0123456789ABCDEF"[(val >> 4) & 0x0F];
+            hexbuf[1] = "0123456789ABCDEF"[val & 0x0F];
+            hexbuf[2] = '\0';
             // VINPUT_ALPHA alone does NOT include digits despite its
             // header comment ("Alpha + digits") -- charwin.c's validation
             // checks (validation & VINPUT_NUMS)/(validation & VINPUT_ALPHA)
             // as independent bits, so a hex field needs both ORed
-            // together. Found and fixed while building src/findreplace.c's
-            // own hex input -- this call had the same latent bug
-            // (untested: no automated coverage of this 'h' hex-row-input
-            // path existed before this fix).
-            if (cwin_textinput(&ce_win, CE_HEX_INPUT_X, CE_HEX_Y, 2, hexbuf, 2, VINPUT_NUMS | VINPUT_ALPHA) >= 0)
+            // together.
+            if (cwin_textinput(&ce_win, CE_HEX_VAL_X, CE_GRID_Y + ce_cy, 4, hexbuf, 2, VINPUT_NUMS | VINPUT_ALPHA) >= 0)
             {
-                g = ce_glyph();
                 ce_snapshot();
                 g[ce_cy] = (uint8_t)(ce_parse_hex(hexbuf) & 0x3F);
             }
-            cwin_fill_rect(&ce_win, CE_HEX_LABEL_X, CE_HEX_Y, 7, 1, CH_SPACE);
             redraw = 1;
             break;
         }
@@ -444,7 +518,7 @@ void charsetedit_run(void)
 
         case KEY_F8:
             help_show(2);
-            cwin_clear(&ce_win);
+            ce_clear();
             ce_draw_header();
             ce_draw_favourites();
             ce_draw_grid();

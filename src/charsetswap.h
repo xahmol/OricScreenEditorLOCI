@@ -72,6 +72,23 @@ void charsetswap_capture_boot_alt(void);
 // Alt->ROM (src/menudata.c).
 void charsetswap_reset_alt_from_boot(void);
 
+// Return a pointer to the user's REAL, un-swapped CHARSET_STD/CHARSET_ALT
+// displayable range (CHARSET_GLYPH_AREA_SIZE/CHARSET_ALT_GLYPH_AREA_SIZE
+// bytes respectively) -- safe to call whether or not a charsetswap_enter()
+// session is currently active. Points either at the live charset RAM bank
+// (no swap active) or at the backup buffer holding the real content (a
+// swap is active and has temporarily overwritten the live bank with safe
+// chrome glyphs). Any code that needs to read the genuine current charset
+// content (e.g. saving it to LOCI) MUST go through these instead of
+// reading CHARSET_STD/CHARSET_ALT directly -- see src/charsetswap.c's doc
+// comment for the bug this fixes (every menu-invoked Save action was
+// silently writing the swapped-in chrome glyphs instead of the user's
+// actual charset, since src/menudata.c's menu_run() keeps a swap session
+// active for its entire bar-level lifetime). Returned pointer is valid
+// only until the next charsetswap_enter()/exit()/mark_changed() call.
+const uint8_t *charsetswap_real_std(void);
+const uint8_t *charsetswap_real_alt(void);
+
 #pragma compile("charsetswap.c")
 
 #endif // CHARSETSWAP_H

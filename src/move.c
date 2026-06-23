@@ -45,11 +45,12 @@
  *
  * x1/y1 are clamped to the real canvas extent (`app.canvas_width/
  * height - 1`), not just `app.xoffset/yoffset + VIEWPORT_WIDTH/HEIGHT -
- * 1` -- needed since canvas_resize_loaded() (Load Project only) can
- * produce a canvas *smaller* than the viewport (V1's genuine 27-row
- * default); without this, shifting would read/write one row or column
- * past the real canvas, into canvas_resize_loaded()'s blank
- * display-only padding. For every canvas >= the viewport (the normal
+ * 1` -- needed since canvas_resize() can produce a canvas *smaller* than
+ * the viewport (Load Project loading V1's genuine 27-row default, or an
+ * interactive Screen > Width/Height shrink below the viewport); without
+ * this, shifting would read/write one row or column past the real
+ * canvas, into canvas_resize()'s blank display-only padding. For every
+ * canvas >= the viewport (the normal
  * case, and the only case before this session), the clamp is a no-op --
  * identical to the previous behaviour.
  *
