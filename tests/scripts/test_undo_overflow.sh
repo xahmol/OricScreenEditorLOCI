@@ -92,7 +92,7 @@ if [ ! -x "$PHOS" ]; then
     exit 0
 fi
 
-RESIZE='\p1\f1\p1\n\p1\d\p1\n\p1\l\p1\l\p12\p10\p10\p1\n\p1\e'
+RESIZE='\p1\F1\p1\n\p1\d\p1\n\p1\l\p1\l\p12\p10\p10\p1\n\p1\e'
 
 # --- Scenario 1: grow canvas height to 200 (40x200=8000 > 6144) ------------
 DUMP1="$OUT/capture_undo_overflow_resize.bin"
@@ -104,7 +104,7 @@ check_found     "statusbar intact" "Main      XY 0, 0C40@ S20I7P0S" "$DUMP1"
 
 # --- Scenario 2: Screen > Clear on the oversized canvas, no crash ----------
 DUMP2="$OUT/capture_undo_overflow_clear.bin"
-run_capture 29600000 "$RESIZE"'\p1\f1\p1\n\p1\d\p1\d\p1\n\p1\e' "$DUMP2"
+run_capture 29600000 "$RESIZE"'\p1\F1\p1\n\p1\d\p1\d\p1\n\p1\e' "$DUMP2"
 echo ""
 echo "Screen > Clear on the oversized canvas completes cleanly"
 check_not_found "bar gone" "Screen File  Charset  Information" "$DUMP2"
@@ -112,7 +112,7 @@ check_found     "statusbar intact" "Main      XY 0, 0C40@ S20I7P0S" "$DUMP2"
 
 # --- Scenario 3: 'z' after the oversized Clear is a graceful no-op --------
 DUMP3="$OUT/capture_undo_overflow_z.bin"
-run_capture 30700000 "$RESIZE"'\p1\f1\p1\n\p1\d\p1\d\p1\n\p1\e\p1z' "$DUMP3"
+run_capture 30700000 "$RESIZE"'\p1\F1\p1\n\p1\d\p1\d\p1\n\p1\e\p1z' "$DUMP3"
 echo ""
 echo "'z' after the oversized Clear -- no crash, no corruption"
 check_not_found "bar gone"        "Screen File  Charset  Information" "$DUMP3"
@@ -120,7 +120,7 @@ check_found     "statusbar intact" "Main      XY 0, 0C40@ S20I7P0S" "$DUMP3"
 
 # --- Scenario 4: normal undo still works on the same oversized canvas -----
 DUMP4="$OUT/capture_undo_overflow_normal.bin"
-run_capture 32900000 "$RESIZE"'\p1\f1\p1\n\p1\d\p1\d\p1\n\p1\e\p1 \p1z' "$DUMP4"
+run_capture 32900000 "$RESIZE"'\p1\F1\p1\n\p1\d\p1\d\p1\n\p1\e\p1 \p1z' "$DUMP4"
 echo ""
 echo "SPACE plots '@' then z undoes it -- small edits stay undoable"
 check_bytes "cell (0,0) undone (c0 = cursor preview over blank)" "0xBB80:1" "c0" "$DUMP4"

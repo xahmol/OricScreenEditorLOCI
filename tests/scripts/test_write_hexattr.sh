@@ -14,7 +14,7 @@
 #
 # --type-keys notes (see CLAUDE.md "Phosphoric testing notes"):
 #   \p1 = pause 1s (releases all keys). A \p1 MUST precede every distinct
-#   key/combo action. \f4 = FUNCT+4. The hex-value field is pre-filled
+#   key/combo action. \F4 = FUNCT+4. The hex-value field is pre-filled
 #   "0"; \l moves the cwin_textinput cursor to idx=0 so the typed digit
 #   overwrites it (same convention as resize_dialog()/goto_dialog()).
 #
@@ -77,7 +77,7 @@ fi
 
 # --- Scenario 1: ESC at the target prompt cancels with no change ----------
 DUMP1="$OUT/capture_writehex_cancel.bin"
-run_capture 18000000 '\p1w\p1\f4\p1\e\p1\e' "$DUMP1"
+run_capture 18000000 '\p1w\p1\F4\p1\e\p1\e' "$DUMP1"
 echo ""
 echo "ESC at the target prompt cancels, no plot, back in Main"
 check_bytes "cell (0,0) unchanged (c0 = cursor preview over blank)" "0xBB80:1" "c0" "$DUMP1"
@@ -85,7 +85,7 @@ check_found "back in Main mode at col0" "Main      XY 0, 0" "$DUMP1"
 
 # --- Scenario 2: target=Ink, value=5 -> attribute byte 0x05 ----------------
 DUMP2="$OUT/capture_writehex_ink.bin"
-run_capture 23500000 '\p1w\p1\f4\p11\p1\l\p15\p1\n\p1\e' "$DUMP2"
+run_capture 23500000 '\p1w\p1\F4\p11\p1\l\p15\p1\n\p1\e' "$DUMP2"
 echo ""
 echo "Target=Ink, value=5 plots attribute 0x05, cursor advances to col1"
 check_bytes "cell (0,0) = 05" "0xBB80:1" "05" "$DUMP2"
@@ -93,14 +93,14 @@ check_found "cursor at col1" "Main      XY 1, 0" "$DUMP2"
 
 # --- Scenario 3: target=Paper, value=3 -> attribute byte 0x13 --------------
 DUMP3="$OUT/capture_writehex_paper.bin"
-run_capture 23500000 '\p1w\p1\f4\p12\p1\l\p13\p1\n\p1\e' "$DUMP3"
+run_capture 23500000 '\p1w\p1\F4\p12\p1\l\p13\p1\n\p1\e' "$DUMP3"
 echo ""
 echo "Target=Paper, value=3 plots attribute 0x13"
 check_bytes "cell (0,0) = 13" "0xBB80:1" "13" "$DUMP3"
 
 # --- Scenario 4: target=Modifier, value=5 (altchar+blink) -> 0x0D ----------
 DUMP4="$OUT/capture_writehex_mod.bin"
-run_capture 23500000 '\p1w\p1\f4\p13\p1\l\p15\p1\n\p1\e' "$DUMP4"
+run_capture 23500000 '\p1w\p1\F4\p13\p1\l\p15\p1\n\p1\e' "$DUMP4"
 echo ""
 echo "Target=Modifier, value=5 (altchar+blink bits) plots attribute 0x0D"
 check_bytes "cell (0,0) = 0d" "0xBB80:1" "0d" "$DUMP4"

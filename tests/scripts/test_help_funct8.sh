@@ -9,19 +9,19 @@
 #
 # Rewritten after fixing include/keyboard.c's decode_funct[] table (see
 # CLAUDE.md "FUNCT+digit keys now match real hardware exactly"): an
-# earlier version of this script assumed a single `\f8` action both
+# earlier version of this script assumed a single `\F8` action both
 # opens AND immediately dismisses the help screen within one matrix
 # event. That assumption was actually a misdiagnosis -- under the old,
 # buggy decode_funct[] table, FUNCT+(physical digit 8) decoded to
 # nothing at all (a silent no-op), which looked like "shown then
 # dismissed" only because no help text ever appeared and the statusbar
 # never changed -- exactly what a genuine no-op also produces. Now that
-# FUNCT+8 actually opens help (confirmed directly: a single `\f8` leaves
+# FUNCT+8 actually opens help (confirmed directly: a single `\F8` leaves
 # help showing indefinitely, even at 30M+ cycles), every scenario below
 # sends an explicit second key to dismiss it.
 #
 # --type-keys notes (see CLAUDE.md "Phosphoric testing notes"):
-#   \fN = FUNCT+N, \pN = pause N sec (releases all keys). A \p1 MUST precede
+#   \FN = FUNCT+N, \pN = pause N sec (releases all keys). A \p1 MUST precede
 #   every distinct key/combo action -- otherwise OSE's RELEASE_DEBOUNCE
 #   blocks the next key indefinitely.
 #
@@ -89,14 +89,14 @@ fi
 # (the real physical digit-8 combo) opens help and it stays open with no
 # further input, rather than silently doing nothing.
 DUMP0="$OUT/capture_help_main_stays_open.bin"
-run_capture 20000000 '\p1\f8' "$DUMP0"
+run_capture 20000000 '\p1\F8' "$DUMP0"
 echo ""
 echo "FUNCT+8 alone opens help and it stays open (no auto-dismiss)"
 check_found "help text shown" "Oric Screen Editor: Help" "$DUMP0"
 
 # --- Scenario 1: Main mode FUNCT+8 then ESC round-trips cleanly ------------
 DUMP1="$OUT/capture_help_main.bin"
-run_capture 12000000 '\p1\f8\p1\e' "$DUMP1"
+run_capture 12000000 '\p1\F8\p1\e' "$DUMP1"
 echo ""
 echo "Main mode FUNCT+8 then ESC dismisses Help1.bin, no residue"
 check_not_found "help text gone"   "Oric Screen Editor: Help" "$DUMP1"
@@ -104,7 +104,7 @@ check_found     "statusbar intact" "Main      XY 0, 0C40@ S20I7P0S" "$DUMP1"
 
 # --- Scenario 2: Character editor FUNCT+8 then ESC, popup still open ------
 DUMP2="$OUT/capture_help_charedit.bin"
-run_capture 16000000 '\p1e\p1\f8\p1\e' "$DUMP2"
+run_capture 16000000 '\p1e\p1\F8\p1\e' "$DUMP2"
 echo ""
 echo "Character editor FUNCT+8 then ESC dismisses help, popup redrawn intact"
 check_not_found "help text gone"     "Oric Screen Editor: Help" "$DUMP2"
@@ -113,7 +113,7 @@ check_found     "grid redrawn"       "Set:Std"                  "$DUMP2"
 
 # --- Scenario 3: a further ESC then closes the character editor as normal -
 DUMP3="$OUT/capture_help_charedit_close.bin"
-run_capture 18000000 '\p1e\p1\f8\p1\e\p1\e' "$DUMP3"
+run_capture 18000000 '\p1e\p1\F8\p1\e\p1\e' "$DUMP3"
 echo ""
 echo "A further ESC after dismissing help closes the character editor"
 check_not_found "popup gone"       "Code:\$"                  "$DUMP3"

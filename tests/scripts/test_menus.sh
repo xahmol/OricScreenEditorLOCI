@@ -16,7 +16,7 @@
 #     test for a missing canvas_blit() call, see Scenario 8)
 #
 # --type-keys notes (see CLAUDE.md "Phosphoric testing notes"):
-#   \fN = FUNCT+N, \pN = pause N sec (releases all keys). A \p1 MUST precede
+#   \FN = FUNCT+N, \pN = pause N sec (releases all keys). A \p1 MUST precede
 #   every distinct key/combo action -- otherwise OSE's RELEASE_DEBOUNCE
 #   blocks the next key indefinitely.
 #
@@ -77,14 +77,14 @@ fi
 
 # --- Scenario 1: menu bar opens (FUNCT+1) ---------------------------------
 DUMP1="$OUT/capture_menu_bar.bin"
-run_capture 9300000 '\p1\f1' "$DUMP1"
+run_capture 9300000 '\p1\F1' "$DUMP1"
 echo ""
 echo "Bar opens (FUNCT+1)"
 check_found "bar shows all 4 items" "Screen File  Charset  Information" "$DUMP1"
 
 # --- Scenario 2: Screen pulldown content -----------------------------------
 DUMP2="$OUT/capture_menu_screen_pulldown.bin"
-run_capture 10500000 '\p1\f1\p1\n' "$DUMP2"
+run_capture 10500000 '\p1\F1\p1\n' "$DUMP2"
 echo ""
 echo "Screen pulldown content (ENTER on bar)"
 check_found "Width item shown"  "Width:   40" "$DUMP2"
@@ -94,7 +94,7 @@ check_found "Fill item shown"   "Fill"        "$DUMP2"
 
 # --- Scenario 3: ESC-ESC clean close ----------------------------------------
 DUMP3="$OUT/capture_menu_esc_close.bin"
-run_capture 12700000 '\p1\f1\p1\n\p1\e\p1\e' "$DUMP3"
+run_capture 12700000 '\p1\F1\p1\n\p1\e\p1\e' "$DUMP3"
 echo ""
 echo "ESC (pulldown) + ESC (bar) closes with no residue"
 check_not_found "bar gone"       "Screen" "$DUMP3"
@@ -108,7 +108,7 @@ check_found     "statusbar intact" "Main      XY 0, 0C40@ S20I7P0S" "$DUMP3"
 # code -- so this scenario, which used to land on a permanent stub, now
 # exercises the real 2-page Version popup.)
 DUMP4="$OUT/capture_menu_version_p1.bin"
-run_capture 15500000 '\p1\f1\p1\r\p1\r\p1\r\p1\n\p1\n' "$DUMP4"
+run_capture 15500000 '\p1\F1\p1\r\p1\r\p1\r\p1\n\p1\n' "$DUMP4"
 echo ""
 echo "Information > Version shows page 1 (logo + version/credits text)"
 check_not_found "bar gone (popup showing)" "Screen File  Charset  Information" "$DUMP4"
@@ -117,7 +117,7 @@ check_found     "GitHub URL shown"         "github.com/xahmol/oricscreeneditorlo
 
 # --- Scenario 5: page 2 (QR code) --------------------------------------------
 DUMP5="$OUT/capture_menu_version_p2.bin"
-run_capture 16600000 '\p1\f1\p1\r\p1\r\p1\r\p1\n\p1\n\p1\n' "$DUMP5"
+run_capture 16600000 '\p1\F1\p1\r\p1\r\p1\r\p1\n\p1\n\p1\n' "$DUMP5"
 echo ""
 echo "Page 2 shows the QR code"
 check_found     "QR title shown"   "Scan QR code for source:" "$DUMP5"
@@ -125,7 +125,7 @@ check_not_found "page 1 text gone" "OricScreenEditorLOCI"     "$DUMP5"
 
 # --- Scenario 6: dismiss + clean close ---------------------------------------
 DUMP6="$OUT/capture_menu_version_dismiss.bin"
-run_capture 19800000 '\p1\f1\p1\r\p1\r\p1\r\p1\n\p1\n\p1\n\p1\n\p1\e\p1\e' "$DUMP6"
+run_capture 19800000 '\p1\F1\p1\r\p1\r\p1\r\p1\n\p1\n\p1\n\p1\n\p1\e\p1\e' "$DUMP6"
 echo ""
 echo "Page 2 (QR) dismissed, ESC-ESC closes with no residue"
 check_not_found "QR title gone"     "Scan QR code for source:" "$DUMP6"
@@ -134,7 +134,7 @@ check_found     "statusbar intact"  "Main      XY 0, 0C40@ S20I7P0S" "$DUMP6"
 
 # --- Scenario 7: Fill dispatch ----------------------------------------------
 DUMP6="$OUT/capture_menu_fill.bin"
-run_capture 16500000 '\p1\f1\p1\n\p1\d\p1\d\p1\d\p1\n\p1\e' "$DUMP6"
+run_capture 16500000 '\p1\F1\p1\n\p1\d\p1\d\p1\d\p1\n\p1\e' "$DUMP6"
 echo ""
 echo "Screen > Fill fills the canvas with the current char"
 check_found "row 0 filled with @"  "@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@" "$DUMP6"
@@ -152,7 +152,7 @@ check_found "statusbar intact"     "Main      XY 0, 0C40@ S40I7P0S" "$DUMP6"
 # the bar (row 0) is still open and waiting for the next key, but rows 1/26
 # must already show the fill, not stale pre-fill content.
 DUMP7="$OUT/capture_menu_fill_immediate.bin"
-run_capture 15200000 '\p1\f1\p1\n\p1\d\p1\d\p1\d\p1\n' "$DUMP7"
+run_capture 15200000 '\p1\F1\p1\n\p1\d\p1\d\p1\d\p1\n' "$DUMP7"
 echo ""
 echo "Screen > Fill is visible immediately, while the menu bar is still open"
 check_found "bar still open"            "Screen File  Charset  Information" "$DUMP7"

@@ -135,7 +135,7 @@ fi
 # popup -- same keystroke count as before, just ENTER instead of 's'.
 reset_flash
 DUMP1="$OUT/capture_fileio_save_screen.bin"
-run_capture 25200000 '\p1 \p1\f1\p1\r\p1\n\p1\n\p1\n\p1T\p1\n' "$DUMP1"
+run_capture 25200000 '\p1 \p1\F1\p1\r\p1\n\p1\n\p1\n\p1T\p1\n' "$DUMP1"
 echo ""
 echo "File > Save Screen writes a bare screenmap[] dump (no header)"
 check_found "statusbar shows '@' plotted" "Main      XY 0, 0C40@ S40I7P0S" "$DUMP1"
@@ -153,7 +153,7 @@ check_file_bytes "t.BIN: '@' (0x40) at screen offset 0" "$LOCIFLASH/t.BIN" \
 # (fileio_get_dimensions(), see fileio.c).
 DUMP2="$OUT/capture_fileio_load_screen.bin"
 run_capture 36100000 \
-    '\p1 \p1\f1\p1\r\p1\n\p1\n\p1\n\p1T\p1\n\p1\e\p1\f1\p1\n\p1\d\p1\d\p1\n\p1\e\p1\f1\p1\r\p1\n\p1\d\p1\n\p1\n\p1\n\p1\n' "$DUMP2"
+    '\p1 \p1\F1\p1\r\p1\n\p1\n\p1\n\p1T\p1\n\p1\e\p1\F1\p1\n\p1\d\p1\d\p1\n\p1\e\p1\F1\p1\r\p1\n\p1\d\p1\n\p1\n\p1\n\p1\n' "$DUMP2"
 echo ""
 echo "File > Load Screen restores a saved canvas after Screen > Clear"
 check_found "statusbar shows '@' restored" "Main      XY 0, 0C40@ S40I7P0S" "$DUMP2"
@@ -162,7 +162,7 @@ check_found "statusbar shows '@' restored" "Main      XY 0, 0C40@ S40I7P0S" "$DU
 reset_flash
 DUMP3="$OUT/capture_fileio_save_combined.bin"
 run_capture 31100000 \
-    '\p1 \p1\f1\p1\r\p1\n\p1\d\p1\d\p1\d\p1\d\p1\n\p1\n\p1C\p1\n' "$DUMP3"
+    '\p1 \p1\F1\p1\r\p1\n\p1\d\p1\d\p1\d\p1\d\p1\n\p1\n\p1C\p1\n' "$DUMP3"
 echo ""
 echo "File > Save Combined writes 768B charset + screenmap[] (no header)"
 check_found "statusbar shows '@' plotted" "Main      XY 0, 0C40@ S40I7P0S" "$DUMP3"
@@ -175,7 +175,7 @@ check_file_bytes "c.BIN: '@' at screen-section offset 768" "$LOCIFLASH/c.BIN" \
 reset_flash
 DUMP4="$OUT/capture_fileio_save_project.bin"
 run_capture 29100000 \
-    '\p1 \p1\f1\p1\r\p1\n\p1\d\p1\d\p1\n\p1\n\p1P\p1\n' "$DUMP4"
+    '\p1 \p1\F1\p1\r\p1\n\p1\d\p1\d\p1\n\p1\n\p1P\p1\n' "$DUMP4"
 echo ""
 echo "File > Save Project writes <name>PJ.BIN + <name>SC.BIN"
 check_found "statusbar shows '@' plotted" "Main      XY 0, 0C40@ S40I7P0S" "$DUMP4"
@@ -196,7 +196,7 @@ check_file_bytes "pSC.BIN: size 1120, '@' at offset 0 (no header)" "$LOCIFLASH/p
 reset_flash
 DUMP5="$OUT/capture_fileio_save_charset.bin"
 run_capture 23100000 \
-    '\p1\f1\p1\r\p1\r\p1\n\p1\d\p1\d\p1\n\p1\n\p1S\p1\n' "$DUMP5"
+    '\p1\F1\p1\r\p1\r\p1\n\p1\d\p1\d\p1\n\p1\n\p1S\p1\n' "$DUMP5"
 echo ""
 echo "Charset > Save Standard writes a raw 768-byte charset dump"
 check_file_bytes "s.BIN: size 768" "$LOCIFLASH/s.BIN" "len(data) == 768"
@@ -211,7 +211,7 @@ check_file_bytes "s.BIN: size 768" "$LOCIFLASH/s.BIN" "len(data) == 768"
 reset_flash
 DUMP6="$OUT/capture_fileio_save_charset_alt.bin"
 run_capture 24100000 \
-    '\p1\f1\p1\r\p1\r\p1\n\p1\d\p1\d\p1\d\p1\n\p1\n\p1A\p1\n' "$DUMP6"
+    '\p1\F1\p1\r\p1\r\p1\n\p1\d\p1\d\p1\d\p1\n\p1\n\p1A\p1\n' "$DUMP6"
 echo ""
 echo "Charset > Save Alternate writes exactly 640 bytes (not 768)"
 check_file_bytes "a.BIN: size 640" "$LOCIFLASH/a.BIN" "len(data) == 640"
@@ -242,7 +242,7 @@ open('$LOCIFLASH/V1SC.BIN', 'wb').write(bytes(scr))
 "
 DUMP7="$OUT/capture_fileio_load_v1project.bin"
 run_capture 21000000 \
-    '\p1\f1\p1\r\p1\n\p1\d\p1\d\p1\d\p1\n\p1\n\p1\e' "$DUMP7"
+    '\p1\F1\p1\r\p1\n\p1\d\p1\d\p1\d\p1\n\p1\n\p1\e' "$DUMP7"
 echo ""
 echo "Load Project accepts V1's original 19-byte PJ.BIN layout"
 check_found "cursor/plot fields translated (XY 5,3 C42B I3 P2)" "XY 5, 3C42B S20I3P2" "$DUMP7"
@@ -280,7 +280,7 @@ open('$LOCIFLASH/H27SC.BIN', 'wb').write(bytes(scr))
 "
 DUMP8="$OUT/capture_fileio_load_subviewport.bin"
 run_capture 21000000 \
-    '\p1\f1\p1\r\p1\n\p1\d\p1\d\p1\d\p1\n\p1\n\p1\e' "$DUMP8"
+    '\p1\F1\p1\r\p1\n\p1\d\p1\d\p1\d\p1\n\p1\n\p1\e' "$DUMP8"
 echo ""
 echo "Load Project accepts a genuine 27-row (sub-viewport) canvas"
 check_bytes "screen content loaded ('X'=0x58 at (5,0))" "0xBB85:1" "58" "$DUMP8"
@@ -317,7 +317,7 @@ check_bytes "phantom row 27 is blank, not stale overlay RAM" "0xBF38:1" "20" "$D
 reset_flash
 DUMP9="$OUT/capture_fileio_charset_real_save.bin"
 run_capture 50000000 \
-    '\p1 \p1e\p1 \p1\e \p1\f1\p1\r\p1\n\p1\d\p1\d\p1\n\p1\n\p1Q\p1\n\p1\e \p1\f1\p1\r\p1\r\p1\n\p1\d\p1\d\p1\d\p1\d\p1\d\p1\d\p1\n\p1\n\p1\e \p1\f1\p1\r\p1\n\p1\d\p1\d\p1\d\p1\n\p1\n\p1\e' \
+    '\p1 \p1e\p1 \p1\e \p1\F1\p1\r\p1\n\p1\d\p1\d\p1\n\p1\n\p1Q\p1\n\p1\e \p1\F1\p1\r\p1\r\p1\n\p1\d\p1\d\p1\d\p1\d\p1\d\p1\d\p1\n\p1\n\p1\e \p1\F1\p1\r\p1\n\p1\d\p1\d\p1\d\p1\n\p1\n\p1\e' \
     "$DUMP9"
 echo ""
 echo "Save Project writes the real charset, not chrome-swapped ROM glyphs"

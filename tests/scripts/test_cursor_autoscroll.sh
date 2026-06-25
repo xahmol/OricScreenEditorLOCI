@@ -22,7 +22,7 @@
 # row 1 (where '@' was plotted) becomes visible at screen row 0.
 #
 # --type-keys notes (see CLAUDE.md "Phosphoric testing notes"):
-#   \p1 = pause 1s (releases all keys). \fN = FUNCT+N. A \p1 MUST precede
+#   \p1 = pause 1s (releases all keys). \FN = FUNCT+N. A \p1 MUST precede
 #   every distinct key/combo action -- otherwise OSE's RELEASE_DEBOUNCE
 #   blocks the next key indefinitely. cwin_textinput's cursor starts at the
 #   end of "27"; \l\l moves it to idx=0, where typing '2','8' overwrites it
@@ -97,7 +97,7 @@ fi
 # scroll-position byte check.
 DOWNS29=""
 for i in $(seq 1 29); do DOWNS29+='\p1\d'; done
-KEYS="\\p1\\d\\p1 \\p1\\u\\p1\\f1\\p1\\n\\p1\\d\\p1\\n\\p1\\l\\p1\\l\\p12\\p19\\p1\\n\\p1\\e${DOWNS29}\\p1\\u"
+KEYS="\\p1\\d\\p1 \\p1\\u\\p1\\F1\\p1\\n\\p1\\d\\p1\\n\\p1\\l\\p1\\l\\p12\\p19\\p1\\n\\p1\\e${DOWNS29}\\p1\\u"
 
 DUMP1="$OUT/capture_autoscroll_down.bin"
 run_capture 67000000 "$KEYS" "$DUMP1"
@@ -119,7 +119,7 @@ check_found "statusbar shows canvas-absolute row 27 (viewport row26 + yoffset1, 
 # a no-op (no further room).
 RIGHTS41=""
 for i in $(seq 1 41); do RIGHTS41+='\p1\r'; done
-WKEYS="\\p1\\f1\\p1\\n\\p1\\n\\p1\\l\\p1\\l\\p14\\p11\\p1\\n\\p1\\e${RIGHTS41}"
+WKEYS="\\p1\\F1\\p1\\n\\p1\\n\\p1\\l\\p1\\l\\p14\\p11\\p1\\n\\p1\\e${RIGHTS41}"
 
 DUMP2="$OUT/capture_autoscroll_right.bin"
 run_capture 65000000 "$WKEYS" "$DUMP2"

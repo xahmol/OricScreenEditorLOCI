@@ -93,7 +93,7 @@ fi
 # FUNCT+1, ENTER (Screen pulldown), ENTER (Width dialog, shows "40"),
 # left, left (cursor to idx 0), '6' (overwrite -> "60"), ENTER (confirm), ESC.
 DUMP1="$OUT/capture_resize_grow.bin"
-run_capture 17200000 '\p1\f1\p1\n\p1\n\p1\l\p1\l\p16\p1\n\p1\e' "$DUMP1"
+run_capture 17200000 '\p1\F1\p1\n\p1\n\p1\l\p1\l\p16\p1\n\p1\e' "$DUMP1"
 echo ""
 echo "Width 40 -> 60 (grow, applies immediately)"
 check_not_found "bar gone" "Screen File  Charset  Information" "$DUMP1"
@@ -104,7 +104,7 @@ check_not_found "bar gone" "Screen File  Charset  Information" "$DUMP1"
 # pulldown_titles[0][0] ("Width:  NN", via update_size_titles()) is now the
 # only on-screen signal for the resized width.
 DUMP1W="$OUT/capture_resize_grow_width.bin"
-run_capture 19400000 '\p1\f1\p1\n\p1\n\p1\l\p1\l\p16\p1\n\p1\e\p1\f1\p1\n' "$DUMP1W"
+run_capture 19400000 '\p1\F1\p1\n\p1\n\p1\l\p1\l\p16\p1\n\p1\e\p1\F1\p1\n' "$DUMP1W"
 check_found "Width pulldown shows 60" "Width:   60" "$DUMP1W"
 
 # --- Scenario 2: grow 40 -> 60, then shrink 60 -> 40, confirm Yes -----------
@@ -113,7 +113,7 @@ check_found "Width pulldown shows 60" "Width:   60" "$DUMP1W"
 # popup since 40 < 60), ENTER (selects "Yes", default highlight), ESC.
 DUMP2="$OUT/capture_resize_shrink_yes.bin"
 run_capture 25500000 \
-    '\p1\f1\p1\n\p1\n\p1\l\p1\l\p16\p1\n\p1\n\p1\n\p1\l\p1\l\p14\p1\n\p1\n\p1\e' \
+    '\p1\F1\p1\n\p1\n\p1\l\p1\l\p16\p1\n\p1\n\p1\n\p1\l\p1\l\p14\p1\n\p1\n\p1\e' \
     "$DUMP2"
 echo ""
 echo "Width 60 -> 40 (shrink, confirm Yes -> applies)"
@@ -123,7 +123,7 @@ check_not_found "confirm popup gone" "Yes" "$DUMP2"
 # Reopen the Screen pulldown to confirm canvas_width is back to 40.
 DUMP2W="$OUT/capture_resize_shrink_yes_width.bin"
 run_capture 27800000 \
-    '\p1\f1\p1\n\p1\n\p1\l\p1\l\p16\p1\n\p1\n\p1\n\p1\l\p1\l\p14\p1\n\p1\n\p1\e\p1\f1\p1\n' \
+    '\p1\F1\p1\n\p1\n\p1\l\p1\l\p16\p1\n\p1\n\p1\n\p1\l\p1\l\p14\p1\n\p1\n\p1\e\p1\F1\p1\n' \
     "$DUMP2W"
 check_found "Width pulldown shows 40" "Width:   40" "$DUMP2W"
 
@@ -132,7 +132,7 @@ check_found "Width pulldown shows 40" "Width:   40" "$DUMP2W"
 # of the default-highlighted "Yes" -- the shrink must NOT be applied.
 DUMP3="$OUT/capture_resize_shrink_no.bin"
 run_capture 26000000 \
-    '\p1\f1\p1\n\p1\n\p1\l\p1\l\p16\p1\n\p1\n\p1\n\p1\l\p1\l\p14\p1\n\p1\d\p1\n\p1\e' \
+    '\p1\F1\p1\n\p1\n\p1\l\p1\l\p16\p1\n\p1\n\p1\n\p1\l\p1\l\p14\p1\n\p1\d\p1\n\p1\e' \
     "$DUMP3"
 echo ""
 echo "Width 60 -> 40 (shrink, confirm No -> size unchanged)"
@@ -143,7 +143,7 @@ check_not_found "confirm popup gone" "Yes" "$DUMP3"
 # was declined).
 DUMP3W="$OUT/capture_resize_shrink_no_width.bin"
 run_capture 28200000 \
-    '\p1\f1\p1\n\p1\n\p1\l\p1\l\p16\p1\n\p1\n\p1\n\p1\l\p1\l\p14\p1\n\p1\d\p1\n\p1\e\p1\f1\p1\n' \
+    '\p1\F1\p1\n\p1\n\p1\l\p1\l\p16\p1\n\p1\n\p1\n\p1\l\p1\l\p14\p1\n\p1\d\p1\n\p1\e\p1\F1\p1\n' \
     "$DUMP3W"
 check_found "Width pulldown shows 60" "Width:   60" "$DUMP3W"
 
@@ -154,7 +154,7 @@ check_found "Width pulldown shows 60" "Width:   60" "$DUMP3W"
 # (Width item already selected by default) and confirm "20".
 DUMP4W="$OUT/capture_resize_subviewport_width.bin"
 run_capture 25000000 \
-    '\p1\f1\p1\n\p1\n\p1\l\p1\l\p12\p10\p1\n\p1\n\p1\e\p1\f1\p1\n' \
+    '\p1\F1\p1\n\p1\n\p1\l\p1\l\p12\p10\p1\n\p1\n\p1\e\p1\F1\p1\n' \
     "$DUMP4W"
 echo ""
 echo "Width 40 -> 20 (below VIEWPORT_WIDTH, no longer rejected)"
@@ -166,7 +166,7 @@ check_found "Width pulldown shows 20" "Width:   20" "$DUMP4W"
 # not re-opening the dialog) to confirm "10" without disturbing it again.
 DUMP4H="$OUT/capture_resize_subviewport_height.bin"
 run_capture 24000000 \
-    '\p1\f1\p1\n\p1\d\p1\n\p1\l\p1\l\p11\p10\p1\n\p1\n\p1\e\p1\f1\p1\n\p1\d' \
+    '\p1\F1\p1\n\p1\d\p1\n\p1\l\p1\l\p11\p10\p1\n\p1\n\p1\e\p1\F1\p1\n\p1\d' \
     "$DUMP4H"
 echo "Height 28 -> 10 (below VIEWPORT_HEIGHT, no longer rejected)"
 check_found "Height pulldown shows 10" "Height:  10" "$DUMP4H"
@@ -194,7 +194,7 @@ check_found "Height pulldown shows 10" "Height:  10" "$DUMP4H"
 # show columns 20-39 blanked, not stale '@' fill.
 DUMP5="$OUT/capture_resize_redraw_immediate.bin"
 run_capture 25000000 \
-    '\p1\f1\p1\n\p1\d\p1\d\p1\d\p1\n\p1\n\p1\n\p1\l\p1\l\p12\p10\p1\n\p1\n' \
+    '\p1\F1\p1\n\p1\d\p1\d\p1\d\p1\n\p1\n\p1\n\p1\l\p1\l\p12\p10\p1\n\p1\n' \
     "$DUMP5"
 echo ""
 echo "Shrinking width redraws immediately, while the menu bar is still open"

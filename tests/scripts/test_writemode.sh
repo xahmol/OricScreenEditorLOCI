@@ -26,7 +26,7 @@
 # src/editor.c; DEL reuses the already-tested cursor_move_scroll()).
 #
 # --type-keys notes (see CLAUDE.md "Phosphoric testing notes"):
-#   \p1 = pause 1s (releases all keys). \fN = FUNCT+N. A \p1 MUST precede
+#   \p1 = pause 1s (releases all keys). \FN = FUNCT+N. A \p1 MUST precede
 #   every distinct key/combo action -- otherwise OSE's RELEASE_DEBOUNCE
 #   blocks the next key indefinitely.
 #
@@ -97,7 +97,7 @@ check_found "back in Main mode at col2" "Main      XY 2, 0" "$DUMP1"
 
 # --- Scenario 2: FUNCT+1 plots ink (0x07) and advances right --------------
 DUMP2="$OUT/capture_write_f1.bin"
-run_capture 12480000 '\p1w\p1\f1\p1\e' "$DUMP2"
+run_capture 12480000 '\p1w\p1\F1\p1\e' "$DUMP2"
 echo ""
 echo "w,FUNCT+1,ESC plots ink attr at col0, cursor advances to col1"
 check_bytes "col0 = 0x07 (ink attr)" "0xBB80:1" "07" "$DUMP2"
@@ -105,14 +105,14 @@ check_found "cursor at col1" "Main      XY 1, 0" "$DUMP2"
 
 # --- Scenario 3: FUNCT+2 plots paper (0x10) -------------------------------
 DUMP3="$OUT/capture_write_f2.bin"
-run_capture 12480000 '\p1w\p1\f2\p1\e' "$DUMP3"
+run_capture 12480000 '\p1w\p1\F2\p1\e' "$DUMP3"
 echo ""
 echo "w,FUNCT+2,ESC plots paper attr at col0"
 check_bytes "col0 = 0x10 (paper attr)" "0xBB80:1" "10" "$DUMP3"
 
 # --- Scenario 4: FUNCT+3 plots the modifier attribute (0x08) --------------
 DUMP4="$OUT/capture_write_f3.bin"
-run_capture 12480000 '\p1w\p1\f3\p1\e' "$DUMP4"
+run_capture 12480000 '\p1w\p1\F3\p1\e' "$DUMP4"
 echo ""
 echo "w,FUNCT+3,ESC plots modifier attr at col0"
 check_bytes "col0 = 0x08 (modifier attr, Std/non-double/non-blink)" "0xBB80:1" "08" "$DUMP4"
