@@ -50,13 +50,20 @@ OUT_PATH = os.path.join(OUT_DIR, "OSEDEMO.BIN")
 OUT_BASE = "OSEDEMO"
 
 # ---- Oric serial attribute values (oric.h) ----
-A_FWYELLOW = 3
-A_FWBLUE = 4
-A_FWCYAN = 6
-A_FWWHITE = 7
-A_BGBLACK = 16
-CH_SPACE = 0x20
+A_FWBLACK   = 0
+A_FWRED     = 1
+A_FWGREEN   = 2
+A_FWYELLOW  = 3
+A_FWBLUE    = 4
+A_FWMAGENTA = 5
+A_FWCYAN    = 6
+A_FWWHITE   = 7
+A_BGBLACK   = 16
+CH_SPACE    = 0x20
 CH_INVSPACE = 0xA0
+
+# 3-letter abbreviations for ink/paper colour labels, index = Oric colour number
+COLOUR_NAMES = ["BLK", "RED", "GRE", "YEL", "BLU", "MAG", "CYA", "WHI"]
 
 COLS, ROWS = 40, 28
 
@@ -214,24 +221,43 @@ def build_screen(border_codes, circle_cellmap, ccols, crows):
 
     put_row_attr(16, A_FWCYAN, A_BGBLACK)
 
-    label = "INK COLOURS:"
-    put_text(17, 3, label, A_FWWHITE, A_BGBLACK)
-    sw_col = 3 + len(label) + 1
-    for n in range(8):
-        put(sw_col + n * 2, 17, n)
-        put(sw_col + n * 2 + 1, 17, CH_INVSPACE)
+    # Ink colour labels -- row 17 for label, row 18 for 3-letter blocks.
+    # Block layout (row 18, left-aligned at col 3):
+    #   8 blocks × [ink_attr + "XYZ"] = 8 × 4 = 32 bytes, cols 3-34.
+    # Order: 1,2,...,7,0 so black (invisible on black paper) is trailing.
+    # col 35: A_FWWHITE to restore ink before the right border at col 39.
+    put_text(17, 3, "INK COLOURS:", A_FWWHITE, A_BGBLACK)
+    put_row_attr(18, A_FWWHITE, A_BGBLACK)
+    ink_order = [1, 2, 3, 4, 5, 6, 7, 0]
+    for i, n in enumerate(ink_order):
+        base = 3 + i * 4
+        put(base,     18, n)                          # ink attribute
+        for j, ch in enumerate(COLOUR_NAMES[n]):
+            put(base + 1 + j, 18, ord(ch))            # 3-letter name
+    put(35, 18, A_FWWHITE)                            # restore ink for right border
 
-    label2 = "PAPER COLOURS:"
-    put_text(18, 3, label2, A_FWWHITE, A_BGBLACK)
-    sw_col2 = 3 + len(label2) + 1
-    for n in range(8):
-        put(sw_col2 + n * 2, 18, A_BGBLACK + n)
-        put(sw_col2 + n * 2 + 1, 18, CH_SPACE)
+    # Paper colour labels -- row 19 for label, row 20 for 3-letter blocks.
+    # Block layout (row 20, left-aligned starting at col 4):
+    #   col 3: ink=black (so all abbreviations are printed in black ink)
+    #   8 blocks × [paper_attr + "XYZ"] = 8 × 4 = 32 bytes, cols 4-35.
+    # Order: 1,2,...,7,0 so black paper (invisible text on black) is trailing.
+    # cols 36-37: restore ink=white + paper=black before the right border.
+    put_text(19, 3, "PAPER COLOURS:", A_FWWHITE, A_BGBLACK)
+    put_row_attr(20, A_FWWHITE, A_BGBLACK)
+    put(3, 20, A_FWBLACK)                             # black ink for all blocks
+    pap_order = [1, 2, 3, 4, 5, 6, 7, 0]
+    for i, n in enumerate(pap_order):
+        base = 4 + i * 4
+        put(base,     20, A_BGBLACK + n)              # paper attribute
+        for j, ch in enumerate(COLOUR_NAMES[n]):
+            put(base + 1 + j, 20, ord(ch))            # 3-letter name
+    put(36, 20, A_FWWHITE)                            # restore ink
+    put(37, 20, A_BGBLACK)                            # restore paper
 
-    put_row_attr(19, A_FWCYAN, A_BGBLACK)
-    put_text(20, center_start(31), "MADE WITH ORICSCREENEDITORLOCI", A_FWWHITE, A_BGBLACK)
-    put_text(21, center_start(17), "XANDER MOL - 2026", A_FWCYAN, A_BGBLACK)
-    for row in range(22, 27):
+    put_row_attr(21, A_FWCYAN, A_BGBLACK)
+    put_text(22, center_start(31), "MADE WITH ORICSCREENEDITORLOCI", A_FWWHITE, A_BGBLACK)
+    put_text(23, center_start(17), "XANDER MOL - 2026", A_FWCYAN, A_BGBLACK)
+    for row in range(24, 27):
         put_row_attr(row, A_FWCYAN, A_BGBLACK)
 
     assert len(screen) == COLS * ROWS

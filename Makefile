@@ -202,7 +202,7 @@ CYCLES   ?= 8000000
 # all: must appear first so it is the default goal
 # =========================================================================
 
-.PHONY: all all-langs clean run docs check-usb usb kbtest-build check-phosphoric sandbox-reset test-capture test-boot test-menus test-screenresize test-charsetram-spike test-charsetedit test-palette test-colourpicker test-cursor-autoscroll test-linebox test-select test-move test-writemode test-boot-no-loci test-select-cutcopy test-undo-overflow test-help-funct8 test-fileio-traffic test-findreplace test-write-hexattr test-trymode test-goto test-hollowbox test-ellipse test
+.PHONY: all all-langs clean run docs zip check-usb usb kbtest-build check-phosphoric sandbox-reset test-capture test-boot test-menus test-screenresize test-charsetram-spike test-charsetedit test-palette test-colourpicker test-cursor-autoscroll test-linebox test-select test-move test-writemode test-boot-no-loci test-select-cutcopy test-undo-overflow test-help-funct8 test-fileio-traffic test-findreplace test-write-hexattr test-trymode test-goto test-hollowbox test-ellipse test
 
 all: build/$(MAIN)$(LANGSUFFIX).tap
 
@@ -504,7 +504,7 @@ test:
 # recipient does not have pandoc installed.
 # -------------------------------------------------------------------------
 
-docs: README.pdf
+docs: README.pdf README_fr.pdf
 
 README.pdf: README.md
 	@if which pandoc >/dev/null 2>&1; then \
@@ -512,6 +512,34 @@ README.pdf: README.md
 	else \
 	    echo "WARNING: pandoc not found -- README.pdf not updated (install: sudo apt install pandoc texlive-xetex)"; \
 	fi
+
+README_fr.pdf: README_fr.md
+	@if which pandoc >/dev/null 2>&1; then \
+	    pandoc README_fr.md -o README_fr.pdf; \
+	else \
+	    echo "WARNING: pandoc not found -- README_fr.pdf not updated (install: sudo apt install pandoc texlive-xetex)"; \
+	fi
+
+# -------------------------------------------------------------------------
+# Release ZIP -- same payload as 'make usb', plus both PDF READMEs.
+# ZIP name: OricScreenEditorLOCI_vMAJOR.MINOR.PATCH_YYYYMMDD.zip
+# -------------------------------------------------------------------------
+
+ZIPNAME = OricScreenEditorLOCI_v$(VERSION_MAJOR).$(VERSION_MINOR).$(VERSION_PATCH)_$(shell date +%Y%m%d)
+
+zip: all-langs kbtest-build docs
+	$(MKDIR) build 2>$(NULLDEV) ; true
+	zip -j build/$(ZIPNAME).zip \
+	    build/$(MAIN).tap \
+	    build/$(MAIN)_fr.tap \
+	    assets/PETSCIIPJ.BIN assets/PETSCIISC.BIN assets/PETSCIICS.BIN assets/PETSCIICA.BIN \
+	    assets/OSETSC.BIN assets/OSEHS1.BIN assets/OSEHS2.BIN assets/OSEHS3.BIN assets/OSEHS4.BIN \
+	    assets/OSEDEMO.BIN \
+	    assets/OSEDEMOPJ.BIN assets/OSEDEMOSC.BIN assets/OSEDEMOCS.BIN \
+	    assets/OSELOGOPJ.BIN assets/OSELOGOSC.BIN assets/OSELOGOCS.BIN assets/OSELOGOCA.BIN \
+	    kbtest/build/kbtest.tap \
+	    README.pdf README_fr.pdf
+	@echo "Created build/$(ZIPNAME).zip"
 
 # -------------------------------------------------------------------------
 # Clean

@@ -122,7 +122,9 @@ int main(void)
         const char *msg = MSG_SPLASH_PRESSKEY;
         uint8_t col;
         for (col = 0; col < SCREEN_COLS; col++) row[col] = CH_SPACE;
-        for (col = 0; msg[col]; col++) row[col] = (uint8_t)msg[col];
+        row[0] = A_FWWHITE;
+        row[1] = A_BGBLACK;
+        for (col = 0; msg[col]; col++) row[col + 2] = (uint8_t)msg[col];
     }
     key_read();
 
