@@ -36,11 +36,14 @@
 
 #define MENU_WIN_DEPTH       9   // maximum nested window saves
 
-// Main-RAM window-save buffer. Largest nested path so far: the row-0 menu
-// bar (40B) + a top-level pulldown (PULLDOWN_MAXOPTIONS*40=280B) + a resize
-// popup (12*40=480B) + its shrink-confirm areyousure popup (6*40=240B) + its
-// Yes/No pulldown (2*40=80B) = 1120B; 2048B leaves headroom for later phases.
-#define MENU_WINBUF_SIZE  2048
+// Main-RAM window-save buffer. Actual worst-case peak: menu_run()'s row-0
+// bar save (1*40=40B, always active) + info_version_show()'s full-screen save
+// (28*40=1120B) = 1160B. Top-level pulldowns are restored by menu_pulldown()
+// itself before menu_run() dispatches to any action, so they don't stack with
+// inner popups. Picker nesting (picker_engine 17*40 + picker_make_dir 6*40 =
+// 920B) and areyousure (6*40+Yes/No 2*40=320B) stay below 1160B. 1400B gives
+// ~240B of margin above the known maximum, which is sufficient headroom.
+#define MENU_WINBUF_SIZE  1400
 
 // Special return codes from menu_pulldown()
 #define MENU_CANCEL          0   // ESC pressed (when escapable=1)

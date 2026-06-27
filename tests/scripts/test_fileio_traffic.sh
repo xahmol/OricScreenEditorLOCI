@@ -13,8 +13,9 @@
 #   - File > Load Screen: prompts for width/height (no embedded size to
 #     auto-detect), round-trips a saved file back onto a cleared canvas
 #     (statusbar's S field confirms the restored screencode)
-#   - File > Save Combined: 768-byte charset immediately followed by
-#     screenmap[], no header
+#   - File > Save Combined: 1664-byte combined charset (768B Std displayable
+#     + 256B Alt non-displayable prefix + 640B Alt displayable) followed by
+#     screenmap[], no header -- total 2784B (40x28) or 2744B (40x27)
 #   - File > Save Project: ProjectHeader fields (canvas size, cursor,
 #     plotscreencode, stdchanged/altchanged) in "<name>PJ.BIN", plus a
 #     bare "<name>SC.BIN" (size known from PJ.BIN, no header of its own)
@@ -164,12 +165,12 @@ DUMP3="$OUT/capture_fileio_save_combined.bin"
 run_capture 31100000 \
     '\p1 \p1\F1\p1\r\p1\n\p1\d\p1\d\p1\d\p1\d\p1\n\p1\n\p1C\p1\n' "$DUMP3"
 echo ""
-echo "File > Save Combined writes 768B charset + screenmap[] (no header)"
+echo "File > Save Combined writes 1664B charsets + screenmap[] (no header)"
 check_found "statusbar shows '@' plotted" "Main      XY 0, 0C40@ S40I7P0S" "$DUMP3"
-check_file_bytes "c.BIN: size 1888 (768 + 1120, no header)" "$LOCIFLASH/c.BIN" \
-    "len(data) == 1888"
-check_file_bytes "c.BIN: '@' at screen-section offset 768" "$LOCIFLASH/c.BIN" \
-    "data[768] == 0x40"
+check_file_bytes "c.BIN: size 2784 (768+256+640+1120, no header)" "$LOCIFLASH/c.BIN" \
+    "len(data) == 2784"
+check_file_bytes "c.BIN: '@' at screen-section offset 1664" "$LOCIFLASH/c.BIN" \
+    "data[1664] == 0x40"
 
 # --- Scenario 4: File > Save Project -----------------------------------------
 reset_flash

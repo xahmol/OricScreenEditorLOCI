@@ -386,11 +386,14 @@ picker at a project saved by the original OricScreenEditor.
 
 *Save combined / Load combined*
 
-Saves or loads the canvas together with the standard character set in a
-single `<filename>.BIN` file (the standard charset's 768 bytes
-immediately followed by the screen data, no header). Like standalone
-Load screen above, Load combined asks you to enter width and height
-yourself before loading.
+Saves or loads both character sets and the canvas in a single
+`<filename>.BIN` file in memory-map order (standard charset displayable
+range, alternate charset region, screen data — see the
+[File format reference](#file-format-reference) for the exact layout).
+Because the format mirrors a fixed region of Oric RAM, the canvas must
+be exactly 40×28 or 40×27 — other sizes are rejected. Load combined
+auto-detects the height from the file size, so no width/height prompt
+is needed.
 
 **_Charset: Load and save character set_**
 
@@ -400,12 +403,10 @@ Load or save the standard or alternate character set separately
 (`<filename>.BIN`: 768 bytes for the standard set, 640 for the alternate
 set -- the alternate character set only has 640 bytes of usable memory
 on real Oric hardware, the rest physically overlaps the screen), or
-"combined": saving combined is identical to saving the standard set;
-loading combined loads the file into **both** the standard and alternate
-banks, so they end up identical. (This differs from V1, which used a ROM
-call to regenerate the alternate set from the standard one on load --
-that ROM call doesn't work in this rewrite, so copying the same data into
-both banks is the closest available equivalent.)
+"combined": saves 768 bytes standard + 256 bytes alternate non-displayable
+prefix + 640 bytes alternate displayable = 1,664 bytes total, in
+memory-map order. Both banks are saved and loaded together. See the
+[File format reference](#file-format-reference) for the exact layout.
 
 *Reset Std->ROM (OSE-LOCI new)*
 
@@ -882,8 +883,66 @@ Note that in OSE calculation of these attribute codes by yourselves is not neces
 ## File format reference
 ([Back to contents](#contents))
 
-As the Oric does not have separate attribute memory, screendata is basically just a width*height dump of screen codes. The screen file is a flat data file with these screencodes, length is calculated as width*height.
-So a standard 40x28 screen would be 1.120 bytes.
+All file formats used by OSE are headerless binary dumps — no magic
+numbers, no metadata fields, no padding. Files are written and read by
+`loci_write()`/`loci_read()` directly from/to the relevant Oric memory
+addresses. The one exception is `PJ.BIN` (Project header), which carries
+a `FILEIO_MAGIC` sentinel (`$4F53`) so V1 format is auto-detected.
+
+### Screen (`<name>.BIN` — File > Save/Load Screen)
+
+A flat raw dump of `screenmap[]`, the width*height canvas buffer.
+No header: width and height are not stored in the file. Load prompts
+you to enter them.
+
+| Offset | Size | Content |
+|--------|------|---------|
+| 0 | width × height bytes | canvas screencodes (row-major, top to bottom) |
+
+Standard 40x28 screen = 1,120 bytes. Any canvas size is valid.
+
+### Combined (`<name>.BIN` — File > Save/Load Combined)
+
+A direct memory-map dump covering both charset banks and the screen,
+laid out in the exact order they occupy in Oric RAM. Because the
+format mirrors a fixed memory region, only the two standard Oric
+screen heights are accepted: **40x28 or 40x27**. Other canvas
+dimensions are rejected on both Save and Load.
+
+Load does not prompt for dimensions — the height is auto-detected
+from the file size.
+
+| Offset | Size | Load address | Content |
+|--------|------|-------------|---------|
+| 0 | 768 | $B500–$B7FF | Standard charset displayable range (codes $20–$7F, 96 glyphs × 8 bytes) |
+| 768 | 256 | $B800–$B8FF | Alternate charset non-displayable prefix (codes $00–$1F; not shown as glyphs but part of the contiguous Alt bank) |
+| 1,024 | 640 | $B900–$BB7F | Alternate charset displayable range (codes $20–$6F, 80 glyphs × 8 bytes; stops before screen RAM at $BB80) |
+| 1,664 | 40 × height | $BB80+ | Screen data (screencodes, row-major) |
+
+Total file size: **2,784 bytes** (40×28) or **2,744 bytes** (40×27).
+
+### Project (four files — File > Save/Load Project)
+
+A project consists of up to four files sharing a base name:
+
+| File | Size | Content |
+|------|------|---------|
+| `<name>PJ.BIN` | 22 bytes | `ProjectHeader` struct: canvas size, cursor/offset position, plot attributes (`plotscreencode`/ink/paper/blink/double/altchar), `stdchanged`/`altchanged` flags, `FILEIO_MAGIC` sentinel (`$4F53`) |
+| `<name>SC.BIN` | width × height bytes | Canvas screencodes (bare, no header; size from `PJ.BIN`) |
+| `<name>CS.BIN` | 768 bytes | Standard charset displayable range (written/read only if `stdchanged` is set) |
+| `<name>CA.BIN` | 640 bytes | Alternate charset displayable range (codes $20–$6F only; written/read only if `altchanged` is set) |
+
+Load Project also transparently accepts V1 (CC65 version) `.PJ.BIN`
+files — V1's 19-byte header is auto-detected via the magic field
+(V1's first two bytes can never equal `$4F53`).
+
+### Charset files (Charset menu)
+
+| Format | File | Size | Content |
+|--------|------|------|---------|
+| Standard | `<name>.BIN` | 768 bytes | CHARSET_STD displayable range, $B500–$B7FF |
+| Alternate | `<name>.BIN` | 640 bytes | CHARSET_ALT displayable range, $B900–$BB7F (80 glyphs only; codes $70–$7F would overlap screen RAM) |
+| Combined | `<name>.BIN` | 1,664 bytes | **Charset menu only** — same layout as File > Combined but without the screen: 768 bytes Std displayable ($B500–$B7FF) + 256 bytes Alt non-displayable prefix ($B800–$B8FF) + 640 bytes Alt displayable ($B900–$BB7F). Loads both banks. |
 
 ## Credits
 ([Back to contents](#contents))

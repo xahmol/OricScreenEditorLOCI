@@ -330,11 +330,41 @@ void fileio_load_screen(void)
 }
 
 /**
- * Save the canvas together with CHARSET_STD's displayable glyph range to
- * app.filename+".BIN": CHARSET_GLYPH_AREA_SIZE (768) bytes written
- * directly from charset RAM (CHARSET_STD + CHARSET_GLYPH_AREA_OFFSET, no
- * copy-to-buffer step), immediately followed by screenmap[] -- no
- * header, by design, see fileio.h.
+ * Write both charset banks to an already-open fd in Combined memory-map
+ * order: 768 bytes Std displayable ($B500), 256 bytes Alt non-displayable
+ * prefix ($B800), 640 bytes Alt displayable ($B900). Shared by
+ * fileio_save_combined() and fileio_save_charset(altorstd=2).
+ *
+ * @param fd  Open writable LOCI file descriptor.
+ * @return (none)
+ */
+static void combined_charset_write(int16_t fd)
+{
+    loci_write(fd, charsetswap_real_std(), CHARSET_GLYPH_AREA_SIZE);
+    loci_write(fd, (void *)CHARSET_ALT, CHARSET_GLYPH_AREA_OFFSET);
+    loci_write(fd, charsetswap_real_alt(), CHARSET_ALT_GLYPH_AREA_SIZE);
+}
+
+/**
+ * Read both charset banks from an already-open fd in Combined memory-map
+ * order: 768 bytes into $B500 (Std displayable), 896 bytes into $B800
+ * (full Alt region). Shared by fileio_load_combined() and
+ * fileio_load_charset(altorstd=2).
+ *
+ * @param fd  Open readable LOCI file descriptor.
+ * @return (none)
+ */
+static void combined_charset_read(int16_t fd)
+{
+    loci_read(fd, (void *)(CHARSET_STD + CHARSET_GLYPH_AREA_OFFSET), CHARSET_GLYPH_AREA_SIZE);
+    loci_read(fd, (void *)CHARSET_ALT, CHARSET_GLYPH_AREA_OFFSET + CHARSET_ALT_GLYPH_AREA_SIZE);
+}
+
+/**
+ * Save canvas + both charset banks to app.filename+".BIN" in memory-map
+ * order: CHARSET_STD displayable range (768 bytes, $B500-$B7FF), then
+ * the full CHARSET_ALT region ($B800-$BB7F = 896 bytes), then screenmap[].
+ * No header -- see fileio.h. Canvas must be exactly 40x28 or 40x27.
  *
  * @return (none)
  */
@@ -343,6 +373,12 @@ void fileio_save_combined(void)
     int16_t fd;
 
     if (!loci_check_present()) return;
+    if (app.canvas_width != 40 ||
+        (app.canvas_height != 28 && app.canvas_height != 27))
+    {
+        menu_messagepopup(MSG_RESIZE_INVALID);
+        return;
+    }
     if (!fileio_get_filename(MSG_FILE_SAVE_COMBINED, PICKER_FILTER_NONE)) return;
 
     filedir_join_suffix(fullpath, ".BIN");
@@ -353,33 +389,27 @@ void fileio_save_combined(void)
         menu_messagepopup(MSG_FILE_INVALID_FORMAT);
         return;
     }
-    loci_write(fd, charsetswap_real_std(), CHARSET_GLYPH_AREA_SIZE);
-    loci_write(fd, screenmap, (uint16_t)(app.canvas_width * app.canvas_height));
+    combined_charset_write(fd);
+    loci_write(fd, screenmap, (uint16_t)(40 * app.canvas_height));
     loci_close(fd);
 }
 
 /**
- * Load a file saved by fileio_save_combined(): prompts for width/height
- * (fileio_get_dimensions(), same as fileio_load_screen()), resizes the
- * canvas, reads CHARSET_GLYPH_AREA_SIZE bytes directly into CHARSET_STD's
- * displayable range, then reads the raw screen bytes. Sets
- * app.stdchanged=1 since CHARSET_STD was just replaced.
+ * Load a file saved by fileio_save_combined(): determines canvas height
+ * (27 or 28) from the file size via loci_lseek(SEEK_END) -- no
+ * width/height prompt needed. Rejects files that are neither 2784 bytes
+ * (40x28) nor 2744 bytes (40x27). Sets stdchanged/altchanged.
  *
  * @return (none)
  */
 void fileio_load_combined(void)
 {
     int16_t  fd;
-    uint16_t neww, newh;
+    int32_t  fsize;
+    uint8_t  newh;
 
     if (!loci_check_present()) return;
     if (!filepicker_run(MSG_FILE_LOAD_COMBINED, PICKER_FILTER_NONE)) return;
-    if (!fileio_get_dimensions(MSG_FILE_LOAD_COMBINED, &neww, &newh)) return;
-    if (!canvas_resize(neww, newh))
-    {
-        menu_messagepopup(MSG_RESIZE_INVALID);
-        return;
-    }
 
     filedir_join(fullpath, app.filename);
     fileio_strip_bin_suffix();
@@ -390,18 +420,37 @@ void fileio_load_combined(void)
         menu_messagepopup(MSG_FILE_NOT_FOUND);
         return;
     }
-    loci_read(fd, (void *)(CHARSET_STD + CHARSET_GLYPH_AREA_OFFSET), CHARSET_GLYPH_AREA_SIZE);
-    loci_read(fd, screenmap, (uint16_t)(neww * newh));
+    fsize = loci_lseek(fd, 0, SEEK_END);
+    if (fsize == 2784)      newh = 28;
+    else if (fsize == 2744) newh = 27;
+    else
+    {
+        loci_close(fd);
+        menu_messagepopup(MSG_FILE_INVALID_FORMAT);
+        return;
+    }
+    loci_lseek(fd, 0, SEEK_SET);
+
+    if (!canvas_resize(40, newh))
+    {
+        loci_close(fd);
+        menu_messagepopup(MSG_RESIZE_INVALID);
+        return;
+    }
+
+    combined_charset_read(fd);
+    loci_read(fd, screenmap, (uint16_t)(40 * newh));
     loci_close(fd);
 
     // charsetswap_mark_changed() (not just app.stdchanged) -- this load
     // bypasses the character editor's own ce_snapshot() chokepoint, the
     // only other call site for charsetswap_mark_changed(), so without
     // this the general popup-chrome Std-charset-swap mechanism would
-    // never realise CHARSET_STD just changed and would leave menus/
+    // never realise CHARSET_STD/ALT just changed and would leave menus/
     // dialogs unprotected (found 2026-06-21, user report).
     charsetswap_mark_changed();
     app.stdchanged = 1;
+    app.altchanged = 1;
     app.cursor_x = 0;
     app.cursor_y = 0;
     app.xoffset  = 0;
@@ -660,13 +709,13 @@ static const char *fileio_charset_title(uint8_t altorstd, uint8_t save, uint16_t
 
 /**
  * Charset menu Load Standard/Alternate/Combined ('altorstd' 0/1/2).
- * Std loads 768 raw bytes, Alt loads 640 (charset_area_size(), see
- * CHARSET_ALT_GLYPH_AREA_SIZE) directly into that bank's displayable
- * range. Combined loads into CHARSET_STD then copies the result into
- * CHARSET_ALT too (charset_load(), include/charset.h, 640 bytes -- see
- * fileio.h's header comment for why Combined uses CHARSET_STD as its
- * source either way). Sets app.stdchanged/altchanged for whichever
- * bank(s) changed.
+ * Std loads 768 raw bytes into CHARSET_STD's displayable range ($B500).
+ * Alt loads 640 bytes (CHARSET_ALT_GLYPH_AREA_SIZE) into CHARSET_ALT's
+ * displayable range ($B900). Combined mirrors File > Load Combined minus
+ * the screen: 768 bytes into $B500 (Std displayable) then 896 bytes into
+ * $B800 (full Alt region: 256-byte non-displayable prefix + 640-byte
+ * displayable range), total 1664 bytes. Sets stdchanged/altchanged for
+ * whichever bank(s) changed.
  *
  * @param altorstd 0=std, 1=alt, 2=combined.
  * @return (none)
@@ -674,6 +723,7 @@ static const char *fileio_charset_title(uint8_t altorstd, uint8_t save, uint16_t
 void fileio_load_charset(uint8_t altorstd)
 {
     uint16_t base;
+    int16_t  fd;
     const char *title = fileio_charset_title(altorstd, 0, &base);
 
     if (!loci_check_present()) return;
@@ -681,50 +731,61 @@ void fileio_load_charset(uint8_t altorstd)
 
     filedir_join(fullpath, app.filename);
     fileio_strip_bin_suffix();
+
+    if (altorstd == 2)
+    {
+        fd = loci_open(fullpath, O_RDONLY);
+        if (fd < 0) { menu_messagepopup(MSG_FILE_NOT_FOUND); return; }
+        combined_charset_read(fd);
+        loci_close(fd);
+        charsetswap_mark_changed();
+        app.stdchanged = 1;
+        app.altchanged = 1;
+        return;
+    }
+
     if (file_load(fullpath, (void *)(base + CHARSET_GLYPH_AREA_OFFSET), charset_area_size(base)) < 0)
     {
         menu_messagepopup(MSG_FILE_NOT_FOUND);
         return;
     }
-
-    if (altorstd == 2)
-    {
-        charset_load(CHARSET_ALT, (const uint8_t *)(CHARSET_STD + CHARSET_GLYPH_AREA_OFFSET));
-        charsetswap_mark_changed();
-        app.stdchanged = 1;
-        app.altchanged = 1;
-    }
-    else if (altorstd == 1)
-    {
-        charsetswap_mark_changed();
-        app.altchanged = 1;
-    }
-    else
-    {
-        charsetswap_mark_changed();
-        app.stdchanged = 1;
-    }
+    charsetswap_mark_changed();
+    if (altorstd == 1) app.altchanged = 1;
+    else               app.stdchanged = 1;
 }
 
 /**
  * Charset menu Save Standard/Alternate/Combined ('altorstd' 0/1/2).
- * Std saves 768 raw bytes, Alt saves 640 (charset_area_size(), see
- * CHARSET_ALT_GLYPH_AREA_SIZE) directly from that bank's displayable
- * range. Combined is identical to Save Std -- CHARSET_STD's range is the
- * only source there is to save (see fileio.h's header comment).
+ * Std saves 768 raw bytes from CHARSET_STD's displayable range ($B500).
+ * Alt saves 640 bytes (CHARSET_ALT_GLYPH_AREA_SIZE) from CHARSET_ALT's
+ * displayable range ($B900). Combined mirrors File > Save Combined minus
+ * the screen: 768 bytes (Std displayable) then 256 bytes (Alt non-
+ * displayable prefix, $B800) then 640 bytes (Alt displayable, $B900),
+ * total 1664 bytes.
  *
  * @param altorstd 0=std, 1=alt, 2=combined.
  * @return (none)
  */
 void fileio_save_charset(uint8_t altorstd)
 {
-    uint16_t base;
+    uint16_t   base;
+    int16_t    fd;
     const char *title = fileio_charset_title(altorstd, 1, &base);
 
     if (!loci_check_present()) return;
     if (!fileio_get_filename(title, PICKER_FILTER_NONE)) return;
 
     filedir_join_suffix(fullpath, ".BIN");
+
+    if (altorstd == 2)
+    {
+        fd = loci_open(fullpath, O_WRONLY | O_CREAT | O_TRUNC);
+        if (fd < 0) { menu_messagepopup(MSG_FILE_INVALID_FORMAT); return; }
+        combined_charset_write(fd);
+        loci_close(fd);
+        return;
+    }
+
     if (file_save(fullpath, (base == CHARSET_ALT) ? charsetswap_real_alt() : charsetswap_real_std(),
                   charset_area_size(base)) < 0)
         menu_messagepopup(MSG_FILE_INVALID_FORMAT);

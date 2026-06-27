@@ -26,10 +26,14 @@ uint8_t fileio_get_filename(const char *title, uint8_t filter);
 void fileio_save_screen(void);
 void fileio_load_screen(void);
 
-// File > Save/Load Combined: app.filename+".BIN", CHARSET_STD's
-// displayable glyph range (768 bytes) immediately followed by
-// screenmap[] -- no header, same bare-format rationale as Screen above
-// (and the same width/height prompt on load).
+// File > Save/Load Combined: app.filename+".BIN", no header.
+// Layout mirrors the Oric memory map: CHARSET_STD displayable range
+// (768 bytes, $B500-$B7FF), then the full CHARSET_ALT region
+// ($B800-$BB7F = 896 bytes: 256-byte non-displayable prefix then
+// 640-byte displayable range), then screenmap[] (40*height bytes).
+// Canvas MUST be 40x28 (2784 bytes total) or 40x27 (2744 bytes total);
+// Save rejects other dimensions, Load auto-detects height from file
+// size via loci_lseek(SEEK_END) -- no width/height prompt needed.
 void fileio_save_combined(void);
 void fileio_load_combined(void);
 
@@ -48,16 +52,13 @@ void fileio_save_project(void);
 void fileio_load_project(void);
 
 // Charset menu Load/Save Standard/Alternate/Combined: altorstd 0=std,
-// 1=alt, 2=combined (matches V1's stdoralt exactly). Std reads/writes 768
-// raw bytes, Alt 640 (charset_area_size(), include/charset.h --
-// CHARSET_ALT only has 640 bytes of safely-addressable RAM) directly
-// from/to CHARSET_STD/CHARSET_ALT's displayable range. Combined save is
-// identical to Save Std (CHARSET_STD's range is the only source);
-// combined load writes the loaded data into *both* CHARSET_STD and
-// CHARSET_ALT (charset_load(), include/charset.h) -- the closest
-// available equivalent to V1's intent, since the ROM call V1 used to
-// regenerate Alt from Std (jsr $F816) is a no-op on this runtime (see
-// CLAUDE.md "Charset-swap mechanism").
+// 1=alt, 2=combined. Std reads/writes 768 raw bytes from/to CHARSET_STD's
+// displayable range ($B500). Alt reads/writes 640 bytes (CHARSET_ALT_
+// GLYPH_AREA_SIZE) from/to CHARSET_ALT's displayable range ($B900).
+// Combined mirrors File > Combined minus the screen: 768 bytes Std
+// displayable + 256 bytes Alt non-displayable prefix ($B800) + 640 bytes
+// Alt displayable ($B900) = 1664 bytes total. Save uses loci_write x3,
+// Load uses loci_read x2.
 void fileio_load_charset(uint8_t altorstd);
 void fileio_save_charset(uint8_t altorstd);
 

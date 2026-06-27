@@ -999,17 +999,19 @@ to call) and aborts with a graceful popup if absent, then
 `fileio_get_filename()` (a `cwin_textinput` popup, same pattern as
 `resize_dialog()`, §6.6) to get/confirm `app.filename`.
 
-- **Save/Load Screen**: `<name>.BIN` = a bare raw `screenmap[]` dump --
-  no header, by design, matching V1 exactly (a saved screen is meant to
-  be a portable, tool-agnostic dump loadable from any source). Load
-  prompts for width/height (`fileio_get_dimensions()`, V1's exact
-  wording) since there's no embedded size. **Save/Load Combined**: same
-  bare-format rationale -- `CHARSET_STD`'s displayable range (768B)
-  immediately followed by `screenmap[]`, no header. Both write/read each
-  piece directly from where it lives via `loci_open`+`loci_write`/`read`+
-  `loci_close` — no staging buffer (unlike V1, whose combined save relies
-  on `CHARSET_STD` and `SCREENMEMORY` being memory-adjacent in *V1's* map,
-  which doesn't hold for OSE).
+- **Save/Load Screen**: `<name>.BIN` = a bare raw `screenmap[]` dump,
+  no header, matching V1 exactly. Load prompts for width/height since
+  there is no embedded size.
+- **Save/Load Combined**: a fixed memory-map layout covering both
+  charset banks and the screen in the order they occupy in Oric RAM —
+  `CHARSET_STD` displayable range (768 B, $B500–$B7FF), then the full
+  `CHARSET_ALT` region (896 B, $B800–$BB7F: 256-byte non-displayable
+  prefix + 640-byte displayable range), then `screenmap[]` (40×height
+  bytes). **Canvas must be exactly 40×28 (2784 B total) or 40×27
+  (2744 B total)**; Save rejects any other dimensions, Load
+  auto-detects height from file size via `loci_lseek(SEEK_END)` and
+  rejects files that match neither expected size. No width/height prompt
+  on load. Sets both `stdchanged` and `altchanged`.
 - **Save/Load Project**: V1's literal 4-file scheme — `<name>PJ.BIN`
   (`ProjectHeader` metadata, via `file_save`/`file_load`'s single-blob
   convenience wrapper -- the one file genuinely justified in differing
@@ -1023,14 +1025,13 @@ to call) and aborts with a graceful popup if absent, then
   auto-detected via the magic field) -- no new menu item.
 - `AppState` gained `stdchanged`/`altchanged`, set in `charsetedit.c`'s
   `ce_snapshot()` (§6.4) based on `ce_altorstd`.
-- **Charset menu** Load/Save Standard/Alternate/Combined: Std is 768 raw
-  bytes, **Alt is 640** (`charset_area_size()`, `include/charset.h` --
-  `CHARSET_ALT` only has 640 bytes of safely-addressable RAM before
-  screen RAM, was a bug, fixed) direct to/from `CHARSET_STD`/
-  `CHARSET_ALT`'s displayable range; Combined save = Save Std; Combined
-  load writes into *both* banks (`charset_load()`, §4.5) since the ROM
-  call V1 used to regenerate Alt from Std is a no-op on this runtime
-  (§6.5).
+- **Charset menu** Load/Save Standard/Alternate/Combined: Std is 768
+  raw bytes from/to `$B500`. Alt is 640 bytes (`CHARSET_ALT_GLYPH_AREA_
+  SIZE`, `include/charset.h`) from/to `$B900`. **Combined** is 1664
+  bytes — same memory-map layout as File > Combined minus the screen:
+  768 bytes Std + 256 bytes Alt non-displayable prefix ($B800) + 640
+  bytes Alt displayable ($B900). Both Save and Load operate on both
+  charset banks.
 - Headless coverage: `test_fileio_traffic.sh` (§7) asserts on the actual
   bytes written/read for every Save/Load action, the Alt-charset size
   fix, and a V1-`PJ.BIN`-import round-trip.

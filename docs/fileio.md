@@ -9,12 +9,19 @@ leftover defensiveness.
 **File formats (final, V1-compatible):**
 - **Screen** (`<name>.BIN`): bare raw dump of `screenmap[]`, no header. Load prompts
   for width and height (`fileio_get_dimensions()`, V1's exact wording).
-- **Combined** (`<name>.BIN`): `CHARSET_STD` displayable range (768 bytes) then
-  `screenmap[]`. Same width/height prompt on load.
+- **Combined** (`<name>.BIN`): fixed memory-map layout — `CHARSET_STD` displayable
+  range (768 bytes, $B500-$B7FF), then the full `CHARSET_ALT` region ($B800-$BB7F =
+  896 bytes: 256-byte non-displayable prefix + 640-byte displayable range), then
+  `screenmap[]` (40×height bytes). **Canvas must be 40×28 (2784 bytes total) or
+  40×27 (2744 bytes total)**: Save rejects other dimensions, Load auto-detects height
+  from `loci_lseek(SEEK_END)` — no width/height prompt. Sets both `stdchanged` and
+  `altchanged` on load.
 - **Project** (`<name>PJ.BIN` + `SC.BIN` + optional `CS.BIN`/`CA.BIN`): see below.
-- **Charset**: Std = 768 raw bytes, **Alt = 640 bytes** (`charset_area_size(CHARSET_ALT)` =
-  640; Alt RAM ends at $BB80, so only codes 0x00-0x6F are valid). Combined save
-  = same as Save Std; Combined load writes both banks.
+- **Charset**: Std = 768 raw bytes ($B500-$B7FF), Alt = 640 bytes ($B900-$BB7F,
+  `CHARSET_ALT_GLYPH_AREA_SIZE`; Alt RAM ends at $BB80, codes 0x00-0x6F only).
+  **Combined** = 1664 bytes, same layout as File > Combined without the screen:
+  768 bytes Std + 256 bytes Alt non-displayable prefix ($B800-$B8FF) + 640 bytes
+  Alt displayable. Saves and loads both banks.
 
 **Save actions must read charset via `charsetswap_real_std()`/`charsetswap_real_alt()`
 (returns a pointer, not a copy)** — otherwise menu-invoked Saves write the

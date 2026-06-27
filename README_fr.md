@@ -393,11 +393,14 @@ original.
 
 *Save combined / Load combined (sauvegarder/charger combiné)*
 
-Sauvegarde ou charge la zone de dessin avec le jeu de caractères standard
-dans un seul fichier `<nomfichier>.BIN` (les 768 octets du jeu standard
-immédiatement suivis des données d'écran, sans en-tête). Comme Charger
-écran ci-dessus, Charger combiné vous demande de saisir vous-même la
-largeur et la hauteur avant de charger.
+Sauvegarde ou charge les deux jeux de caractères et la zone de dessin
+dans un seul fichier `<nomfichier>.BIN` en ordre de carte mémoire (plage
+affichable du jeu standard, région du jeu alternatif, données d'écran --
+voir la [Référence du format de fichier](#référence-du-format-de-fichier)
+pour la disposition exacte). Le canevas doit être exactement 40×28 ou
+40×27 -- les autres dimensions sont rejetées. Charger combiné détecte
+automatiquement la hauteur d'après la taille du fichier, donc aucune
+saisie de largeur/hauteur n'est nécessaire.
 
 **_Charset : charger et sauvegarder le jeu de caractères_**
 
@@ -407,13 +410,12 @@ Chargez ou sauvegardez le jeu standard ou alternatif séparément
 (`<nomfichier>.BIN` : 768 octets pour le jeu standard, 640 pour le jeu
 alternatif -- le jeu alternatif ne dispose que de 640 octets de mémoire
 réellement utilisable sur le matériel Oric réel, le reste chevauchant
-physiquement l'écran), ou "combiné" : sauvegarder en combiné est
-identique à sauvegarder le jeu standard ; charger en combiné charge le
-fichier dans **les deux** jeux standard et alternatif, qui deviennent donc
-identiques. (Ceci diffère de V1, qui utilisait un appel ROM pour régénérer
-le jeu alternatif à partir du standard au chargement -- cet appel ROM ne
-fonctionne pas dans cette réécriture, donc copier les mêmes données dans
-les deux jeux est l'équivalent le plus proche disponible.)
+physiquement l'écran), ou "combiné" : sauvegarde 768 octets standard +
+256 octets prefixe non-affichable alternatif + 640 octets alternatif
+affichable = 1 664 octets au total, en ordre de carte mémoire. Les deux
+jeux sont sauvegardés et chargés ensemble. Voir la
+[Référence du format de fichier](#référence-du-format-de-fichier) pour
+la disposition exacte.
 
 *Réinitialiser standard->ROM (Nouveau OSE-LOCI)*
 
@@ -892,8 +894,64 @@ Notez que dans OSE, il n'est pas nécessaire de calculer ces codes d'attribut vo
 ## Référence du format de fichier
 ([Retour au sommaire](#sommaire))
 
-Comme l'Oric ne possède pas de mémoire d'attributs séparée, les données d'écran sont essentiellement un simple dump largeur*hauteur de codes écran. Le fichier d'écran est un fichier de données brutes contenant ces codes écran, sa longueur étant calculée comme largeur*hauteur.
-Ainsi, un écran standard 40x27 ferait 1 080 octets.
+Tous les formats utilisés par OSE sont des dumps binaires sans en-tête --
+pas de nombres magiques, pas de champs de métadonnées, pas de rembourrage.
+Les fichiers sont écrits et lus par `loci_write()`/`loci_read()` directement
+depuis/vers les adresses mémoire Oric concernées. La seule exception est
+`PJ.BIN` (en-tête de projet), qui contient un marqueur `FILEIO_MAGIC`
+(`$4F53`) permettant la détection automatique du format V1.
+
+### Ecran (`<nom>.BIN` — Fichier > Sauver/Charger écran)
+
+Dump brut de `screenmap[]`, le tampon canevas largeur×hauteur.
+Sans en-tête : la largeur et la hauteur ne sont pas stockées dans le
+fichier. Le chargement vous demande de les saisir.
+
+| Offset | Taille | Contenu |
+|--------|--------|---------|
+| 0 | largeur × hauteur octets | codes d'écran du canevas (ligne par ligne, de haut en bas) |
+
+Ecran standard 40×28 = 1 120 octets. Toute taille de canevas est valide.
+
+### Combiné (`<nom>.BIN` — Fichier > Sauver/Charger combiné)
+
+Dump de carte mémoire couvrant les deux jeux de caractères et l'écran,
+dans l'ordre exact qu'ils occupent en RAM Oric. Le format reflétant une
+région mémoire fixe, seules les deux hauteurs d'écran Oric standard sont
+acceptées : **40×28 ou 40×27**. Les autres dimensions sont rejetées.
+
+Le chargement ne demande pas les dimensions -- la hauteur est détectée
+automatiquement d'après la taille du fichier.
+
+| Offset | Taille | Adresse de chargement | Contenu |
+|--------|--------|-----------------------|---------|
+| 0 | 768 | $B500–$B7FF | Plage affichable du jeu standard (codes $20–$7F, 96 glyphes × 8 octets) |
+| 768 | 256 | $B800–$B8FF | Préfixe non-affichable du jeu alternatif (codes $00–$1F ; non affiché comme glyphes mais partie de la banque Alt contiguë) |
+| 1 024 | 640 | $B900–$BB7F | Plage affichable du jeu alternatif (codes $20–$6F, 80 glyphes × 8 octets ; s'arrête avant la RAM écran en $BB80) |
+| 1 664 | 40 × hauteur | $BB80+ | Données d'écran (codes d'écran, ligne par ligne) |
+
+Taille totale du fichier : **2 784 octets** (40×28) ou **2 744 octets** (40×27).
+
+### Projet (quatre fichiers — Fichier > Sauver/Charger projet)
+
+Un projet se compose de jusqu'à quatre fichiers partageant un nom de base :
+
+| Fichier | Taille | Contenu |
+|---------|--------|---------|
+| `<nom>PJ.BIN` | 22 octets | Structure `ProjectHeader` : taille du canevas, position curseur/décalage, attributs de tracé (`plotscreencode`/encre/papier/clignotement/double/altchar), indicateurs `stdchanged`/`altchanged`, marqueur `FILEIO_MAGIC` (`$4F53`) |
+| `<nom>SC.BIN` | largeur × hauteur octets | Codes d'écran du canevas (brut, sans en-tête ; taille issue de `PJ.BIN`) |
+| `<nom>CS.BIN` | 768 octets | Plage affichable du jeu standard (écrit/lu uniquement si `stdchanged` est actif) |
+| `<nom>CA.BIN` | 640 octets | Plage affichable du jeu alternatif (codes $20–$6F uniquement ; écrit/lu uniquement si `altchanged` est actif) |
+
+Charger projet accepte aussi directement les fichiers `.PJ.BIN` de V1 (version CC65) -- le format 19 octets de V1 est détecté automatiquement via le champ magic.
+
+### Fichiers jeu de caractères (menu Charset)
+
+| Format | Fichier | Taille | Contenu |
+|--------|---------|--------|---------|
+| Standard | `<nom>.BIN` | 768 octets | Plage affichable CHARSET_STD, $B500–$B7FF |
+| Alternatif | `<nom>.BIN` | 640 octets | Plage affichable CHARSET_ALT, $B900–$BB7F (80 glyphes uniquement ; les codes $70–$7F chevaucheraient la RAM écran) |
+| Combiné | `<nom>.BIN` | 1 664 octets | **Menu Charset uniquement** — même disposition que Fichier > Combiné mais sans l'écran : 768 octets standard affichable ($B500–$B7FF) + 256 octets préfixe non-affichable alternatif ($B800–$B8FF) + 640 octets alternatif affichable ($B900–$BB7F). Charge les deux banques. |
 
 ## Crédits
 ([Retour au sommaire](#sommaire))
