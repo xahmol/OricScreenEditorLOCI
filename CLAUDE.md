@@ -181,7 +181,7 @@ src/
   homedir.c/h     homedir_init(), homedir_join(), filedir_join(), filedir_join_suffix()
   undo.c/h        Canvas-edit undo/redo, overlay-RAM ring buffer
   input.c/h       key_read() — keyboard + IJK joystick, replaces cwin_getch() everywhere
-  help.c/h        FUNCT+8 help screens (OSEHS1-4.BIN, runtime LOCI loads)
+  help.c/h        FUNCT+8 help screens (runtime LOCI loads via MSG_HELP_SCREEN_PREFIX)
   info.c/h        Information menu: Version popup + Exit (RESET vector)
   charsetedit.c/h Character editor sidebar popup (live charset RAM, Strategy A)
   charsetswap.c/h Charset-swap mechanism (both banks), charsetswap_real_std/alt()
@@ -200,7 +200,18 @@ include/
   loci.h/c        LOCI mass storage API
   ijk.h/c         Raxiss IJK joystick driver
 tools/
-  mktap.py        Wraps .bin in Oric tape header
+  mktap.py               Wraps .bin in Oric tape header
+  patch_title_screen.py  Patches OSETSC.BIN (EN year fix); generates OSETSF.BIN (FR)
+                         by calling gen_title_text.build_fr_title_art() for rows 0-20
+                         then patching rows 24-25 with FR credits text.
+                         Run: python3 tools/patch_title_screen.py
+  gen_title_text.py      French mosaic letter table + build_fr_title_art() → 840 bytes.
+                         Imported by patch_title_screen.py; also runnable standalone.
+  gen_help_screens.py    Generates all 8 help-screen BINs (OSEHS1-4.BIN EN +
+                         OSEHF1-4.BIN FR). Run: python3 tools/gen_help_screens.py
+  gen_demo_screen.py     One-off generator for assets/OSEDEMO*.BIN demo project files.
+  gen_logo_screen.py     One-off generator for assets/OSELOGO*.BIN logo demo project.
+  gen_qr.js              One-off generator for the QR code in src/info.c.
 tests/
   scripts/        oric_screen.py + test_*.sh (Phosphoric harness)
   fixtures/       Checked-in assets copied into tests/sandbox/ by sandbox-reset
