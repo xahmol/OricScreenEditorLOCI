@@ -202,9 +202,9 @@ CYCLES   ?= 8000000
 # all: must appear first so it is the default goal
 # =========================================================================
 
-.PHONY: all all-langs clean run docs zip check-usb usb kbtest-build check-phosphoric sandbox-reset test-capture test-boot test-menus test-screenresize test-charsetram-spike test-charsetedit test-palette test-colourpicker test-cursor-autoscroll test-linebox test-select test-move test-writemode test-boot-no-loci test-select-cutcopy test-undo-overflow test-help-funct8 test-fileio-traffic test-findreplace test-write-hexattr test-trymode test-goto test-hollowbox test-ellipse test
+.PHONY: all all-langs clean run docs zip check-usb usb kbtest check-phosphoric sandbox-reset test-capture test-boot test-menus test-screenresize test-charsetram-spike test-charsetedit test-palette test-colourpicker test-cursor-autoscroll test-linebox test-select test-move test-writemode test-boot-no-loci test-select-cutcopy test-undo-overflow test-help-funct8 test-fileio-traffic test-findreplace test-write-hexattr test-trymode test-goto test-hollowbox test-ellipse test
 
-all: build/$(MAIN)$(LANGSUFFIX).tap
+all: zip
 
 # Step 1: compile main app to raw binary
 build/$(MAIN)$(LANGSUFFIX).bin: $(MAIN_SRCS)
@@ -230,10 +230,10 @@ run: build/$(MAIN)$(LANGSUFFIX).tap
 	cd $(ORICUTRON_HOME) && \
 	    $(EMUL) $(EMUFLAG) "$(CURDIR)/build/$(MAIN)$(LANGSUFFIX).tap"
 
-# Build both language variants
+# Build both language variants (invoke .tap targets directly to avoid default-goal recursion)
 all-langs:
-	$(MAKE) LANG=EN
-	$(MAKE) LANG=FR
+	$(MAKE) LANG=EN build/$(MAIN).tap
+	$(MAKE) LANG=FR build/$(MAIN)_fr.tap
 
 # -------------------------------------------------------------------------
 # USB stick transfer
@@ -279,7 +279,7 @@ check-usb:
 	@test -d "$(USBPATH)" || \
 	    (echo "ERROR: USB path '$(USBPATH)' not found -- plug in USB stick and retry" && false)
 
-usb: check-usb all-langs kbtest-build
+usb: check-usb all-langs kbtest
 	cp build/$(MAIN).tap      "$(USBPATH)/"
 	cp build/$(MAIN)_fr.tap   "$(USBPATH)/"
 	cp assets/PETSCIIPJ.BIN assets/PETSCIISC.BIN assets/PETSCIICS.BIN assets/PETSCIICA.BIN "$(USBPATH)/"
@@ -298,9 +298,9 @@ usb: check-usb all-langs kbtest-build
 
 # kbtest/ is a separate, standalone diagnostic program (see CLAUDE.md
 # "Standalone keyboard matrix test (kbtest/)") -- not part of the main
-# build, built here only so `make usb` can distribute kbtest.tap
-# alongside oseloci.tap for real-hardware testing.
-kbtest-build:
+# build or ZIP release; `make kbtest` builds it explicitly, and
+# `make usb` includes it on the USB stick for real-hardware testing.
+kbtest:
 	$(MAKE) -C kbtest
 
 # -------------------------------------------------------------------------
@@ -536,7 +536,7 @@ README_fr.pdf: README_fr.md
 
 ZIPNAME = OricScreenEditorLOCI_v$(VERSION_MAJOR).$(VERSION_MINOR).$(VERSION_PATCH)_$(shell date +%Y%m%d)
 
-zip: all-langs kbtest-build docs
+zip: all-langs docs
 	$(MKDIR) build 2>$(NULLDEV) ; true
 	zip -j build/$(ZIPNAME).zip \
 	    build/$(MAIN).tap \
@@ -548,7 +548,6 @@ zip: all-langs kbtest-build docs
 	    assets/OSELOGOPJ.BIN assets/OSELOGOSC.BIN assets/OSELOGOCS.BIN assets/OSELOGOCA.BIN \
 	    assets/LUDOTITLPJ.BIN assets/LUDOTITLSC.BIN assets/LUDOTITLCS.BIN assets/LUDOTITLCA.BIN \
 	    assets/LUDOSCRMPJ.BIN assets/LUDOSCRMSC.BIN assets/LUDOSCRMCS.BIN assets/LUDOSCRMCA.BIN \
-	    kbtest/build/kbtest.tap \
 	    README.pdf README_fr.pdf
 	@echo "Created build/$(ZIPNAME).zip"
 
