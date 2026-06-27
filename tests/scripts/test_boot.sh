@@ -90,12 +90,12 @@ if [ ! -f "$SPLASH_DUMP" ] || [ ! -f "$MAIN_DUMP" ]; then
 else
     echo ""
     echo "Splash screen"
-    check_found "title image renders" "idi8b        Written in 2022-26" "$SPLASH_DUMP"
+    check_found "title image renders" "idi8b      Written in 2022-2026" "$SPLASH_DUMP"
     check_found "prompt renders"      "Press any key to start"               "$SPLASH_DUMP"
 
     echo ""
     echo "Main mode (after dismiss)"
-    check_not_found "splash dismissed"     "idi8b        Written in 2022-26" "$MAIN_DUMP"
+    check_not_found "splash dismissed"     "idi8b      Written in 2022-2026" "$MAIN_DUMP"
     check_found     "statusbar renders"    "Main      XY 0, 0C40@ S20I7P0S" "$MAIN_DUMP"
 fi
 

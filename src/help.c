@@ -20,6 +20,7 @@
 #include <stdio.h>
 #include "oric.h"
 #include "appstate.h"
+#include "strings.h"
 #include "charsetswap.h"
 #include "canvas.h"
 #include "statusbar.h"
@@ -44,7 +45,7 @@ void help_show(uint8_t screennumber)
 
     if (screennumber < 1 || screennumber > 4) return;
 
-    sprintf(name, "OSEHS%u.BIN", screennumber);
+    sprintf(name, MSG_HELP_SCREEN_PREFIX "%u.BIN", screennumber);
     homedir_join(path, name);
 
     charsetswap_enter();

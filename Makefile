@@ -284,6 +284,7 @@ usb: check-usb all-langs kbtest
 	cp build/$(MAIN)_fr.tap   "$(USBPATH)/"
 	cp assets/PETSCIIPJ.BIN assets/PETSCIISC.BIN assets/PETSCIICS.BIN assets/PETSCIICA.BIN "$(USBPATH)/"
 	cp assets/OSETSC.BIN assets/OSEHS1.BIN assets/OSEHS2.BIN assets/OSEHS3.BIN assets/OSEHS4.BIN "$(USBPATH)/"
+	cp assets/OSETSF.BIN assets/OSEHF1.BIN assets/OSEHF2.BIN assets/OSEHF3.BIN assets/OSEHF4.BIN "$(USBPATH)/"
 	cp assets/OSEDEMO.BIN "$(USBPATH)/"
 	cp assets/OSEDEMOPJ.BIN assets/OSEDEMOSC.BIN assets/OSEDEMOCS.BIN assets/OSEDEMOCA.BIN "$(USBPATH)/"
 	cp assets/OSELOGOPJ.BIN assets/OSELOGOSC.BIN assets/OSELOGOCS.BIN assets/OSELOGOCA.BIN "$(USBPATH)/"
@@ -543,6 +544,7 @@ zip: all-langs docs
 	    build/$(MAIN)_fr.tap \
 	    assets/PETSCIIPJ.BIN assets/PETSCIISC.BIN assets/PETSCIICS.BIN assets/PETSCIICA.BIN \
 	    assets/OSETSC.BIN assets/OSEHS1.BIN assets/OSEHS2.BIN assets/OSEHS3.BIN assets/OSEHS4.BIN \
+	    assets/OSETSF.BIN assets/OSEHF1.BIN assets/OSEHF2.BIN assets/OSEHF3.BIN assets/OSEHF4.BIN \
 	    assets/OSEDEMO.BIN \
 	    assets/OSEDEMOPJ.BIN assets/OSEDEMOSC.BIN assets/OSEDEMOCS.BIN assets/OSEDEMOCA.BIN \
 	    assets/OSELOGOPJ.BIN assets/OSELOGOSC.BIN assets/OSELOGOCS.BIN assets/OSELOGOCA.BIN \

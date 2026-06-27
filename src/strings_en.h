@@ -11,12 +11,17 @@
 #define MSG_LOCI_NOT_FOUND  "No LOCI device detected or firmware too old."
 #define MSG_PRESS_KEY_EXIT  "Press any key to exit."
 
-// ── Splash screen (src/main.c) ────────────────────────────────────────────
-// MSG_SPLASH_PRESSKEY is overlaid on the title image (assets/OSETSC.BIN,
-// loaded from LOCI at runtime) at row 26 -- the title/version text V1
-// showed alongside its own title screen now lives only in the
-// Information menu's Version popup (src/info.c).
-#define MSG_SPLASH_PRESSKEY   "Press any key to start"
+// ── Splash screen (src/main.c) and help screens (src/help.c) ─────────────
+// MSG_TITLE_SCREEN_FILE: filename of the boot splash image (1120-byte raw
+// screen dump), loaded from LOCI at runtime (assets/OSETSC.BIN / OSETSF.BIN).
+// MSG_HELP_SCREEN_PREFIX: filename prefix for help screens; help_show(n)
+// loads MSG_HELP_SCREEN_PREFIX + n + ".BIN" (OSEHS{1-4} / OSEHF{1-4}).
+// MSG_SPLASH_PRESSKEY is overlaid on the title image at row 27 -- the
+// title/version text V1 showed alongside its own title screen now lives
+// only in the Information menu's Version popup (src/info.c).
+#define MSG_TITLE_SCREEN_FILE  "OSETSC.BIN"
+#define MSG_HELP_SCREEN_PREFIX "OSEHS"
+#define MSG_SPLASH_PRESSKEY    "Press any key to start"
 
 // ── Menu bar titles (src/menudata.c, menubar.titles) ──────────────────────
 #define MSG_MENU_BAR_SCREEN   "Screen"

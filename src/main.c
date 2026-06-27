@@ -103,7 +103,7 @@ int main(void)
     {
         char    path[HOMEDIR_MAXLEN + 16];
         int16_t fd;
-        homedir_join(path, "OSETSC.BIN");
+        homedir_join(path, MSG_TITLE_SCREEN_FILE);
         fd = loci_open(path, O_RDONLY);
         if (fd >= 0)
         {
