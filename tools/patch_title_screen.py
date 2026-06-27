@@ -6,8 +6,12 @@
 # French version OSETSF.BIN.
 #
 # The main title artwork (the large alt-charset "ORIC SCREEN EDITOR LOCI"
-# wordmark across rows 2-23) is hand-drawn and identical for both languages
-# -- only rows 24-25 carry the localised credits text.
+# wordmark across rows 2-23) is translated for the FR version:
+#   EN: ORIC / SCREEN / EDITOR / FOR / LOCI
+#   FR: ORIC / EDITEUR / ECRANS / POUR / LOCI
+# gen_title_text.py handles the French mosaic art generation; ORIC and LOCI
+# blocks are kept verbatim from the EN original. Rows 24-25 carry localised
+# credits text (same in both FR builds).
 #
 # Row 24 layout (original, all 40 bytes):
 #   bytes  0-11: colour-spectrum display (attribute bytes + coloured chars)
@@ -32,6 +36,10 @@
 import os
 import sys
 import shutil
+
+# gen_title_text.py lives alongside this file in tools/
+sys.path.insert(0, os.path.dirname(__file__))
+from gen_title_text import build_fr_title_art
 
 ASSETS = os.path.join(os.path.dirname(__file__), "..", "assets")
 EN_PATH = os.path.join(ASSETS, "OSETSC.BIN")
@@ -105,11 +113,15 @@ def main():
     print(f"Wrote {EN_PATH}")
 
     # --- Build FR version (from original, not from the EN-patched copy) ------
-    # FR row 24: "Ecrit en 2022-2026" = 18 chars -- same length as the
-    # original "Written in 2022-26", so padding stays at 8 spaces.
-    # FR row 25: "    par Xander Mol" = 18 chars ("by" -> "par", 1 fewer
-    # leading space to keep same total length).
+    # Rows 0-20: French mosaic title art (EDITEUR/ECRANS/POUR replacing SCREEN/EDITOR/FOR).
+    # Rows 21-23: decorative bottom border — copied verbatim from original.
+    # Row 24: "Ecrit en 2022-2026" = 18 chars — same length as original EN.
+    # Row 25: "    par Xander Mol" = 18 chars ("by" -> "par").
     fr_data = original   # start from original to avoid double-patching
+
+    fr_art = build_fr_title_art(original)   # 840 bytes = rows 0-20
+    fr_data = patch(fr_data, 0, fr_art)
+    print("OSETSF.BIN rows 0-20 replaced with French mosaic title art")
 
     new_tail_24_fr = make_tail(PAD_ORIG, "Ecrit en 2022-2026")
     fr_data = patch(fr_data, ROW_24 + HEADER_LEN, new_tail_24_fr)
