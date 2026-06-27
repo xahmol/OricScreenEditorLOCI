@@ -46,8 +46,8 @@ LETTERS = {
     'L': (b'\x35\x20\x20', b'\x35\x20\x20', b'\x55\x50\x50'),
     # Hand-designed: U (O sides + O bottom arc)
     'U': (b'\x35\x20\x4a', b'\x35\x20\x4a', b'\x45\x50\x3a'),
-    # Hand-designed: A (O top arc + full crossbar + open sides at bottom)
-    'A': (b'\x36\x23\x49', b'\x35\x5f\x4a', b'\x35\x20\x4a'),
+    # Hand-designed: A (O top arc + crossbar at base of mid section + open sides at bottom)
+    'A': (b'\x36\x23\x49', b'\x55\x50\x5a', b'\x35\x20\x4a'),
     # Hand-designed: P (R top bowl + bowl-close mid + left leg only at bottom)
     'P': (b'\x37\x23\x49', b'\x55\x50\x3a', b'\x35\x20\x20'),
 }
