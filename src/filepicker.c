@@ -922,7 +922,7 @@ static uint8_t picker_engine(const char *title, uint8_t filter, uint8_t mode)
 {
     OricCharWin win;
     PickerMeta  meta;
-    uint8_t     key;
+    uint8_t     key = 0;
     char       *path = picker_path;
 
     filedir_init_default();
