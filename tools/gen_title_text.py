@@ -61,29 +61,34 @@ def _find_trail_color(row_bytes):
     return 0x07  # fallback: white ink
 
 
-def _build_row(word, fill_char, row_idx, lead, colors, trail):
+def _build_row(word, fill_char, row_idx, lead, first_color, rest_color, trail):
     """
-    Build one 40-byte title-art row.
+    Build one 40-byte title-art row matching the EN payload scheme:
+      [first_color][L0] [rest_color][L1] [sp][L2] [sp]...[sp][LN-1]
 
-    word:      list of letter characters
-    fill_char: 0x53 (top/bot glyph rows) or 0x2c (mid glyph row)
-    row_idx:   0=top, 1=mid, 2=bot
-    lead:      color attribute byte after A_ALT (sets fill and first-letter colour)
-    colors:    list of per-letter color attribute bytes (one per letter)
-    trail:     color attribute byte after the last letter (closes the word region)
+    When first_color == rest_color, rest_color acts as an explicit sep between
+    L0 and L1 (same as a 0x20 sep). When they differ, rest_color is the color
+    change attr that also serves as the single-column gap between L0 and L1.
+    All subsequent inter-letter gaps are plain 0x20.
+
+    word:        list of letter characters
+    fill_char:   0x53 (top/bot glyph rows) or 0x2c (mid glyph row)
+    row_idx:     0=top, 1=mid, 2=bot
+    lead:        color attr byte after A_ALT (fills + overall context colour)
+    first_color: color attr before letter 0
+    rest_color:  color attr between letter 0 and letter 1 (= colour for L1..LN-1)
+    trail:       color attr byte after the last letter glyph
     """
-    if isinstance(colors, int):
-        colors = [colors] * len(word)
-
-    # Build letter payload: [color][3 glyphs][space sep]... (no trailing sep)
     payload = bytearray()
-    for i, ch in enumerate(word):
-        payload.append(colors[i])
-        payload += LETTERS[ch][row_idx]
-        if i < len(word) - 1:
-            payload.append(0x20)
+    payload.append(first_color)
+    payload += LETTERS[word[0]][row_idx]
+    for i in range(1, len(word)):
+        if i == 1 and rest_color != first_color:
+            payload.append(rest_color)   # colour change doubles as the 1-col gap
+        else:
+            payload.append(0x20)         # explicit 1-col gap (inherited colour)
+        payload += LETTERS[word[i]][row_idx]
 
-    # Center the letter block: ceil(inner/2) fill on left, rest on right.
     inner = COLS - 2 - 1 - len(payload)   # 2=A_ALT+lead, 1=trail
     fill_lead  = (inner + 1) // 2
     fill_trail = inner - fill_lead
@@ -97,30 +102,25 @@ def _build_row(word, fill_char, row_idx, lead, colors, trail):
     return row
 
 
-def _word_rows(word, colors, src_bin, top_src, mid_src, bot_src):
+def _word_rows(word, first_color, rest_color, src_bin, top_src, mid_src, bot_src):
     """
     Build 3 rows (top, mid, bot) for a word, cloning lead/trail from EN source rows.
 
-    word:    list of letter chars
-    colors:  list of per-letter color bytes (one per letter)
-    src_bin: full EN title screen bytes (1120)
-    top_src, mid_src, bot_src: EN row indices to clone lead/trail from
+    first_color: colour attr for letter 0
+    rest_color:  colour attr between letter 0 and letter 1 (doubles as 1-col gap)
     """
     def src_row(n):
         return src_bin[n*COLS:(n+1)*COLS]
 
-    specs = [
-        (0x53, top_src, 0),
-        (0x2c, mid_src, 1),
-        (0x53, bot_src, 2),
-    ]
     rows = b''
-    for fill_char, src_idx, row_idx in specs:
+    for fill_char, src_idx, row_idx in [(0x53, top_src, 0),
+                                         (0x2c, mid_src, 1),
+                                         (0x53, bot_src, 2)]:
         r = src_row(src_idx)
         rows += _build_row(word, fill_char, row_idx,
-                           r[1],                     # lead = byte 1 of EN row
-                           colors,
-                           _find_trail_color(r))     # trail = last attr in EN row
+                           r[1],
+                           first_color, rest_color,
+                           _find_trail_color(r))
     return rows
 
 
@@ -146,21 +146,21 @@ def build_fr_title_art(src_bin):
     out += row(5)
 
     # rows 6-8: EDITEUR (replaces SCREEN)
-    # EN color scheme: first letter red (0x01), rest white (0x07)
-    out += _word_rows(list('EDITEUR'), [0x01]+[0x07]*6, src_bin, 6, 7, 8)
+    # EN colour scheme: first letter red (0x01), rest_color white (0x07) acts as gap
+    out += _word_rows(list('EDITEUR'), 0x01, 0x07, src_bin, 6, 7, 8)
 
     # row 9: separator (unchanged)
     out += row(9)
 
     # rows 10-12: ECRANS (replaces EDITOR)
-    out += _word_rows(list('ECRANS'), [0x01]+[0x07]*5, src_bin, 10, 11, 12)
+    out += _word_rows(list('ECRANS'), 0x01, 0x07, src_bin, 10, 11, 12)
 
     # row 13: separator (unchanged)
     out += row(13)
 
     # rows 14-16: POUR (replaces FOR)
-    # EN color scheme: all white (0x07)
-    out += _word_rows(list('POUR'), [0x07]*4, src_bin, 14, 15, 16)
+    # EN colour scheme: single colour (0x07), plain 0x20 sep between all letters
+    out += _word_rows(list('POUR'), 0x07, 0x07, src_bin, 14, 15, 16)
 
     # row 17: separator (unchanged)
     out += row(17)
