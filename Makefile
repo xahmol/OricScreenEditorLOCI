@@ -260,6 +260,12 @@ all-langs:
 # hand-drawn glyphs across both CHARSET_STD and CHARSET_ALT, loadable
 # via File > Load Project (tools/gen_logo_screen.py, not part of the
 # build).
+#
+# Also copies assets/LUDOTITL{PJ,SC,CS,CA}.BIN -- the Ludo title screen
+# demo project, loadable via File > Load Project.
+#
+# Also copies assets/LUDOSCRM{PJ,SC,CS,CA}.BIN -- the Ludo game screen
+# demo project, loadable via File > Load Project.
 
 check-usb:
 	@test "$(USBPATH)" != "NOT_SET" || \
@@ -281,6 +287,8 @@ usb: check-usb all-langs kbtest-build
 	cp assets/OSEDEMO.BIN "$(USBPATH)/"
 	cp assets/OSEDEMOPJ.BIN assets/OSEDEMOSC.BIN assets/OSEDEMOCS.BIN assets/OSEDEMOCA.BIN "$(USBPATH)/"
 	cp assets/OSELOGOPJ.BIN assets/OSELOGOSC.BIN assets/OSELOGOCS.BIN assets/OSELOGOCA.BIN "$(USBPATH)/"
+	cp assets/LUDOTITLPJ.BIN assets/LUDOTITLSC.BIN assets/LUDOTITLCS.BIN assets/LUDOTITLCA.BIN "$(USBPATH)/"
+	cp assets/LUDOSCRMPJ.BIN assets/LUDOSCRMSC.BIN assets/LUDOSCRMCS.BIN assets/LUDOSCRMCA.BIN "$(USBPATH)/"
 	cp kbtest/build/kbtest.tap "$(USBPATH)/"
 	@if [ "$(IS_WSL2)" = "1" ]; then \
 	    echo "WSL2: unmounting $(USBMOUNT)..."; \
@@ -538,6 +546,8 @@ zip: all-langs kbtest-build docs
 	    assets/OSEDEMO.BIN \
 	    assets/OSEDEMOPJ.BIN assets/OSEDEMOSC.BIN assets/OSEDEMOCS.BIN assets/OSEDEMOCA.BIN \
 	    assets/OSELOGOPJ.BIN assets/OSELOGOSC.BIN assets/OSELOGOCS.BIN assets/OSELOGOCA.BIN \
+	    assets/LUDOTITLPJ.BIN assets/LUDOTITLSC.BIN assets/LUDOTITLCS.BIN assets/LUDOTITLCA.BIN \
+	    assets/LUDOSCRMPJ.BIN assets/LUDOSCRMSC.BIN assets/LUDOSCRMCS.BIN assets/LUDOSCRMCA.BIN \
 	    kbtest/build/kbtest.tap \
 	    README.pdf README_fr.pdf
 	@echo "Created build/$(ZIPNAME).zip"
