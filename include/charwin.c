@@ -147,10 +147,12 @@ void cwin_clear(OricCharWin *w)
  * popup with sx > 2 (the various sx=5 dialogs: resize, goto, find/
  * replace, file save/load filename prompts, write-mode hex-attribute
  * entry) wants a fully opaque popup with no background bleeding through
- * on the left, which cwin_clear() alone doesn't provide. Use this
- * instead of cwin_clear() for any new sx > 2 popup that should be fully
- * opaque; keep using cwin_clear() for anything that should stay a
- * narrow, see-through sidebar.
+ * on either side. This function fills from col 2 all the way to
+ * SCREEN_COLS-1 (col 39) regardless of w->sx+w->wx, so narrower dialogs
+ * (wx=30, right edge at col 34) also get cols 35-39 blanked.
+ * Use this instead of cwin_clear() for any new sx > 2 popup that should
+ * be fully opaque; keep using cwin_clear() for anything that should stay
+ * a narrow, see-through sidebar.
  *
  * @param w Window to clear.
  * @return (none)
@@ -162,7 +164,7 @@ void cwin_clear_full(OricCharWin *w)
         uint8_t  row  = w->sy + y;
         uint8_t *base = (uint8_t *)row_base[row];
         row_setattr(row, w->ink, w->paper);
-        for (uint8_t x = 2; x < w->sx + w->wx; x++)
+        for (uint8_t x = 2; x < SCREEN_COLS; x++)
             base[x] = 0x20;   // space character
     }
     w->cx = 0;

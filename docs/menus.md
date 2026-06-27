@@ -26,9 +26,12 @@ in/out of the charset-swap mechanism. `menu_winrestore()` pairs
 Every popup passes `1` except `charsetedit_run()` (passes `0`).
 
 **`cwin_clear_full()` (`include/charwin.c/h`):** same as `cwin_clear()` but fills
-from column 2 (not `w->sx`) through `w->sx+w->wx-1`. Use for all popups with
-`sx > 2` that want a fully opaque box (resize_dialog, goto_dialog,
-fileio_get_dimensions, fileio_get_filename, findreplace_run, write_hex_attr).
+from column 2 through `SCREEN_COLS-1` (col 39) — the full row — regardless of
+`w->sx+w->wx`. Stops bleed on both the left (cols 2 to `sx-1`) and the right
+(cols `sx+wx` to 39) of narrower popups (wx=30: fileio_get_filename,
+picker_make_dir, write_hex_attr). Use for all popups with `sx > 2` that want a
+fully opaque box (resize_dialog, goto_dialog, fileio_get_dimensions,
+fileio_get_filename, findreplace_run, write_hex_attr).
 `charsetedit_run()`'s two `cwin_clear()` calls are untouched (sidebar popup wants
 transparency left of its own `sx`).
 
