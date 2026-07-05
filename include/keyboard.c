@@ -127,8 +127,8 @@ static uint8_t     candidate_count; // consecutive polls candidate has matched c
 // before the combo's true value appears (and then holds steady) -- 2 polls
 // filters that single-poll artifact at a ~0.7 ms cost, imperceptible to a
 // human typist.
-#define REP_DELAY          3000
-#define REP_RATE            300
+#define REP_DELAY          1000
+#define REP_RATE            200
 #define RELEASE_DEBOUNCE     20
 #define PRESS_DEBOUNCE        2
 

@@ -226,7 +226,7 @@ uint8_t fileio_get_filename(const char *title, uint8_t filter)
     cwin_putat_string(&win, 2, 1, title);
     cwin_putat_string(&win, 2, 3, MSG_FILE_PROMPT_FILENAME);
 
-    result = (cwin_textinput(&win, 2, 4, 24, app.filename, FILENAME_MAXLEN, VINPUT_ALPHA) >= 0) ? 1 : 0;
+    result = (cwin_textinput(&win, 2, 4, 24, app.filename, FILENAME_MAXLEN, VINPUT_NUMS | VINPUT_ALPHA) >= 0) ? 1 : 0;
     if (result) fileio_strip_bin_suffix();
 
     menu_winrestore();
