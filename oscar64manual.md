@@ -1420,6 +1420,19 @@ When using `-rt=`, extract the math and float runtime routines from `oscar64/inc
 - Lines ~2939–4164: float register ops (freg), float arithmetic (faddsub, crt_fmul, crt_fdiv, crt_fcmp), int↔float conversions, fround, store32/load32 + `#pragma runtime(fsplita, ...)` etc.
 - Stub routines for bcexec, jmpaddr, crt_malloc, crt_free, crt_breakpoint (see below).
 
+**`divu16by8` runtime required (oscar64 ≥ v1.32.272+41, Jun 2026):**
+Oscar64 commit `5da792a` ("Optimize div/mod pairs") added a fast `uint16÷uint8` path
+that emits `JSR divu16by8`. The standard `crt.c` gained a `DM8:` entry label inside
+`__asm divmod` and `#pragma runtime(divu16by8, divmod.DM8)`. A custom `crt_math.c`
+that was extracted before this commit will be missing both. Build fails with:
+```
+error 3002: Missing runtime code implementation 'divu16by8'
+```
+Fix: add a `DM8:` label before the existing `WB:` label in `__asm divmod`, and add
+`#pragma runtime(divu16by8, divmod.DM8);` to the pragma block. The DM8 entry stores
+the byte divisor from `A` into `tmp`, zero-extends to `tmp+1`, checks if the dividend
+fits in a byte (branches to `BB`), then falls into the existing `WB` word/byte path.
+
 **Do NOT include the bytecode handler wrappers** (`inp_*` functions that end with `jmp startup.exec`) — they reference labels inside the default startup block which won't exist in your custom runtime.
 
 The `accu`, `tmp`, `tmpy`, `ip`, `addr`, `sp`, `fp` aliases must be defined in crt_math.c:
