@@ -2,8 +2,8 @@
 // Oscar64)
 //
 // info_version_show() is now an IDENTICAL layout to locifilemanager-v2's
-// versioninfo() (local reference at
-// /home/xahmol/git/locifilemanager-v2/src/main.c +
+// versioninfo()
+// (https://github.com/xahmol/locifilemanager-v2/blob/main/src/main.c +
 // src/splash_data.h) -- same 2-page sequence (logo + version/credits text
 // sharing page 1, QR code alone on page 2), same idi8b_logo[] artwork
 // (copied verbatim below, see its own credit comment), same QR-generation

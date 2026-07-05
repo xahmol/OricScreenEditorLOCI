@@ -5,8 +5,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Project Overview
 
 OricScreenEditorLOCI is a from-scratch **Oscar64** rewrite of
-[OricScreenEditor](https://github.com/xahmol/OricScreenEditor) (V1, CC65,
-local checkout at `/home/xahmol/git/OricScreenEditor`) — a character-set-aware
+[OricScreenEditor](https://github.com/xahmol/OricScreenEditor) (V1, CC65) — a character-set-aware
 screen editor for the Oric Atmos — extended with support for the **LOCI mass
 storage device**.
 
@@ -28,7 +27,7 @@ Find/Replace, hex-direct attribute entry in Write mode (FUNCT+4).
 
 **Other docs:** `ARCHITECTURE.md`, `libmanual.md`/`libmanual_fr.md`, `README.md`/
 `README.pdf`/`README_fr.md`, `oscar64manual.md` (Oscar64 compiler reference).
-V1 reference: `/home/xahmol/git/OricScreenEditor/src/main.c`.
+V1 reference: [OricScreenEditor/src/main.c](https://github.com/xahmol/OricScreenEditor/blob/main/src/main.c).
 
 **V1 as literal reference:** When porting or adapting V1 behavior, **read its
 actual code** before designing — do not substitute an assumed-simpler

@@ -5,8 +5,8 @@
 // charset (0x20-0x7F) and the full alternate charset (0x20-0x7F, optionally
 // remapped via visualchar[] -- "visual charmap mode"), for selecting
 // app.plotscreencode/app.plotaltchar. Layout, cursor-wrap navigation and key
-// bindings are ported from V1 OricScreenEditor's palette() (local reference
-// at /home/xahmol/git/OricScreenEditor and the archived
+// bindings are ported from V1 OricScreenEditor's palette()
+// (https://github.com/xahmol/OricScreenEditor and the archived
 // nonworkingcc65:src/palette.c), adapted to OSE's OricCharWin popup model
 // and to a 13-row grid (V1 used 12 rows; OSE adds a 13th row so the full
 // 0x20-0x7F alternate range is reachable even with visualmap on -- see
@@ -63,8 +63,8 @@
 // visualchar[80]: PETSCII-style visual ordering for the alternate charset
 // -------------------------------------------------------------------------
 
-// Ported verbatim from V1 OricScreenEditor (local reference at
-// /home/xahmol/git/OricScreenEditor/src/main.c, visualchar[] table),
+// Ported verbatim from V1 OricScreenEditor
+// (https://github.com/xahmol/OricScreenEditor/blob/main/src/main.c, visualchar[] table),
 // credited there to jab / Artline Designs (Jaakko Luoto) for the palette
 // mode and PETSCII visual mode (see README.md Credits). No changes other
 // than C array syntax. Covers screencodes 0x20-0x6F (rows PAL_ROW_ALT0 ..

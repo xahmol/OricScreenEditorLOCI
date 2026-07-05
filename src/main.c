@@ -1,8 +1,8 @@
 // main.c - OricScreenEditorLOCI entry point
 //
 // Entry point: splash screen, canvas + statusbar init, main-mode editor loop.
-// The splash is V1's actual title screen image, matching V1's own boot sequence (local reference at
-// /home/xahmol/git/OricScreenEditor/src/main.c: loads "OSETSC.BIN" into
+// The splash is V1's actual title screen image, matching V1's own boot sequence
+// (https://github.com/xahmol/OricScreenEditor/blob/main/src/main.c: loads "OSETSC.BIN" into
 // SCREENMEMORY, overlays "Press key." at row 26, waits for a key). The
 // image's own rows 24-25 already contain V1's "IDreamtIn8Bits.com /
 // Written in 2022 by Xander Mol" credit text baked in; row 26 is blank,
@@ -27,7 +27,7 @@
 // Oric-side overlay RAM, which only exists with a LOCI device attached.
 // The hard loci_present() gate below, shown before anything else (even
 // the splash), is adapted from locifilemanager-v2's own main() (local
-// reference, /home/xahmol/git/locifilemanager-v2/src/main.c lines
+// reference, https://github.com/xahmol/locifilemanager-v2/blob/main/src/main.c lines
 // 485-497) -- same MSG_LOCI_NOT_FOUND/MSG_PRESS_KEY_EXIT popup shape;
 // those two strings were already defined in strings_en.h/strings_fr.h,
 // unused, pre-staged for exactly this. See CLAUDE.md "Memory Layout".

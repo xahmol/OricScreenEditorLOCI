@@ -1,7 +1,7 @@
 // menu.h - Menu system for OricScreenEditorLOCI (Oric Atmos, Oscar64)
 //
-// Adapted from locifilemanager-v2's src/menu.h/menu.c by Xander Mol (local
-// reference at /home/xahmol/git/locifilemanager-v2/src/menu.h). Adapted: 4
+// Adapted from locifilemanager-v2's src/menu.h/menu.c by Xander Mol
+// (https://github.com/xahmol/locifilemanager-v2/blob/main/src/menu.h). Adapted: 4
 // -item menu bar (Screen/File/Charset/Information), 5 pulldowns (incl.
 // Yes/No), main-RAM window-save buffer (menu_winbuf[]) replacing overlay-RAM
 // cwin_push/pop -- menus must close with no residue in plain Oricutron,

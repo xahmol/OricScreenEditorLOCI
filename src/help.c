@@ -1,7 +1,7 @@
 // help.c - Help screens for OricScreenEditorLOCI (Oric Atmos, Oscar64)
 //
 // Ported from V1 OricScreenEditor's helpscreen_load(screennumber)
-// (/home/xahmol/git/OricScreenEditor/src/main.c): same 4 screens (Main,
+// (https://github.com/xahmol/OricScreenEditor/blob/main/src/main.c): same 4 screens (Main,
 // Character editor, Select/Move/Line-Box, Write), same charset-swap
 // around the raw screen-RAM blit, same "OSEHS<n>.BIN" filenames. Adapted:
 // V1 tape-loads each 1080-byte dump and must manually save/restore the

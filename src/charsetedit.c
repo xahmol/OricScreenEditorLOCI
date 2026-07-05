@@ -15,7 +15,7 @@
 // popup is open.
 //
 // Pixel-toggle/scroll/mirror algorithms ported from V1 OricScreenEditor
-// chareditor() (local reference at /home/xahmol/git/OricScreenEditor/src/main.c).
+// chareditor() (https://github.com/xahmol/OricScreenEditor/blob/main/src/main.c).
 
 #include "oric.h"
 #include "keyboard.h"
@@ -61,7 +61,7 @@
 // own panel's columns as an attribute-transition strip immediately
 // before its real content -- local reference at
 // showchareditfield()/showchareditgrid(),
-// /home/xahmol/git/OricScreenEditor/src/main.c).
+// https://github.com/xahmol/OricScreenEditor/blob/main/src/main.c).
 //
 // The 3rd reserved column (charset-mode reset to A_STD) was ADDED
 // 2026-06-23 (user report: "Charset editor does not set attribute code
@@ -103,7 +103,7 @@
 // Per-row 2-digit hex byte value, always visible immediately left of the
 // grid (CE_HEX_VAL_X..+1, same row as that grid row) -- matches V1's
 // showchareditgrid() exactly (local reference at
-// /home/xahmol/git/OricScreenEditor/src/main.c: `gotoxy(30,y+3);
+// https://github.com/xahmol/OricScreenEditor/blob/main/src/main.c: `gotoxy(30,y+3);
 // cprintf("%2X",char_byte);` immediately before that row's own pixel
 // grid at column 33). User-requested 2026-06-23 ("chareditor should
 // always show the hex values of each byte line left of the edit matrix
@@ -504,7 +504,7 @@ void charsetedit_run(void)
             // top of its own always-visible hex readout (CE_HEX_VAL_X,
             // ce_draw_grid()) -- matches V1's chareditor() 'h' case
             // exactly (local reference at
-            // /home/xahmol/git/OricScreenEditor/src/main.c:
+            // https://github.com/xahmol/OricScreenEditor/blob/main/src/main.c:
             // `sprintf(buffer,"%2x",char_present[ypos]);
             // textInput(30,ypos+3,buffer,2,3);`), including taking the
             // row's current value as the input's pre-filled default

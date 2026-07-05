@@ -1,8 +1,8 @@
 // write.c - Write mode (free-typing screencodes) for OricScreenEditorLOCI
 // (Oric Atmos, Oscar64)
 //
-// Direct port of V1's writemode() (local reference at
-// /home/xahmol/git/OricScreenEditor/src/main.c, lines 864-973). One
+// Direct port of V1's writemode()
+// (https://github.com/xahmol/OricScreenEditor/blob/main/src/main.c, lines 864-973). One
 // deliberate deviation worth flagging: Main mode's 'i'/'o'/'u' keys plot
 // ink/paper/modifier at the cursor (src/editor.c), but Write mode can't
 // reuse those letters -- they're themselves printable characters to type

@@ -44,8 +44,8 @@
 // they still use the popup's normal cwin_putat_*() bordered window, since
 // only the grid itself needs the direct-write treatment.
 //
-// Adapted from V1's colourpicker()/colorpicker_cursorplot() (local reference
-// at /home/xahmol/git/OricScreenEditor, archived nonworkingcc65:
+// Adapted from V1's colourpicker()/colorpicker_cursorplot()
+// (https://github.com/xahmol/OricScreenEditor, archived nonworkingcc65:
 // src/colorpicker.c): same ink x paper grid and Ink:/Paper:/Result:
 // feedback concept, RETURN/ESC to select/cancel. The per-cell border-drawing
 // cursor (colorpicker_cursorplot, 4 ORIC_HChar/cputcxy calls per move) is

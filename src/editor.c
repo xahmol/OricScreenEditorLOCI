@@ -265,8 +265,8 @@ void editor_run(void)
         // committing it. Writes directly to screen RAM ($BB80), not
         // screenmap[] -- so on cancel, canvas_blit() restoring the real
         // canvas content is all that's needed, no remembered byte to
-        // put back. Ported from V1's plot_try() (local reference,
-        // /home/xahmol/git/OricScreenEditor/src/main.c).
+        // put back. Ported from V1's plot_try()
+        // (https://github.com/xahmol/OricScreenEditor/blob/main/src/main.c).
         case 't':
         {
             uint8_t *cell = (uint8_t *)TEXTVRAM + app.cursor_y * SCREEN_COLS + app.cursor_x;

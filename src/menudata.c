@@ -1,8 +1,8 @@
 // menudata.c - OricScreenEditorLOCI menu tables, dialogs and dispatch
 //
 // Menu bar layout and Screen-menu semantics (Width:/Height:/Clear/Fill,
-// shrink-confirm) follow V1 OricScreenEditor (local reference at
-// /home/xahmol/git/OricScreenEditor/src/main.c, menubartitles/
+// shrink-confirm) follow V1 OricScreenEditor
+// (https://github.com/xahmol/OricScreenEditor/blob/main/src/main.c, menubartitles/
 // pulldownmenutitles and resizewidth()/resizeheight()/case 11-14).
 
 #include <stdint.h>

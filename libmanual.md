@@ -3,8 +3,7 @@
 Oscar64 bare-metal libraries for the Oric Atmos.
 Target: 6502A, 1 MHz, no ROM calls.
 
-Adapted from locifilemanager-v2's `libmanual.md` (local reference at
-`/home/xahmol/git/locifilemanager-v2/libmanual.md`) — §1-5 cover the
+Adapted from [locifilemanager-v2's `libmanual.md`](https://github.com/xahmol/locifilemanager-v2/blob/main/libmanual.md) — §1-5 cover the
 libraries shared verbatim between the two projects (`oric.h`, `keyboard.h`,
 `charwin.h`, `ijk.h`, `loci.h`), with notes where OSE's usage differs. §6
 (`include/charset.h`) is new — a generic charset-bank library extracted
@@ -1011,8 +1010,7 @@ void charsetswap_exit(void);          // opt-in: restore the user's CHARSET_STD 
 
 Full-screen pulldown menu system: menu bar → pulldown menus → popup dialogs,
 with a LIFO main-RAM window-save stack. Include `menu.h`. Adapted from
-locifilemanager-v2's `menu.h`/`menu.c` (local reference at
-`/home/xahmol/git/locifilemanager-v2/src/menu.h`) — **OSE's version differs
+locifilemanager-v2's [`menu.h`](https://github.com/xahmol/locifilemanager-v2/blob/main/src/menu.h)/`menu.c` — **OSE's version differs
 substantially**: a 4-item bar instead of 6, 5 pulldowns instead of 11, and
 window save/restore copies to a **main-RAM buffer** instead of overlay RAM
 (no LOCI required — menus close with no residue in plain Oricutron).

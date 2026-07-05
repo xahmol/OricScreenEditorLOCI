@@ -1,8 +1,8 @@
 // move.c - Move mode (content nudge) for OricScreenEditorLOCI (Oric Atmos,
 // Oscar64)
 //
-// Adapted from V1's movemode() (local reference at
-// /home/xahmol/git/OricScreenEditor/src/main.c). V1 shifts the *currently
+// Adapted from V1's movemode()
+// (https://github.com/xahmol/OricScreenEditor/blob/main/src/main.c). V1 shifts the *currently
 // visible* viewport's content by one row/col using a hardware scroll, then
 // (only on ENTER) bakes that shift back into screenmap permanently -- ESC
 // effectively "cancels" only because nothing had been written back yet.

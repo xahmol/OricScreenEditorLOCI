@@ -1,7 +1,7 @@
 // menu.c - Menu system for OricScreenEditorLOCI (Oric Atmos, Oscar64)
 //
-// Based on locifilemanager-v2 src/menu.c by Xander Mol (local reference at
-// /home/xahmol/git/locifilemanager-v2/src/menu.c). Adapted: MENUBAR_MAXOPTIONS
+// Based on locifilemanager-v2 src/menu.c by Xander Mol
+// (https://github.com/xahmol/locifilemanager-v2/blob/main/src/menu.c). Adapted: MENUBAR_MAXOPTIONS
 // reduced to 4, window save/restore copies to a main-RAM buffer
 // (menu_winbuf[]) instead of overlay RAM (no loci_present()/enable_overlay_ram
 // gating needed), menu_getkey() replaced by a direct key_read() call

@@ -110,7 +110,7 @@ slots, so reverting a cut needs two `z` presses**).
 ## Canvas undo/redo
 
 `src/undo.c/h`, `z`/`y` in Main mode. Ported from VDCScreenEditor2's undo
-(`/home/xahmol/VDCScreenEditor2/src/main.c`), adapted for single-plane canvas
+([VDCScreenEditor2/src/main.c](https://github.com/xahmol/VDCScreenEditor2/blob/main/src/main.c)), adapted for single-plane canvas
 and Oric-side overlay RAM (`$E800-$FFFF`, 6144 bytes, `UNDO_REGION_SIZE`).
 
 **Design:**

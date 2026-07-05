@@ -1,8 +1,8 @@
 // select.c - Shared rectangle-grower, Line/Box and Select modes for
 // OricScreenEditorLOCI (Oric Atmos, Oscar64)
 //
-// Adapted from V1's lineandbox()/selectmode() (local reference at
-// /home/xahmol/git/OricScreenEditor/src/main.c). V1 grows the rect by
+// Adapted from V1's lineandbox()/selectmode()
+// (https://github.com/xahmol/OricScreenEditor/blob/main/src/main.c). V1 grows the rect by
 // tracking which edge is "trailing" the fixed origin and redrawing only
 // the single edge line that moved each keypress (plotvisible() -- which
 // draws app.plotscreencode^0x80 as a preview, not a XOR-toggle of

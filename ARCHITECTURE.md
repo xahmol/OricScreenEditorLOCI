@@ -12,11 +12,11 @@ of the project's libraries (`oric.h`, `keyboard.h`, `charwin.h`, `ijk.h`,
 `libmanual_fr.md` (French).
 
 OSE is a from-scratch Oscar64 rewrite of
-[OricScreenEditor](https://github.com/xahmol/OricScreenEditor) (V1, CC65,
-local checkout at `/home/xahmol/git/OricScreenEditor`), restarted on the
+[OricScreenEditor](https://github.com/xahmol/OricScreenEditor) (V1, CC65),
+restarted on the
 Oscar64 native/bare-metal build chain shared with
-[locifilemanager-v2](https://github.com/xahmol/locifilemanager-v2)
-(`/home/xahmol/git/locifilemanager-v2`), which this document's structure is
+[locifilemanager-v2](https://github.com/xahmol/locifilemanager-v2),
+which this document's structure is
 adapted from. **All 9 phases of the rewrite are complete.**
 
 ---
@@ -812,7 +812,7 @@ charset 0x20-0x7F, or — if `app.visualmap` — rows 7-11 remapped via
 `visualchar[80]` (row 12 stays identity 0x70-0x7F). Each grid cell is the
 screencode byte, drawn under the row's `A_STD`/`A_ALT` attribute byte at
 `PAL_ATTR_X=4`. `visualchar[80]` is ported verbatim from V1 OricScreenEditor
-(`/home/xahmol/git/OricScreenEditor/src/main.c`), credited to jab/Artline
+([OricScreenEditor/src/main.c](https://github.com/xahmol/OricScreenEditor/blob/main/src/main.c)), credited to jab/Artline
 Designs.
 
 Cursor `(rowsel, colsel)` is highlighted via `^0x80` (same convention as
@@ -1041,7 +1041,7 @@ to call) and aborts with a graceful popup if absent, then
 `filepicker_run(title, filter)` replaces `fileio_get_filename()` for
 every Load action with a real LOCI directory browser. Save actions are
 unaffected. Adapted from locifilemanager-v2's directory engine
-(`/home/xahmol/git/locifilemanager-v2/src/dir.c`, `struct DirElement`/
+([locifilemanager-v2/src/dir.c](https://github.com/xahmol/locifilemanager-v2/blob/main/src/dir.c), `struct DirElement`/
 `DirMeta` in `dir.h` — the primary reference for this phase, per explicit
 instruction), simplified for a single-pane, single-select, no-sort,
 dir-vs-file-only picker.
@@ -1104,7 +1104,7 @@ automated today. The actual directory browsing isn't covered yet, but
 
 Genuinely new functionality — V1 has no canvas-edit undo at all. A
 faithful port of vdcscreeneditor-v2's `undo_new()`/`undo_performundo()`/
-`undo_performredo()` (`/home/xahmol/VDCScreenEditor2/src/main.c`, lines
+`undo_performredo()` ([VDCScreenEditor2/src/main.c](https://github.com/xahmol/VDCScreenEditor2/blob/main/src/main.c), lines
 739-905), adapted for OSE's single-plane canvas and **Oric-side overlay
 RAM** ($C000-$FFFF, `enable_overlay_ram()`/`disable_overlay_ram()`) — a
 different resource from §6.15's LOCI-device XRAM (see §2.4; this

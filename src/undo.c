@@ -2,8 +2,8 @@
 // Oscar64)
 //
 // Faithful port of vdcscreeneditor-v2's undo_new()/undo_performundo()/
-// undo_performredo() (local reference at
-// /home/xahmol/VDCScreenEditor2/src/main.c, lines 739-905, struct
+// undo_performredo()
+// (https://github.com/xahmol/VDCScreenEditor2/blob/main/src/main.c, lines 739-905, struct
 // UndoStruct in include/defines.h) -- a ring buffer of dirty-rectangle
 // snapshots (only the changed bounding box, not the full canvas) stored
 // in bank-switched RAM. Adapted here for OSE's single-plane canvas

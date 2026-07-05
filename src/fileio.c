@@ -518,7 +518,7 @@ void fileio_save_project(void)
 
 /**
  * Parse a buffer containing V1's original 19-byte PJ.BIN layout
- * (/home/xahmol/git/OricScreenEditor/src/main.c saveproject()) into the
+ * (https://github.com/xahmol/OricScreenEditor/blob/main/src/main.c saveproject()) into the
  * current ProjectHeader fields, so Load Project transparently accepts
  * V1 projects too -- see fileio_load_project(). V1 byte offsets:
  *   0  charsetchanged[0] -> stdchanged

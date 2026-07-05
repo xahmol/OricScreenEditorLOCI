@@ -4,8 +4,8 @@
 // Replaces src/fileio.c's typed-filename prompt for Load actions with a
 // real directory listing, and (added 2026-06-21) lets Save actions browse
 // to and confirm a directory first too. Adapted from locifilemanager-v2's
-// directory engine (local reference at /home/xahmol/git/locifilemanager-v2/
-// src/dir.c, struct DirElement/DirMeta in dir.h) -- the primary reference
+// directory engine (https://github.com/xahmol/locifilemanager-v2/blob/main/src/dir.c,
+// struct DirElement/DirMeta in dir.h) -- the primary reference
 // for this, per explicit instruction (VDC Screen Editor 2's own file
 // browser was also checked, but turned out to only navigate within a
 // single disk image, no subdirectory tree at all, so it has nothing to add

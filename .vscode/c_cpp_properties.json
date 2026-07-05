@@ -3,7 +3,7 @@
         {
             "name": "Linux",
             "includePath": [
-                "/home/xahmol/oscar64/include/",
+                "${env:OSCAR64_HOME}/include/",
                 "${workspaceFolder}/include",
                 "${workspaceFolder}/src"
             ],
