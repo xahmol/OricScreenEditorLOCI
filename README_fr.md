@@ -48,7 +48,7 @@
 Lien vers la dernière version publiée :
 https://github.com/xahmol/OricScreenEditorLOCI/releases/latest
 
-Version v0.1.0 (premiere version OSE-LOCI) :
+Version v1.0.0 (première version publique) :
 
 - Réécriture complète en C Oscar64 pour l'Oric Atmos 6502A bare-metal
 - **Périphérique de stockage de masse LOCI requis** — la zone de dessin réside en RAM d'extension ; tous les accès fichiers sont via LOCI

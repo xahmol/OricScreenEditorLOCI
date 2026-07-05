@@ -48,7 +48,7 @@ Screen editor for the Oric Atmos — Oscar64 rewrite with LOCI mass-storage supp
 Link to the latest release:
 https://github.com/xahmol/OricScreenEditorLOCI/releases/latest
 
-Version v0.1.0 (initial OSE-LOCI release):
+Version v1.0.0 (initial public release):
 
 - From-scratch rewrite in Oscar64 C targeting the Oric Atmos 6502A bare-metal
 - **LOCI mass-storage device required** — canvas lives in overlay RAM; all file I/O is LOCI-based
