@@ -507,12 +507,20 @@ void fileio_save_project(void)
     if (app.stdchanged)
     {
         filedir_join_suffix(fullpath, "CS.BIN");
-        file_save(fullpath, charsetswap_real_std(), charset_area_size(CHARSET_STD));
+        if (file_save(fullpath, charsetswap_real_std(), charset_area_size(CHARSET_STD)) < 0)
+        {
+            menu_messagepopup(MSG_FILE_INVALID_FORMAT);
+            return;
+        }
     }
     if (app.altchanged)
     {
         filedir_join_suffix(fullpath, "CA.BIN");
-        file_save(fullpath, charsetswap_real_alt(), charset_area_size(CHARSET_ALT));
+        if (file_save(fullpath, charsetswap_real_alt(), charset_area_size(CHARSET_ALT)) < 0)
+        {
+            menu_messagepopup(MSG_FILE_INVALID_FORMAT);
+            return;
+        }
     }
 }
 
@@ -639,14 +647,18 @@ void fileio_load_project(void)
     filedir_join_suffix(fullpath, "CS.BIN");
     if (file_exists(fullpath))
     {
-        file_load(fullpath, (void *)(CHARSET_STD + CHARSET_GLYPH_AREA_OFFSET), charset_area_size(CHARSET_STD));
-        app.stdchanged = 1;
+        if (file_load(fullpath, (void *)(CHARSET_STD + CHARSET_GLYPH_AREA_OFFSET), charset_area_size(CHARSET_STD)) < 0)
+            menu_messagepopup(MSG_FILE_INVALID_FORMAT);
+        else
+            app.stdchanged = 1;
     }
     filedir_join_suffix(fullpath, "CA.BIN");
     if (file_exists(fullpath))
     {
-        file_load(fullpath, (void *)(CHARSET_ALT + CHARSET_GLYPH_AREA_OFFSET), charset_area_size(CHARSET_ALT));
-        app.altchanged = 1;
+        if (file_load(fullpath, (void *)(CHARSET_ALT + CHARSET_GLYPH_AREA_OFFSET), charset_area_size(CHARSET_ALT)) < 0)
+            menu_messagepopup(MSG_FILE_INVALID_FORMAT);
+        else
+            app.altchanged = 1;
     }
     charsetswap_mark_changed();
 
