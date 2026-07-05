@@ -152,6 +152,13 @@ BW:
         sta accu + 1
         rts
 
+DM8:
+        sta  tmp
+        lda  #0
+        sta  tmp + 1
+        lda  accu + 1
+        beq  BB
+
 WB:
         lda tmp + 1
         bne WW
@@ -702,6 +709,7 @@ L3:
 #pragma runtime(mul16by8, mul16by8);
 #pragma runtime(divu16, divmod);
 #pragma runtime(modu16, divmod);
+#pragma runtime(divu16by8, divmod.DM8);
 #pragma runtime(divs16, divs16);
 #pragma runtime(mods16, mods16);
 #pragma runtime(divmods16, divmods16);
