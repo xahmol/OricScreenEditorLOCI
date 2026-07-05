@@ -1,5 +1,5 @@
-# Oric Screen Editor
-Éditeur d'écran pour l'Oric Atmos
+# Oric Screen Editor pour LOCI
+Éditeur d'écran pour l'Oric Atmos — réécriture Oscar64 avec support de stockage de masse LOCI
 
 ## Sommaire
 
@@ -7,9 +7,9 @@
 
 [Introduction](#introduction)
 
-[Problèmes connus](#problèmes-connus)
-
 [Démarrage du programme](#démarrage-du-programme)
+
+[Compilation depuis les sources](#compilation-depuis-les-sources)
 
 [Mode principal](#mode-principal)
 
@@ -40,94 +40,143 @@
 [Crédits](#crédits)
 
 
-![Écran-titre d'OSE](https://github.com/xahmol/OricScreenEditor/blob/main/screenshots/OSE%20Titlescreen.png?raw=true)
+*(Capture d'ecran de l'ecran-titre a venir dans une prochaine version.)*
 
 ## Historique des versions et téléchargement
 ([Retour au sommaire](#sommaire))
 
-Lien vers les dernières versions compilées :
-- [Image disque .DSK](https://github.com/xahmol/OricScreenEditor/raw/main/BUILD/OSE.dsk)
-- [Image disque .HFE](https://github.com/xahmol/OricScreenEditor/raw/main/BUILD/OSE.hfe)
+Lien vers la dernière version publiée :
+https://github.com/xahmol/OricScreenEditorLOCI/releases/latest
 
-Version v099-20220824-1345 :
-- Ajout du sélecteur de fichiers
-- Autres ajustements et corrections mineurs
+Version v0.1.0 (premiere version OSE-LOCI) :
 
-Version v099-20220615-1454 :
-- Première version bêta publiée, basée sur [VDCSE](https://github.com/xahmol/VDCScreenEdit) version v099-20220324-1527
+- Réécriture complète en C Oscar64 pour l'Oric Atmos 6502A bare-metal
+- **Périphérique de stockage de masse LOCI requis** — la zone de dessin réside en RAM d'extension ; tous les accès fichiers sont via LOCI
+- Localisation complète : versions anglaise (`oseloci.tap`) et française (`oseloci_fr.tap`), chacune avec son propre écran-titre et ses écrans d'aide
+- Annuler/Rétablir les modifications de la zone de dessin (jusqu'à 40 niveaux, stockés en RAM d'extension)
+- Navigateur de fichiers basé sur la XRAM LOCI, avec exploration complète du système de fichiers
+- Formats Sauver/Charger Ecran, Projet (4 fichiers), Combiné (2 jeux + écran), et Jeux de caractères ; compatibilité avec les projets V1
+- Éditeur de caractères : modifications directes en RAM charset en temps réel, saisie hexadécimale par ligne, annulation locale
+- Mécanisme de protection du chrome des popups contre les glyphes redéfinis par l'utilisateur
+- Sélecteur de couleurs pour choisir encre et papier visuellement
+- Support du joystick IJK (interface Raxiss), détecté automatiquement
+- Mode Essai, Aller à/Origine, Rechercher/Remplacer, boite creuse + ellipse en mode Ligne et boîte
+- Jeu de caractères > Reinitialiser Standard→ROM et Reinitialiser Alt→Boot
+- Saisie hexadécimale directe d'attribut en mode Écriture (FUNCT+4)
+- Suite de tests automatisés Phosphoric : 200/200 tests reussis
 
 ## Introduction
 ([Retour au sommaire](#sommaire))
 
-Oric Screen Editor est un éditeur permettant de créer des écrans textuels pour l'Oric Atmos. Il prend entièrement en charge l'utilisation de jeux de caractères personnalisés.
+Oric Screen Editor pour LOCI (OSE-LOCI) est un éditeur d'écran pour l'Oric Atmos, prenant entièrement en charge les jeux de caractères personnalisés, réécrit de zéro en C Oscar64. Il est basé sur [OricScreenEditor V1](https://github.com/xahmol/OricScreenEditor) (la version originale CC65) et l'étend avec le support du stockage de masse LOCI, l'annulation/rétablissement des modifications, et de nombreuses nouvelles fonctionnalités d'édition.
 
-Principales fonctionnalités du programme :
-- Prise en charge d'écrans plus grands que 40x25 caractères. Les écrans peuvent atteindre 10 Kio (10 240 octets) ; toutes les tailles tenant dans cette mémoire, avec une largeur minimale de 40 et une hauteur minimale de 27, sont prises en charge.
-- Prend en charge le redimensionnement de la zone de dessin, son effacement ou son remplissage
-- Prise en charge du chargement de jeux de caractères personnalisés (doivent être des jeux de caractères standards de 96 caractères de 6 bits de large et 8 bits de haut, des jeux alternatifs de 80 caractères, ou des jeux combinés de 176 caractères).
-- Inclut un éditeur de caractères simple pour modifier les caractères à la volée et voir directement le résultat dans l'écran en cours de création.
-- Prend en charge les attributs sériels de l'Oric pour l'encre, le papier et les modificateurs de caractère (jeu de caractères standard ou alternatif, double hauteur, clignotement).
-- Mode écriture pour saisir librement des caractères au clavier
-- Mode ligne et boîte pour dessiner des lignes et des boîtes
-- Mode sélection pour couper, copier, effacer ou repeindre (couleur seule ou tous les attributs) la sélection.
-- Mode déplacement pour faire défiler le contenu de l'écran (uniquement pour la fenêtre visible de 40x27, en raison de contraintes mémoire)
-- Mode palette, incluant un mode de plan de caractères visuel, pour sélectionner visuellement les caractères et les couleurs
-- Emplacements favoris pour sélectionner rapidement 10 caractères favoris
-- **Ajout OSE-LOCI** : prend en charge un joystick compatible IJK
-  (interface Raxiss IJK) comme alternative au clavier partout où les
-  touches curseur et ENTER sont utilisées -- aucun mode ou réglage séparé
-  n'est nécessaire, il est détecté automatiquement au démarrage et
-  fonctionne simplement en parallèle du clavier.
-- **Ajouts OSE-LOCI** : un mode d'essai pour prévisualiser un caractère
-  avant de le tracer ; Aller à (**J**) et Origine (**H**) pour déplacer
-  le curseur et la vue directement vers une coordonnée saisie ou fixe ;
-  un Rechercher/Remplacer unifié (**F**) pour les codes écran et les
-  couleurs d'encre/papier dans toute la zone de dessin ; une option de
-  boîte creuse et ellipse/cercle en mode Ligne et boîte ; une option du
-  menu Charset pour réinitialiser le jeu de caractères standard depuis
-  la ROM en une seule étape ; et un raccourci de saisie hexadécimale
-  directe d'attribut en mode Écriture.
+**Un périphérique de stockage de masse LOCI est requis pour utiliser le programme.** La zone de dessin elle-même réside en RAM d'extension activée par LOCI ($C000–$E7FF), pas seulement le chargement et la sauvegarde de fichiers. Si aucun périphérique LOCI n'est détecté au démarrage, le programme affiche un message et se termine au lieu de démarrer l'éditeur.
 
-## Problèmes connus
-- La routine de sélection de fichiers ne fonctionne correctement qu'avec les disques SEDORIC3 créés par l'outil TAP2DSK de l'OSDK. Si vous souhaitez importer des écrans ou des jeux de caractères depuis d'autres disques, copiez-les d'abord sur une image créée avec TAP2DSK.
+Principales fonctionnalités :
+
+- Prise en charge de zones de dessin plus grandes que 40×28 caractères. Toute taille de 1×1 vers le haut est prise en charge, jusqu'à un maximum de 10 Kio (10 240 octets). La largeur et la hauteur ne sont pas limitées à la fenêtre visible de 40×28 — l'éditeur fait défiler automatiquement quand le curseur atteint un bord.
+- Redimensionner, effacer ou remplir la zone de dessin à tout moment via le menu Ecran
+- Accès complet aux fichiers LOCI avec un navigateur XRAM prenant en charge l'exploration complète du système de fichiers. Formats Sauver/Charger Ecran, Projet, Combiné, et Jeux de caractères. Sauvegarde des deux banques de jeux de caractères quand modifiées.
+- Éditeur de caractères (popup latérale) pour modifier les glyphes en direct — les modifications s'appliquent directement à la RAM charset et mettent à jour toutes les cellules de la zone de dessin utilisant ce glyphe en temps réel
+- Prise en charge des attributs sériels Oric : encre, papier et modificateurs de jeu de caractères (standard ou alternatif, double hauteur, clignotement)
+- Annuler/Rétablir les modifications de la zone de dessin (**Z**/**Y**) sauvegardés en RAM d'extension, jusqu'à 40 niveaux
+- Mode écriture pour saisir librement du texte avec le clavier complet
+- Mode ligne et boîte : boite pleine, boite creuse, ellipse pleine ou creuse inscrite dans le rectangle englobant
+- Mode sélection : délimiter un rectangle, puis couper, copier, supprimer ou remplir avec un attribut encre/papier/modificateur
+- Mode déplacement : faire défiler le contenu de la fenêtre visible
+- Mode palette avec option de plan de caractères visuel pour le jeu alternatif
+- Sélecteur de couleurs pour choisir ensemble les couleurs encre et papier sur une grille visuelle
+- Emplacements favoris pour 10 caractères fréquemment utilisés
+- **Support du joystick IJK** (interface Raxiss IJK) — détecté automatiquement au démarrage, fonctionne en parallèle avec le clavier partout où les touches curseur et ENTRÉE sont utilisées
+- **Mode Essai** (**T**) : prévisualiser un caractère sans le valider ; ESPACE confirme, toute autre touche annule
+- **Aller à** (**J**) : ouvrir une popup pour déplacer le curseur et la vue vers n'importe quelle coordonnée saisie
+- **Origine** (**H**) : revenir directement à l'origine (0,0) de la zone de dessin sans popup
+- **Rechercher/Remplacer** (**F**) pour les codes écran et les couleurs encre/papier dans toute la zone de dessin
+- Bascules boîte creuse et ellipse en mode Ligne et boîte (**O**, **C**)
+- **Jeux de caractères > Reinitialiser Standard→ROM** et **Reinitialiser Alt→Boot**
+- **Saisie hexadécimale directe d'attribut** en mode Écriture (**FUNCT+4**)
+- Disponible en anglais et en français (écran-titre et écrans d'aide localisés)
 
 ## Démarrage du programme
 ([Retour au sommaire](#sommaire))
 
-Montez l'image disque OSE. Choisissez l'image .DSK ou .HFE selon ce que prend en charge votre matériel ou émulateur (en général : .HFE pour Cumana Reborn, .DSK pour un émulateur).
+**Prérequis :** un Oric Atmos avec un périphérique de stockage de masse LOCI connecté. L'éditeur ne démarrera pas sans lui — si aucun LOCI n'est détecté, il affiche un message et se termine.
 
-L'exécutable OSE démarre automatiquement au montage du disque. Si ce n'est pas le cas, tapez simplement OSE\<ENTER\>.
+**Installation :**
 
-Description du contenu de l'image disque :
+1. Téléchargez le dernier ZIP de version depuis la [page des versions publiées](https://github.com/xahmol/OricScreenEditorLOCI/releases/latest).
 
-|Nom de fichier|Extension|Description|
-|---|---|---|
-|OSE|.COM|Exécutable principal
-|OSEHS1|.BIN|Écran d'aide pour le mode principal
-|OSEHS2|.BIN|Écran d'aide pour les modes édition de caractères et palette
-|OSEHS3|.BIN|Écran d'aide pour les modes sélection, déplacement et ligne/boîte
-|OSEHS4|.BIN|Écran d'aide pour les modes écriture et écriture colorée
-|OSETSC|.BIN|Écran-titre
+2. Décompressez tout le contenu dans un seul dossier sur la carte SD du périphérique LOCI. Vous pouvez choisir n'importe quel nom de dossier. Le programme charge ses fichiers d'assets (écran-titre, écrans d'aide) relativement au dossier depuis lequel il a été lancé, donc tous les fichiers doivent être dans le même dossier.
 
+3. Utilisez l'interface LOCI pour naviguer jusqu'au dossier et lancer le fichier `.tap` dans la langue souhaitée :
+   - `oseloci.tap` — version anglaise
+   - `oseloci_fr.tap` — version française
 
-(Anecdote : tous ces écrans ont en fait été créés avec OSE comme éditeur)
+   Pour les instructions sur la navigation dans les dossiers et le lancement de fichiers `.tap` avec le matériel LOCI, consultez le [Manuel utilisateur LOCI](https://github.com/sodiumlb/loci-hardware/wiki/LOCI-User-Manual).
 
-Quittez l'écran-titre en appuyant sur n'importe quelle touche.
+**Fichiers inclus dans le ZIP de version :**
+
+| Nom de fichier | Description |
+|---|---|
+| `oseloci.tap` | Programme principal — anglais |
+| `oseloci_fr.tap` | Programme principal — français |
+| `OSETSC.BIN` | Ecran-titre (EN) |
+| `OSETSF.BIN` | Ecran-titre (FR) |
+| `OSEHS1.BIN`–`OSEHS4.BIN` | Ecrans d'aide EN : mode principal / editeur de caracteres / selection+deplacement+ligne-boite / ecriture |
+| `OSEHF1.BIN`–`OSEHF4.BIN` | Ecrans d'aide FR |
+| `PETSCIIPJ/SC/CS/CA.BIN` | Projet demo : art PETSCII (issu d'OricScreenEditor V1) |
+| `OSEDEMOPJ/SC/CS/CA.BIN` | Projet demo : echantillons de couleurs + soleil en pixel-art |
+| `OSEDEMO.BIN` | Meme demo au format Combine (Fichier > Charger combine) |
+| `OSELOGOPJ/SC/CS/CA.BIN` | Projet demo : logo de la societe Oric en glyphes dessines a la main |
+| `LUDOTITLPJ/SC/CS/CA.BIN` | Projet demo : ecran-titre du jeu Ludo |
+| `LUDOSCRMPJ/SC/CS/CA.BIN` | Projet demo : ecran de jeu Ludo |
+| `README.pdf` | Ce manuel (EN) |
+| `README_fr.pdf` | Ce manuel (FR) |
+
+Tous les projets demo sont chargeables via **Fichier > Charger projet**. `OSEDEMO.BIN` est egalement chargeable via **Fichier > Charger combine**.
+
+Quittez l'écran-titre en appuyant sur n'importe quelle touche. L'éditeur démarre en mode principal.
+
+## Compilation depuis les sources
+([Retour au sommaire](#sommaire))
+
+**Prérequis :**
+
+- Compilateur [Oscar64](https://github.com/drmortalwombat/oscar64). Définissez `OSCAR64_HOME` sur le dossier d'installation (par défaut : `~/oscar64`).
+- Python 3 (pour l'outil `mktap.py` d'encapsulation en tape).
+- GNU Make.
+- Optionnel : `pandoc` + `texlive-xetex` pour régénérer les PDF (`make docs`).
+- Optionnel : émulateur [Phosphoric](https://github.com/benedictemarty/Phosphoric) pour la suite de tests automatisés (`make test`).
+
+**Compilation :**
+
+```
+git clone https://github.com/xahmol/OricScreenEditorLOCI.git
+cd OricScreenEditorLOCI
+make              # version EN → build/oseloci.tap
+make LANG=FR      # version FR → build/oseloci_fr.tap
+make all-langs    # les deux versions
+make docs         # regénérer README.pdf / README_fr.pdf
+make zip          # créer le ZIP de distribution (les deux .tap + tous les assets + les READMEs)
+```
+
+**Copie vers un périphérique LOCI :**
+
+1. Copiez `.env.example` vers `.env` et définissez `USBPATH` vers le dossier cible sur la carte SD LOCI.
+2. Lancez `make usb` — compile les deux versions, puis copie tous les fichiers `.tap` et `.BIN` d'assets vers `USBPATH`.
 
 ## Mode principal
 ([Retour au sommaire](#sommaire))
 
-Après l'écran-titre, le programme démarre dans ce mode. Au démarrage, l'écran affiche ceci :
+Après l'écran-titre, le programme démarre dans ce mode. Un curseur inversé affichant le code écran actuellement sélectionné est visible à l'origine de la zone de dessin.
 
-![Écran en mode principal](https://github.com/xahmol/OricScreenEditor/blob/main/screenshots/OSE%20empty%20startscreen.png?raw=true)
-
-Seul un curseur inversé affichant le code écran actuellement sélectionné est visible.
+*(Capture d'ecran a venir dans une prochaine version.)*
 
 Appuyez sur ces touches en mode principal pour l'édition :
 
 |Touche|Description
 |---|---|
-|**Touches curseur**|Déplacer le curseur
+|**Touches curseur**|Déplacer le curseur (fait défiler la vue si la zone de dessin est plus grande que 40×28)
 |**+** ou **=**|Caractère suivant (augmente le code écran)
 |**-**|Caractère précédent (diminue le code écran)
 |**0-9**|Sélectionner le caractère de l'emplacement favori correspondant
@@ -138,609 +187,408 @@ Appuyez sur ces touches en mode principal pour l'édition :
 |**\'**|Augmenter le papier (augmente le numéro de couleur)
 |**ESPACE**|Tracer avec le code écran et les attributs actuels
 |**DEL**|Effacer la position actuelle du curseur (trace un espace blanc)
-|**B**|Basculer l'attribut '**B**link' (clignotement)
+|**B**|Basculer l'attribut clignotement (**B**link)
 |**A**|Basculer entre le jeu de caractères **A**lternatif et Standard
-|**D**|Basculer l'attribut **D**ouble hauteur
-|**I**|Tracer un attribut modificateur **I**nk (encre) pour la couleur d'encre actuellement sélectionnée
-|**O**|Tracer un attribut modificateur Paper (papier) pour la couleur de papier actuellement sélectionnée
-|**U**|Tracer un attribut modificateur de jeu de caractères pour la sélection de jeu, la taille double et le clignotement actuellement sélectionnés
+|**D**|Basculer l'attribut double hauteur (**D**ouble)
+|**I**|Tracer un modificateur **I**nk (encre) pour la couleur d'encre actuellement sélectionnée
+|**O**|Tracer un modificateur Paper (papier) pour la couleur de papier actuellement sélectionnée
+|**U**|Tracer un modificateur de jeu de caractères pour la sélection actuelle de jeu/double/clignotement
 |**E**|Aller au mode '**É**dition de caractère' avec le code écran actuel
-|**G**|Récupérer (**g**rab) le caractère et l'attribut situés sous le curseur
-|**W**|Aller au mode '**W**rite' (écriture)
+|**G**|Récupérer (**G**rab) le caractère ou l'attribut sous le curseur
+|**W**|Aller au mode '**É**criture' (**W**rite)
 |**L**|Aller au mode '**L**igne et boîte'
-|**M**|Aller au mode '**M**ove' (déplacement)
+|**M**|Aller au mode 'Déplace**m**ent' (**M**ove)
 |**S**|Aller au mode '**S**élection'
 |**P**|Aller au mode '**P**alette'
-|**C**|Aller au sélecteur de couleurs ('**C**olour picker')
-|**T**|Mode d'essai (**T**ry)
-|**R**|Basculer '**R**everse' (vidéo inversée) : bascule l'augmentation/diminution du code écran de 128
-|**J**|**Nouveau OSE-LOCI :** Aller (**J**ump) à une coordonnée X/Y saisie
-|**H**|**Nouveau OSE-LOCI :** Origine (**H**ome) -- ramener le curseur et la vue à la coordonnée (0,0)
-|**F**|**Nouveau OSE-LOCI :** Rechercher/Remplacer (**F**ind) un code écran ou une couleur d'encre/papier dans toute la zone de dessin
-|**Z**|**OSE-LOCI uniquement :** Annuler la dernière modification de la zone de dessin
-|**Y**|**OSE-LOCI uniquement :** Rétablir la dernière modification annulée
+|**C**|Aller au sélecteur de couleurs (**C**olour picker)
+|**T**|Mode d'essai (**T**ry) — prévisualiser le caractère actuel sans le valider
+|**R**|Basculer la vidéo inversée (**R**everse) : XOR du code écran avec 128
+|**J**|Aller à (**J**ump) — déplacer le curseur et la vue vers une coordonnée X/Y saisie
+|**H**|Origine (**H**ome) — revenir à l'origine (0,0) de la zone de dessin
+|**F**|Rechercher/Remplacer (**F**ind) un code écran ou une couleur encre/papier
+|**Z**|Annuler la dernière modification de la zone de dessin
+|**Y**|Rétablir la dernière modification annulée
 |**FUNCT+1**|Aller au menu principal
 |**FUNCT+6**|Basculer la visibilité de la barre d'état
 |**FUNCT+8**|Écran d'aide
 
-**NB** : Dans Oricutron, avec la configuration clavier par défaut, la touche FUNCT est associée à la touche ALT du clavier PC.
+**NB :** Dans Oricutron avec la configuration clavier par défaut, la touche FUNCT est associée à la touche ALT du clavier PC.
 
 *Déplacer le curseur*
 
-Appuyez sur les **touches curseur** pour déplacer le curseur sur l'écran. Si la taille de la zone de dessin est plus grande que l'écran de 40x27, l'écran défile en atteignant les bords.
+Appuyez sur les **touches curseur** pour déplacer le curseur sur l'écran. Si la zone de dessin est plus grande que la fenêtre de 40×28, l'écran défile automatiquement lorsque le curseur atteint un bord.
 
 *Sélectionner le code écran à tracer*
 
-La touche **+** ou **-** augmente, respectivement diminue, le code écran sélectionné de un. Le curseur se met à jour pour afficher le code écran actuellement sélectionné.
+La touche **+** ou **=** augmente le code écran sélectionné de un ; **-** le diminue. Le curseur se met à jour pour afficher le code écran actuellement sélectionné.
 
-Appuyer sur **R** augmente le code écran de 128 si le code actuel est inférieur à 128, sinon le diminue de 128. Ceci active/désactive le bit d'inversion pour l'inversion matérielle du caractère.
+Appuyer sur **R** effectue un XOR du code écran avec 128, activant/désactivant le bit de vidéo inversée.
 
-*Sélectionner le code écran à tracer depuis un emplacement favori*
+*Sélectionner les codes écran depuis un emplacement favori*
 
-Dans OSE, 10 emplacements sont disponibles pour stocker vos caractères les plus utilisés. Appuyer sur une touche **0-9** sélectionne le favori avec le numéro correspondant.
-
-*Enregistrer le code écran actuel dans un emplacement favori*
-
-Appuyer sur **SHIFT** plus **0-9** enregistre le caractère actuellement sélectionné dans l'emplacement favori correspondant.
+Dix emplacements favoris sont disponibles. Appuyer sur **0-9** sélectionne le favori correspondant ; **SHIFT+0-9** y stocke le caractère actuellement sélectionné.
 
 *Sélectionner les attributs à tracer*
 
-Augmentez ou diminuez le [code couleur](#référence-des-valeurs-de-couleur) de un en appuyant sur la touche **.** resp. **,** pour la couleur d'encre, ou **;** resp. **\'** pour la couleur de papier. Appuyer sur **B**, **D** ou **A** bascule l'attribut **B**link (clignotement), **D**ouble taille ou **A**lternatif du jeu de caractères. Vous pouvez aussi appuyer sur **C** pour ouvrir le [sélecteur de couleurs](#sélecteur-de-couleurs) et choisir ensemble les couleurs d'Encre et de Papier depuis une grille visuelle.
+Augmentez ou diminuez la [valeur de couleur](#référence-des-valeurs-de-couleur) avec **.** / **,** pour l'encre, ou **;** / **\'** pour le papier. Appuyer sur **B**, **D** ou **A** bascule le clignotement, la double hauteur ou le jeu alternatif. Vous pouvez aussi appuyer sur **C** pour ouvrir le [sélecteur de couleurs](#sélecteur-de-couleurs) et choisir l'encre et le papier ensemble sur une grille visuelle.
 
 *Tracer et effacer un caractère*
 
-Appuyez sur **ESPACE** pour tracer le caractère actuellement sélectionné à la position actuelle du curseur. **DEL** efface le caractère ou la valeur d'attribut à la position actuelle et le remplace par un caractère ESPACE.
-Appuyez sur **T** pour prévisualiser l'apparence du caractère sélectionné s'il était tracé sans le clignotement du curseur. Appuyez ensuite sur **ESPACE** pour confirmer le tracé du caractère, ou sur toute autre touche pour annuler.
+Appuyez sur **ESPACE** pour tracer le caractère actuellement sélectionné à la position du curseur. **DEL** remplace la cellule par un espace.
+
+Appuyez sur **T** pour prévisualiser l'apparence du caractère sélectionné lorsque tracé. Appuyez sur **ESPACE** pour confirmer et le valider, ou sur toute autre touche pour annuler.
 
 *Tracer des attributs sériels*
 
-En raison de la façon dont l'Oric gère les [changements de couleur et d'attribut](#référence-des-codes-dattribut-série), chaque position d'écran est soit un modificateur d'attribut, soit un caractère, mais jamais les deux à la fois. Pour cette raison, tracer un caractère ne trace aucun attribut. L'utilisateur d'OSE doit tracer les attributs sériels séparément, selon son propre choix.
-Pour cela, appuyez sur **I** pour tracer un modificateur **I**nk (encre) pour la couleur d'encre actuelle, **P** pour tracer un modificateur **P**aper (papier) pour la couleur de papier actuelle, et **U** pour tracer un modificateur de jeu de caractères pour les attributs de caractère actuels (les bascules alternatif, double et clignotement).
+En raison de la façon dont l'Oric gère les [changements de couleur et d'attribut](#référence-des-codes-dattribut-série), chaque position d'écran est soit un modificateur d'attribut, soit un caractère — jamais les deux. Pour cette raison, tracer un caractère ne trace aucun attribut.
+
+Appuyez sur **I** pour tracer un modificateur d'encre pour la couleur d'encre actuelle, **O** pour tracer un modificateur de papier, et **U** pour tracer un modificateur de jeu de caractères reflétant les réglages alternatif, double et clignotement actuels.
 
 *Récupérer un caractère*
 
-Appuyer sur **G** permet de « récupérer » le caractère ou les attributs à la position actuelle du curseur et de remplacer le code écran ou l'attribut sélectionné par ces valeurs, pour utilisation dans toutes les autres fonctions d'édition.
+Appuyer sur **G** lit le caractère ou l'attribut à la position du curseur et met à jour les réglages de tracé : un code >31 met à jour le code écran ; un code <8 met à jour l'encre ; un code >15 met à jour le papier ; les codes 8–15 décodent les bascules jeu alternatif, double et clignotement. Le curseur se met à jour en conséquence.
 
 *Mode édition de caractère*
 
-Ceci ouvre le [mode édition de caractère](#éditeur-de-caractères) et commence l'édition du code écran actuellement sélectionné. Astuce : si vous souhaitez éditer un caractère précis de l'écran, récupérez-le d'abord en déplaçant le curseur sur ce caractère et en appuyant sur **G** pour récupérer.
+Appuyez sur **E** pour entrer dans le [mode édition de caractère](#éditeur-de-caractères) pour le code écran actuellement sélectionné. Astuce : déplacez le curseur sur un caractère que vous souhaitez modifier, appuyez sur **G** pour le récupérer, puis sur **E** pour l'éditer.
 
 *Entrer dans les modes d'édition*
 
-Appuyez sur **S** ([Mode sélection](#mode-sélection)), **M** ([Mode déplacement](#mode-déplacement)), **L** ([Mode ligne et boîte](#mode-ligne-et-boîte)) ou **W** ([Mode écriture](#mode-écriture)) pour entrer dans le mode d'édition correspondant.
-Référez-vous aux sections spécifiques de ce readme pour ces modes (cliquez sur les liens). Depuis tous les modes, revenez au mode principal en appuyant sur **ESC**.
+Appuyez sur **S** ([Mode sélection](#mode-sélection)), **M** ([Mode déplacement](#mode-déplacement)), **L** ([Mode ligne et boîte](#mode-ligne-et-boîte)) ou **W** ([Mode écriture](#mode-écriture)) pour entrer dans le mode correspondant. Appuyez sur **ESC** dans n'importe quel mode pour revenir au mode principal.
 
-*Aller à des coordonnées et Origine (Nouveau OSE-LOCI)*
+*Aller à des coordonnées et Origine*
 
-Appuyez sur **J** pour ouvrir une fenêtre demandant une coordonnée X puis
-Y de la zone de dessin (toutes deux pré-remplies avec la position
-actuelle du curseur). Valider les deux déplace le curseur et la vue en
-une seule étape, en défilant si nécessaire -- bien plus rapide que de
-défiler case par case sur une zone de dessin plus grande que l'écran de
-40x27. ESC à l'une ou l'autre des saisies annule sans rien changer.
-Appuyez sur **H** pour revenir directement à l'origine (0,0) de la zone
-de dessin, sans fenêtre.
+Appuyez sur **J** pour ouvrir une popup demandant une coordonnée X puis Y (toutes deux pré-remplies avec la position actuelle du curseur). Valider les deux déplace le curseur et la vue en une seule étape — bien plus rapide que de défiler case par case sur une zone de dessin plus grande que l'écran de 40×28. ESC à l'un ou l'autre des champs annule sans rien changer.
 
-*Rechercher/Remplacer (Nouveau OSE-LOCI)*
+Appuyez sur **H** pour revenir directement à l'origine (0,0) de la zone de dessin, sans popup.
 
-Appuyez sur **F** pour ouvrir la fenêtre Rechercher/Remplacer. Choisissez
-d'abord ce qu'il faut rechercher : **1** pour un code écran, **2** pour
-une couleur d'encre, ou **3** pour une couleur de papier. Saisissez
-ensuite la valeur à rechercher (un code écran hexadécimal, ou un numéro
-de couleur 0-7). Enfin, appuyez sur **ENTRÉE** avec une valeur de
-remplacement pour remplacer toutes les occurrences correspondantes dans
-toute la zone de dessin (annulable ensuite avec **Z**), ou appuyez sur
-**ESC** à cette étape pour plutôt déplacer le curseur directement à la
-prochaine occurrence de la valeur recherchée, sans modifier la zone de
-dessin. ESC aux deux premières étapes annule toute l'opération.
+*Rechercher/Remplacer*
 
-*Annuler et rétablir (OSE-LOCI uniquement)*
+Appuyez sur **F** pour ouvrir la popup Rechercher/Remplacer. Choisissez d'abord ce qu'il faut rechercher : **1** pour un code écran, **2** pour une couleur d'encre, ou **3** pour une couleur de papier. Saisissez ensuite la valeur à rechercher (un code écran hexadécimal, ou un numéro de couleur 0–7). Enfin :
+- Appuyez sur **ENTRÉE** avec une valeur de remplacement pour remplacer toutes les occurrences dans toute la zone de dessin (annulable ensuite avec **Z**).
+- Appuyez sur **ESC** à l'étape de remplacement pour déplacer le curseur jusqu'à la prochaine occurrence sans modifier la zone de dessin.
 
-Appuyez sur **Z** pour annuler la dernière modification de la zone de
-dessin (tracé, Ligne/Boîte, remplissages/couper/copier de Sélection,
-Déplacement, mode Écriture, ou Écran > Effacer/Remplir), et **Y** pour
-rétablir la dernière modification annulée. Cette fonction nécessite un
-périphérique LOCI connecté (l'historique d'annulation est stocké dans la
-RAM d'extension de l'Oric, que seul un périphérique LOCI peut activer) --
-sans périphérique, **Z**/**Y** ne font rien. Il n'existe pas d'équivalent
-de cette fonction dans V1.
+ESC aux deux premières étapes annule toute l'opération.
+
+*Annuler et rétablir*
+
+Appuyez sur **Z** pour annuler la dernière modification de la zone de dessin (tracé, Ligne/Boîte, remplissages/couper/copier de Sélection, Déplacement, mode Écriture, ou Ecran > Effacer/Remplir), et **Y** pour rétablir. L'historique est stocké en RAM d'extension ($E800–$FFFF, 6 Kio), jusqu'à 40 niveaux. Ecran > Effacer/Remplir sur une zone de dessin de plus de 6 Kio n'est explicitement pas annulable.
 
 *Basculer la visibilité de la barre d'état*
-Appuyez sur **FUNCT+6** pour basculer entre la barre d'état visible (par défaut) ou non.
+
+Appuyez sur **FUNCT+6** pour basculer la barre d'état dans n'importe quel mode.
 
 *Écran d'aide*
-Appuyez sur **FUNCT+8** pour afficher un écran d'aide avec toutes les commandes clavier de ce mode.
+
+Appuyez sur **FUNCT+8** pour afficher un écran d'aide avec toutes les commandes clavier du mode actuel.
 
 ## Barre d'état
 ([Retour au sommaire](#sommaire))
 
-Si elle est activée, la barre d'état est affichée ainsi sur la dernière ligne de l'écran :
+Si elle est activée, la barre d'état occupe la dernière ligne de l'écran (ligne 27). Elle se masque automatiquement quand le curseur se déplace sur cette ligne (affichant à la place le contenu réel de la zone de dessin à cet endroit), et réapparaît quand le curseur s'éloigne.
 
-![Barre d'état](https://github.com/xahmol/OricScreenEditor/raw/main/screenshots/OSE%20statusbar.png)
+*(Capture d'ecran a venir dans une prochaine version.)*
 
-De gauche à droite, cette barre d'état affiche :
+De gauche à droite :
 
-- Mode : le mode dans lequel se trouve le programme (tel que Principal, Sélection, Ligne/Boîte, Palette ou Éditeur de caractères).
-- X,Y : coordonnées X et Y du curseur (coordonnées de l'écran complet, et pas seulement de la partie visible, si un écran plus grand que 40 par 27 caractères est sélectionné. Normalement affichées en décimal, mais en hexadécimal si la taille maximale de X ou Y dépasse 99)
-- C : code écran (Screencode), le caractère actuellement sélectionné pour le tracé, d'abord sous forme de numéro de code écran en hexadécimal, puis sous forme du caractère visuel réel.
-- S : le code écran en mémoire sous la position du curseur. Affiche soit le code de caractère (supérieur à $20), soit le code d'attribut (inférieur à $20), en hexadécimal
-- I : Ink (encre), la couleur actuellement sélectionnée pour l'encre. D'abord sous forme de numéro 0-7, puis sous forme de couleur visuelle.
-- P : Paper (papier), la couleur actuellement sélectionnée pour le papier. D'abord sous forme de numéro 0-7, puis sous forme de couleur visuelle.
-- Les trois dernières positions affichent les attributs modificateurs de jeu de caractères activés : A si le jeu alternatif est activé, D pour la taille double et B pour le clignotement.
-
-La barre d'état se masque automatiquement si le curseur est déplacé sur la dernière ligne visible de l'écran, et réapparaît (si elle était activée à l'origine) lorsque le curseur remonte.
+- **Mode** : mode actuel (Principal, Sélection, Ligne/Boîte, Palette, Éditeur de caractères, etc.)
+- **X,Y** : coordonnées absolues du curseur sur la zone de dessin (depuis l'origine, pas depuis la fenêtre visible). Affichées en décimal ; passe en hexadécimal si l'une des dimensions de la zone de dessin dépasse 99.
+- **C** : code écran sélectionné — valeur numérique (hex) puis caractère visuel
+- **S** : octet en mémoire à la position du curseur — code de caractère (>$20) ou code d'attribut (<$20), en hex
+- **I** : couleur d'encre sélectionnée — numéro 0–7, puis échantillon de couleur
+- **P** : couleur de papier sélectionnée — numéro 0–7, puis échantillon de couleur
+- **A / S** : bascule jeu de caractères alternatif (A=Alt, S=Std)
+- **D / _** : bascule double hauteur
+- **B / _** : bascule clignotement
 
 Appuyer sur **FUNCT+6** bascule la visibilité de la barre d'état dans tous les modes.
 
 ## Menu principal
 ([Retour au sommaire](#sommaire))
 
-Depuis le [mode principal](#mode-principal), appuyez sur **FUNCT+1** pour aller au menu principal. Le menu suivant apparaît :
-![Menu principal d'OSE](https://github.com/xahmol/OricScreenEditor/blob/main/screenshots/OSE%20Main%20menu.png?raw=true)
-
-(NB : si votre création utilise un jeu de caractères modifié, le programme charge la police système standard et votre création peut momentanément sembler incorrecte. Celle-ci sera restaurée à la sortie du menu principal. De plus, les menus déroulants affichent une ombre noire à droite en raison de limitations du système Oric).
-
-La navigation dans ce menu se fait avec les touches suivantes :
+Depuis le mode principal, appuyez sur **FUNCT+1** pour ouvrir la barre de menus. Navigation :
 
 |Touche|Description
 |---|---|
-|**Curseur GAUCHE / DROITE**|Se déplacer entre les options du menu principal
+|**Curseur GAUCHE / DROITE**|Se déplacer entre les entrées de la barre de menus
 |**Curseur HAUT / BAS**|Se déplacer entre les options du menu déroulant
-|**RETURN**|Sélectionner l'option de menu en surbrillance
-|**ESC** |Quitter le menu et revenir en arrière
+|**RETURN**|Sélectionner l'option en surbrillance
+|**ESC**|Quitter le menu et revenir en arrière
 
-**_Menu Écran_**
+(Note : si la zone de dessin utilise un jeu de caractères modifié, le programme restaure temporairement la police ROM pendant l'ouverture du menu, afin que le chrome des popups s'affiche correctement. Votre zone de dessin est restaurée à la fermeture du menu — c'est le mécanisme d'échange de jeux de caractères.)
 
-![Menu Écran](https://github.com/xahmol/OricScreenEditor/blob/main/screenshots/OSE%20Screen%20menu.png?raw=true)
+**_Menu Ecran_**
+
+*(Capture d'ecran a venir dans une prochaine version.)*
 
 *Width : redimensionner la largeur*
 
-Redimensionnez la largeur de la zone de dessin en saisissant la nouvelle largeur. Vous pouvez aussi bien réduire qu'agrandir la largeur. La largeur minimale est 40, la largeur maximale dépend de la hauteur de la zone de dessin et du fait que le résultat tienne dans l'allocation mémoire maximale de 10 Kio.
-
-Notez qu'en réduisant la largeur vous risquez de perdre des données, car tous les caractères à droite de la nouvelle largeur seront perdus. C'est pourquoi, lors d'une réduction, un menu déroulant apparaît pour vous demander confirmation. Sélectionnez la réponse souhaitée (position en surbrillance jaune si vous utilisez un fond noir).
-
-![Redimensionner la largeur](https://github.com/xahmol/OricScreenEditor/blob/main/screenshots/OSE%20Screen%20menu%20-%20width.png?raw=true)
+Redimensionnez la largeur de la zone de dessin en saisissant la nouvelle valeur. Toute largeur à partir de 1 est acceptée, sous réserve que largeur×hauteur ne dépasse pas 10 240 octets. Réduire en dessous de la largeur actuelle supprime les colonnes à droite de la nouvelle limite ; une boîte de dialogue de confirmation apparaît avant de réduire.
 
 *Height : redimensionner la hauteur*
 
-Comme pour le redimensionnement de la largeur, cette option permet de redimensionner la hauteur de la même façon. La hauteur minimale est 27, le maximum dépend à nouveau de la largeur, compte tenu de l'allocation mémoire maximale de 10 Kio.
-
-Là aussi : en réduisant, vous risquez de perdre des données, qui seront effectivement perdues si vous confirmez.
-
-![Redimensionner la hauteur](https://github.com/xahmol/OricScreenEditor/blob/main/screenshots/OSE%20Screen%20menu%20-%20height.png?raw=true)
+Identique pour la hauteur. Toute hauteur à partir de 1, même limite totale. Après redimensionnement, la vue est recentrée sur (0,0).
 
 *Clear : effacer la zone de dessin*
 
-Sélectionner cette option de menu efface la zone de dessin (c'est-à-dire la remplit d'espaces, avec les codes d'attribut pour la couleur d'encre et de papier sélectionnées tracés dans les deux premières colonnes de l'écran). Aucune confirmation n'est demandée.
+Remplit toute la zone de dessin avec des espaces et réinitialise les attributs encre/papier dans les deux premières colonnes de chaque ligne avec les valeurs actuellement sélectionnées. Annulable avec **Z** uniquement si la zone de dessin fait 6 Kio ou moins.
 
 *Fill : remplir la zone de dessin*
 
-Comme pour Clear, mais cette option remplit la zone de dessin avec le code écran actuellement sélectionné (c'est-à-dire les valeurs affichées par le curseur).
+Comme Effacer, mais remplit avec le code écran actuellement sélectionné plutôt qu'un espace. Même limite d'annulation.
 
 **_Menu Fichier_**
 
-![Menu Fichier](https://github.com/xahmol/OricScreenEditor/blob/main/screenshots/OSE%20filemenu.png?raw=true)
+*(Capture d'ecran a venir dans une prochaine version.)*
 
-**Note OSE-LOCI** : cette réécriture utilise le **périphérique de stockage
-de masse LOCI** pour toutes les opérations sur fichiers, au lieu des
-commandes cassette de V1. Les actions de **sauvegarde** et de
-**chargement** ouvrent désormais le même navigateur de fichiers : les
-actions de **sauvegarde** vous permettent de naviguer jusqu'au dossier
-souhaité et de le confirmer (appuyez sur **S** une fois au bon endroit),
-puis demandent un nom de fichier saisi (48 caractères maximum) ; les
-actions de **chargement** naviguent et sélectionnent directement le
-fichier, n'affichant que les fichiers pertinents pour l'action choisie
-(par exemple, Charger projet n'affiche que les fichiers de projet). Si
-aucun périphérique LOCI n'est détecté, chaque option des menus Fichier/
-Charset affiche un message "Aucun LOCI detecte" au lieu de tenter
-l'opération, le reste de l'éditeur continuant à fonctionner normalement
-sans périphérique connecté.
+Toutes les actions du menu Fichier utilisent le **périphérique de stockage de masse LOCI** — pas de commandes cassette. Les actions de sauvegarde et de chargement ouvrent toutes les deux le même navigateur de fichiers basé sur la XRAM LOCI.
 
-Le navigateur de fichiers permet de parcourir tout le système de
-fichiers, pas seulement le dossier de départ :
+**Les actions de sauvegarde** présentent une entrée `<nouveau fichier>` en haut de la liste, suivie des fichiers existants. Appuyez sur ENTRÉE sur `<nouveau fichier>` pour saisir un nouveau nom de fichier (48 caractères maximum) ; appuyez sur ENTRÉE sur un fichier existant pour l'écraser (avec une confirmation).
+
+**Les actions de chargement** permettent de naviguer et sélectionner directement le fichier dans la liste. Charger projet n'affiche que les fichiers de projet (`*PJ.BIN`) ; toutes les autres actions de chargement (Ecran, Combiné, Jeux de caractères) affichent tous les fichiers du dossier sans filtrage.
+
+Le navigateur de fichiers permet d'explorer tout le système de fichiers :
 
 |Touche|Description
 |---|---|
-|**Curseur HAUT/BAS**|Deplacer la surbrillance
+|**Curseur HAUT/BAS**|Déplacer la surbrillance
 |**Curseur GAUCHE**|Remonter au dossier parent
-|**Curseur DROITE / ENTER**|Entrer dans le dossier en surbrillance
-|**ENTER**|Selectionner le fichier en surbrillance (chargement uniquement)
-|**S**|Confirmer le dossier actuel (sauvegarde uniquement)
-|**T**|Aller au debut de la liste
-|**B**|Aller a la fin de la liste
+|**Curseur DROITE / ENTRÉE**|Entrer dans le dossier en surbrillance
+|**ENTRÉE**|Sélectionner le fichier en surbrillance (chargement) ou confirmer l'écrasement (sauvegarde)
+|**T**|Aller au début de la liste
+|**B**|Aller à la fin de la liste
 |**D**|Page suivante
-|**P**|Page precedente
-|**\\**|Aller a la racine du lecteur actuel
-|**. / ,**|Changer de lecteur suivant/precedent (0-9)
-|**E**|Creer un nouveau sous-dossier ici
-|**FUNCT+6**|Afficher/masquer la barre d'etat
-|**ESC**|Annuler et revenir en arriere
+|**P**|Page précédente
+|**\\**|Aller à la racine du lecteur actuel
+|**. / ,**|Changer de lecteur suivant/précédent (0–9, en sautant les lecteurs absents)
+|**E**|Créer un nouveau sous-dossier ici
+|**FUNCT+6**|Basculer la barre d'état
+|**ESC**|Annuler et revenir en arrière
 
-Copier, renommer ou supprimer des fichiers/dossiers n'est pas pris en
-charge -- utilisez un outil compatible LOCI sur l'ordinateur hote pour
-cela.
+Copier, renommer et supprimer des fichiers/dossiers ne sont pas pris en charge — utilisez un outil compatible LOCI sur l'ordinateur hôte pour ces opérations.
 
-*Save screen / Load screen (sauvegarder/charger l'écran)*
+*Sauver/Charger écran*
 
-Sauvegarde ou charge uniquement la zone de dessin (sans les jeux de
-caractères) dans/depuis `<nomfichier>.BIN` sur le périphérique LOCI : un
-simple dump des données d'écran, sans en-tête ni métadonnées d'aucune
-sorte -- c'est volontaire, exactement comme V1 : un écran sauvegardé est
-conçu pour être un fichier portable, chargeable ou intégrable depuis
-n'importe quelle source, pas seulement depuis OSE. C'est pourquoi Charger
-écran vous demande de saisir vous-même la largeur et la hauteur (pré-
-remplies avec la taille actuelle de la zone de dessin) avant de charger --
-rien dans le fichier ne permet de les déduire automatiquement.
+Sauvegarde ou charge uniquement la zone de dessin (sans les jeux de caractères) sous `<nomfichier>.BIN` sur le périphérique LOCI : un simple dump des données d'écran sans en-tête ni métadonnées — identique à V1 pour la portabilité. Comme il n'y a pas d'en-tête, Charger écran vous demande de saisir la largeur et la hauteur (pré-remplies avec la taille actuelle) avant de charger.
 
-*Save project / Load project (sauvegarder/charger le projet)*
+*Sauver/Charger projet*
 
-Sauvegarde ou charge la zone de dessin avec ses métadonnées (position du
-curseur, fenêtre visible, sélection encre/papier/clignotement/double
-hauteur/jeu alternatif) et, si vous les avez modifiés pendant la session,
-les deux jeux de caractères -- sous la forme de jusqu'à quatre fichiers
-partageant le nom saisi : `<nomfichier>PJ.BIN` (métadonnées, incluant la
-taille de la zone de dessin -- donc, contrairement à Charger écran
-ci-dessus, Charger projet ne vous demande pas de ressaisir la largeur/
-hauteur), `<nomfichier>SC.BIN` (écran, même format simple que Sauver/
-Charger écran), `<nomfichier>CS.BIN` (jeu standard, écrit/attendu
-uniquement si vous l'avez modifié) et `<nomfichier>CA.BIN` (jeu
-alternatif, même condition). Charger un projet sauvegardé avec un seul jeu
-modifié laisse l'autre jeu inchangé (tel qu'il était avant le
-chargement). **Charger projet accepte aussi directement les fichiers de
-projet de V1** -- aucune conversion nécessaire, pointez simplement le
-navigateur de fichiers vers un projet sauvegardé par l'OricScreenEditor
-original.
+Sauvegarde ou charge la zone de dessin avec toutes les métadonnées : position du curseur, décalages de la vue, sélections encre/papier/clignotement/double/alternatif, et — si modifiés pendant cette session — l'un ou les deux jeux de caractères. Jusqu'à quatre fichiers partagent le nom de base :
 
-*Save combined / Load combined (sauvegarder/charger combiné)*
+- `<nomfichier>PJ.BIN` — en-tête de projet (taille de la zone, curseur/décalages, attributs de tracé, marqueur magic)
+- `<nomfichier>SC.BIN` — codes écran de la zone de dessin (brut, sans en-tête)
+- `<nomfichier>CS.BIN` — jeu de caractères standard (écrit/lu uniquement si modifié cette session)
+- `<nomfichier>CA.BIN` — jeu de caractères alternatif (même condition)
 
-Sauvegarde ou charge les deux jeux de caractères et la zone de dessin
-dans un seul fichier `<nomfichier>.BIN` en ordre de carte mémoire (plage
-affichable du jeu standard, région du jeu alternatif, données d'écran --
-voir la [Référence du format de fichier](#référence-du-format-de-fichier)
-pour la disposition exacte). Le canevas doit être exactement 40×28 ou
-40×27 -- les autres dimensions sont rejetées. Charger combiné détecte
-automatiquement la hauteur d'après la taille du fichier, donc aucune
-saisie de largeur/hauteur n'est nécessaire.
+Charger projet détecte automatiquement la taille de la zone de dessin depuis `PJ.BIN` — pas de saisie de largeur/hauteur. Il **accepte également directement les fichiers de projet de V1** (version CC65) — le format 19 octets de V1 est détecté automatiquement via le marqueur magic.
 
-**_Charset : charger et sauvegarder le jeu de caractères_**
+*Sauver/Charger combiné*
 
-![Menu Charset](https://github.com/xahmol/OricScreenEditor/blob/main/screenshots/OSE%20charsetmenu.png?raw=true)
+Sauvegarde ou charge les deux jeux de caractères et la zone de dessin dans un seul fichier `<nomfichier>.BIN` en ordre de carte mémoire. Le canevas doit être exactement 40×28 ou 40×27 — les autres dimensions sont rejetées. Charger combiné détecte automatiquement la hauteur depuis la taille du fichier. Voir la [Référence du format de fichier](#référence-du-format-de-fichier) pour la disposition exacte.
 
-Chargez ou sauvegardez le jeu standard ou alternatif séparément
-(`<nomfichier>.BIN` : 768 octets pour le jeu standard, 640 pour le jeu
-alternatif -- le jeu alternatif ne dispose que de 640 octets de mémoire
-réellement utilisable sur le matériel Oric réel, le reste chevauchant
-physiquement l'écran), ou "combiné" : sauvegarde 768 octets standard +
-256 octets prefixe non-affichable alternatif + 640 octets alternatif
-affichable = 1 664 octets au total, en ordre de carte mémoire. Les deux
-jeux sont sauvegardés et chargés ensemble. Voir la
-[Référence du format de fichier](#référence-du-format-de-fichier) pour
-la disposition exacte.
+**_Menu Caract._**
 
-*Réinitialiser standard->ROM (Nouveau OSE-LOCI)*
+*(Capture d'ecran a venir dans une prochaine version.)*
 
-Restaure le jeu de caractères standard depuis la police ROM de l'Oric en
-une seule étape, en perdant toute modification apportée via l'éditeur de
-caractères durant cette session. Demande confirmation au préalable, car
-ceci ne peut pas être annulé (utilisez cette option pour repartir d'un
-jeu standard vierge sans devoir revenir dans l'éditeur et appuyer sur
-**S** caractère par caractère). Seul le jeu standard peut être
-réinitialisé ainsi -- la ROM de l'Oric ne contient pas de table pour le
-jeu alternatif.
+Chargez ou sauvegardez le jeu standard ou alternatif séparément (`<nomfichier>.BIN` : 768 octets pour le jeu standard, 640 octets pour le jeu alternatif — le jeu alternatif ne dispose que de 640 octets de mémoire utilisable sur l'Oric réel, le reste chevauchant la RAM écran), ou "combiné" : 768 octets standard + 256 octets préfixe non-affichable alternatif + 640 octets alternatif affichable = 1 664 octets au total. Voir la [Référence du format de fichier](#référence-du-format-de-fichier) pour la disposition exacte.
 
-**_Information : informations de version, quitter le programme_**
+*Reinitialiser Standard→ROM*
 
+Restaure le jeu de caractères standard depuis la police ROM de l'Oric en une seule étape, perdant toutes les modifications apportées cette session. Demande confirmation. Seul le jeu standard peut être réinitialisé ainsi — utilisez Reinitialiser Alt→Boot pour le jeu alternatif.
 
-![Menu Information](https://github.com/xahmol/OricScreenEditor/blob/main/screenshots/OSE%20Screen%20Information.png?raw=true)
+*Reinitialiser Alt→Boot*
 
+Restaure le jeu de caractères alternatif (mosaïque) depuis la capture prise au démarrage du programme, perdant toutes les modifications apportées cette session. Demande confirmation. Utilise la capture du démarrage plutôt que la ROM, car l'Oric génère la police mosaïque algorithmiquement au démarrage — elle n'est pas stockée sous forme de table statique dans la ROM.
+
+**_Menu Information_**
+
+*(Capture d'ecran a venir dans une prochaine version.)*
 
 *Information*
 
-**Note OSE-LOCI** : cette option affiche une fenêtre en 2 pages au lieu de
-l'écran texte unique de V1, identique à celle du gestionnaire de fichiers
-LOCI locifilemanager-v2 : une page avec le logo IDreamtIn8Bits.com ainsi
-que les informations de version et les crédits, suivie d'une page avec un
-code QR menant à la page GitHub de ce projet. Appuyez sur une touche pour
-avancer entre les pages, puis pour revenir au menu principal.
+Affiche une popup en 2 pages : une page avec le logo IDreamtIn8Bits, le numéro de version et les crédits ; suivie d'une page avec un code QR menant à la page GitHub de ce projet. Appuyez sur une touche pour avancer entre les pages, puis pour revenir au menu.
 
-*Exit program (quitter le programme)*
+*Quitter*
 
-**Note OSE-LOCI** : comme cette réécriture bare-metal n'a pas de
-chargeur cassette sous-jacent vers lequel revenir (contrairement à
-l'OricScreenEditor original en CC65), cette option réinitialise la
-machine à son état de démarrage à froid. NB : aucune confirmation ne sera
-demandée et le travail non sauvegardé sera perdu.
+Réinitialise l'Oric à son état de démarrage à froid (saut via le vecteur RESET). Aucune confirmation n'est demandée et le travail non sauvegardé sera perdu.
 
 ## Éditeur de caractères
 ([Retour au sommaire](#sommaire))
 
-Appuyer sur **E** depuis le mode principal fait apparaître l'éditeur de caractères, qui se présente ainsi :
+Appuyer sur **E** depuis le mode principal ouvre l'éditeur de caractères sous forme de popup latérale (colonnes 26–39, lignes 0–14). Le reste de la zone de dessin reste visible et continue de montrer l'effet des modifications en temps réel — les modifications s'appliquent directement à la RAM charset.
 
-![Éditeur de caractères](https://github.com/xahmol/OricScreenEditor/blob/main/screenshots/OSE%20Chaedit.png?raw=true)
+L'en-tête de la popup affiche le code écran actuel (hex) et si le jeu Standard (Std) ou Alternatif (Alt) est actif. Les lignes en dessous affichent la grille de pixels 8×6, avec la valeur hexadécimale de chaque ligne affichée immédiatement à sa gauche.
 
-Il affiche une grille agrandie des bits du caractère actuel. L'en-tête indique le code écran du caractère actuel (en hexadécimal) et si le jeu de caractères Standard (Std) ou Alternatif (Alt) est actif. À gauche de la grille, les valeurs en octets des 8 lignes du caractère sont affichées en hexadécimal.
+*(Capture d'ecran a venir dans une prochaine version.)*
 
 Commandes clavier dans ce mode :
 
 |Touche|Description
 |---|---|
-|**Touches curseur**|Déplacer le curseur
+|**Touches curseur**|Déplacer le curseur dans la grille de pixels 8×6
 |**+**|Caractère suivant (augmente le code écran)
 |**-**|Caractère précédent (diminue le code écran)
-|**0-9**|Sélectionner le caractère de l'emplacement favori correspondant
-|**SHIFT + 0-9**|Enregistrer le caractère dans l'emplacement favori correspondant
-|**ESPACE**|Basculer le pixel à la position du curseur (trace/efface le pixel)
-|**DEL**|Effacer le caractère (efface tous les pixels du caractère actuel)
-|**I**|**I**nverser le caractère
-|**Z**|Annuler (**U**ndo) : restaure le caractère actuel à son état d'origine
-|**S**|Re**s**taurer le caractère depuis le jeu de caractères système (= jeu ROM système en minuscules)
-|**C**|**C**opier le caractère actuel
-|**V**|Coller le caractère actuel
-|**X / Y**|Mettre en miroir sur l'axe **X** ou **Y**
-|**L** / **R** / **U** / **D**|Faire défiler vers la gauche (**L**eft), la droite (**R**ight), le haut (**U**p) ou le bas (**D**own)
-|**H**|Saisir une valeur **H**exadécimale pour la ligne à la position du curseur
-|**ESC**|Quitter le mode caractère et revenir au mode principal
+|**=**|Identique à **+**
+|**A**|Basculer entre les jeux Standard et **A**lternatif
+|**0-9**|Sélectionner le caractère de l'emplacement favori
+|**SHIFT + 0-9**|Enregistrer le caractère dans l'emplacement favori
+|**ESPACE**|Basculer le pixel à la position du curseur
+|**DEL**|Effacer tous les pixels du caractère actuel
+|**I**|**I**nverser tous les pixels (XOR avec $3F)
+|**Z**|Annuler la dernière modification du caractère actuel (niveau unique, distinct de l'annulation de la zone de dessin)
+|**S**|Re**s**taurer le caractère depuis la ROM système (jeu Standard uniquement)
+|**C**|**C**opier le caractère actuel dans un tampon
+|**V**|Coller le tampon dans le caractère actuel
+|**X**|Miroir horizontal (inverser les bits gauche/droite)
+|**Y**|Miroir vertical (inverser les lignes haut/bas)
+|**L** / **R** / **U** / **D**|Faire défiler les pixels Gauche / Droite / Haut / Bas (avec rebouclage)
+|**H**|Saisir la valeur **H**exadécimale de la ligne à la position du curseur
+|**ESC**|Quitter l'éditeur de caractères et revenir au mode principal
 |**FUNCT+6**|Basculer la visibilité de la barre d'état
 |**FUNCT+8**|Écran d'aide
 
-*Déplacer le curseur*
+*Sélectionner le caractère à éditer*
 
-Appuyez sur les **touches curseur** pour déplacer le curseur dans la grille 8 par 8.
+**+** ou **=** augmente le code écran ; **-** le diminue. **A** bascule entre Standard (codes $20–$7F) et Alternatif (codes $20–$6F).
 
-*Sélectionner le code écran à éditer*
+*Basculer les pixels*
 
-La touche **+** ou **-** augmente, respectivement diminue, le code écran sélectionné de un. Appuyer sur A bascule le jeu de caractères utilisé entre Standard et Alternatif.
+**ESPACE** bascule le pixel au curseur. **DEL** efface tous les pixels. **I** inverse tous les pixels. **Z** restaure le caractère à son état avant cette session d'édition (niveau unique).
 
-*Sélectionner le code écran à éditer depuis un emplacement favori*
+*Copier, coller, miroir, défilement*
 
-Dans OSE, 10 emplacements sont disponibles pour stocker vos caractères les plus utilisés. Appuyer sur une touche **0-9** sélectionne le favori avec le numéro correspondant.
-
-*Enregistrer le code écran actuel dans un emplacement favori*
-
-Appuyer sur **SHIFT** plus **0-9** enregistre le caractère actuellement sélectionné dans l'emplacement favori correspondant.
-
-*Basculer les bits dans la grille*
-
-Appuyez sur **ESPACE** pour basculer le bit à la position actuelle du curseur. **DEL** efface tous les bits de la grille, **I** inverse tous les bits de la grille.
-
-*Annuler et restaurer*
-
-**U** restaure le caractère actuel à ses valeurs d'origine. Notez qu'après être passé à un autre code écran à éditer, le code écran précédent ne peut plus être restauré.
-
-**S** copie le code écran actuel depuis la police système.
-
-*Copier et coller*
-
-**C** copie le code écran actuel dans une mémoire tampon, à coller en appuyant sur **V** sur un autre code écran après avoir sélectionné ce dernier.
-
-*Miroir et défilement*
-
-Appuyez sur **X** ou **Y** pour mettre la grille en miroir sur l'axe X, respectivement Y. **L**, **R**, **U** et **D** font défiler la grille vers la gauche (**L**eft), la droite (**R**ight), le haut (**U**p) ou le bas (**D**own).
+**C** copie le glyphe actuel dans un tampon ; **V** le colle au code écran actuel. **X** / **Y** inversent le glyphe horizontalement/verticalement. **L**, **R**, **U**, **D** font défiler la grille d'un cran dans la direction indiquée, avec rebouclage.
 
 *Saisie hexadécimale*
 
-Appuyez sur **H** pour éditer la ligne actuelle complète de la grille en saisissant la valeur hexadécimale de l'octet représentant les bits de cette ligne.
+Appuyez sur **H** pour éditer la ligne actuelle en saisissant sa valeur 8 bits sous forme de deux chiffres hexadécimaux directement à l'écran.
 
-*Quitter le mode et aide*
+*Restaurer depuis la ROM*
 
-Appuyer sur **ESC** quitte le mode caractère et revient au mode principal. **FUNCT+8** affiche un écran d'aide avec toutes les commandes clavier du mode caractère.
+Appuyez sur **S** (jeu Standard uniquement) pour copier le glyphe ROM du code écran actuel dans la RAM charset, écrasant toutes les modifications. Il n'existe pas de source ROM pour le jeu Alternatif — utilisez **Caract. > Reinitialiser Alt→Boot** depuis le menu principal pour restaurer toute la banque Alt depuis la capture du démarrage.
 
 ## Mode palette
 ([Retour au sommaire](#sommaire))
 
-Appuyer sur **P** en mode principal démarre le mode Palette. Dans ce mode, un caractère à tracer peut être sélectionné depuis le jeu de caractères, la palette complète de 121 couleurs et les 10 emplacements favoris.
+Appuyer sur **P** en mode principal ouvre le mode Palette. Une popup affiche les 10 emplacements favoris en première ligne, suivis du jeu Standard complet (codes $20–$7F, 6 lignes de 16), puis le jeu Alternatif complet (ou un réordonnancement en plan de caractères visuel, voir ci-dessous).
 
-Une fenêtre comme celle-ci apparaît :
+*(Capture d'ecran a venir dans une prochaine version.)*
 
-![Capture d'écran du mode Palette](https://github.com/xahmol/OricScreenEditor/blob/main/screenshots/OSE%20Palette.png?raw=true)
-
-La fenêtre affiche les 10 emplacements favoris sur la première ligne, en dessous le jeu de caractères standard, et en dessous encore le jeu de caractères alternatif.
-
-Commandes clavier dans ce mode :
+Commandes clavier :
 
 |Touche|Description
 |---|---|
-|**Touches curseur**|Déplacer le curseur
-|**ESPACE ou ENTER**|Sélectionner le caractère
-|**0-9**|Enregistrer le caractère dans l'emplacement favori correspondant
+|**Touches curseur**|Déplacer le curseur (avec rebouclage entre les sections)
+|**ESPACE ou ENTRÉE**|Sélectionner le caractère en surbrillance et revenir au mode principal
+|**0-9**|Enregistrer le caractère en surbrillance dans l'emplacement favori correspondant
 |**V**|Basculer entre le mode normal et le mode plan de caractères **v**isuel
-|**ESC** |Quitter le mode caractère et revenir au mode principal
+|**ESC**|Revenir au mode principal sans modifier le caractère sélectionné
 |**FUNCT+6**|Basculer la visibilité de la barre d'état
 
-*Déplacer le curseur*
+*Mode plan de caractères visuel*
 
-Appuyez sur les **touches curseur** pour déplacer le curseur dans la grille. Vous pouvez passer d'une section à l'autre simplement en sortant d'une section vers l'autre.
+Appuyer sur **V** bascule le mode plan de caractères visuel, qui réordonne la section du jeu Alternatif de sorte que les caractères soient classés dans un ordre logique pour le dessin (conçu autour de la police mosaïque/semi-graphique native de l'Oric). Ce mode n'a de sens que pour un jeu Alternatif non modifié.
 
-*Sélectionner un caractère ou une couleur*
-
-Appuyez sur **ESPACE** ou **ENTER** pour sélectionner le caractère ou la couleur en surbrillance comme nouveau caractère ou couleur de tracé. Ceci quitte le mode palette.
-
-*Enregistrer dans un emplacement favori*
-
-Appuyer sur **0-9** enregistre le caractère actuellement en surbrillance dans l'emplacement favori correspondant.
-
-*Basculer le mode plan de caractères visuel*
-
-Le mode plan de caractères visuel est un mode dans lequel la palette du jeu de caractères alternatif est réorganisée de manière à classer les caractères dans un ordre logique pour le dessin. Ce mode n'a de sens que pour des jeux de caractères alternatifs non modifiés.
-
-Cela ressemble à ceci :
-
-![Palette PETSCII visuelle](https://github.com/xahmol/OricScreenEditor/blob/main/screenshots/OSE%20Palette%20Visual.png?raw=true)
-
-Appuyer sur **V** bascule entre le mode normal et le mode visuel.
-
-*Quitter le mode et aide*
-
-Appuyer sur **ESC** quitte le mode palette et revient au mode principal. Il n'y a pas d'écran d'aide séparé pour le mode palette.
+*(Capture d'ecran du mode visuel a venir dans une prochaine version.)*
 
 ## Sélecteur de couleurs
 ([Retour au sommaire](#sommaire))
 
-Appuyer sur **C** en mode principal démarre le sélecteur de couleurs. Il s'agit d'un ajout par rapport à l'OricScreenEditor original : une grille visuelle permettant de sélectionner ensemble les couleurs d'encre et de papier à tracer, avec un aperçu de la combinaison normale et inversée résultante.
+Appuyer sur **C** en mode principal ouvre le sélecteur de couleurs, qui fournit une grille visuelle pour sélectionner les couleurs d'encre et de papier.
 
-Une fenêtre comme celle-ci apparaît, montrant les 64 combinaisons Encre/Papier sous forme d'une grille de 4 colonnes x 16 lignes (cette répartition, plutôt qu'une grille 8x8, permet à chaque cellule d'afficher un echantillon normal et un echantillon inverse côte à côte sans depasser la largeur de l'ecran), ainsi que des lignes d'information indiquant l'Encre et le Papier actuellement en surbrillance et l'aperçu normal/inversé résultant :
+La popup affiche les 64 combinaisons Encre/Papier sous forme d'une grille 8×8 (une ligne par couleur de papier, une colonne par couleur d'encre). Chaque cellule montre un échantillon de couleur normal et un inversé côte à côte. Trois lignes sous la grille affichent l'encre et le papier actuellement en surbrillance, ainsi qu'un aperçu normal/inversé résultant.
 
-```
-Choisir encre et papier
-<grille de 4 colonnes x 16 lignes de cellules encre x papier, chacune montrant l'echantillon normal et inverse pour cette combinaison>
-Encre:  N <echantillon>
-Papier: N <echantillon>
-Result: <apercu normal/inverse>
-```
+*(Capture d'ecran a venir dans une prochaine version.)*
 
-*(Capture d'ecran a venir -- cette section n'a pas d'equivalent dans V1
-pour en reprendre une image temporaire, le selecteur de couleurs etant
-une nouveaute propre a OSE-LOCI.)*
-
-Commandes clavier dans ce mode :
+Commandes clavier :
 
 |Touche|Description
 |---|---|
-|**Touches curseur**|Déplacer le curseur (GAUCHE/DROITE font défiler l'Encre, HAUT/BAS font défiler le Papier, les deux bouclent de 0 à 7)
-|**ESPACE ou ENTER**|Sélectionner la combinaison Encre/Papier en surbrillance
-|**ESC**|Quitter le sélecteur de couleurs et revenir au mode principal, sans modifier les couleurs Encre/Papier sélectionnées
-
-*Déplacer le curseur*
-
-Appuyez sur les **touches curseur** pour déplacer le curseur dans la grille. **GAUCHE**/**DROITE** font défiler la couleur d'Encre (en bouclant entre les deux moities de 4 colonnes de la grille), **HAUT**/**BAS** font défiler la couleur de Papier par pas de deux lignes, les deux bouclant entre les couleurs 0 et 7.
-
-*Sélectionner l'encre et le papier*
-
-Appuyez sur **ESPACE** ou **ENTER** pour sélectionner la combinaison Encre/Papier en surbrillance comme nouvelles couleurs de tracé. Ceci quitte le sélecteur de couleurs et revient au mode principal ; les champs I et P de la barre d'état se mettent à jour en conséquence.
-
-*Quitter le mode*
-
-Appuyer sur **ESC** quitte le sélecteur de couleurs sans modifier les couleurs Encre/Papier sélectionnées, et revient au mode principal.
+|**Curseur GAUCHE / DROITE**|Faire défiler la couleur d'encre (rebouclage 0–7)
+|**Curseur HAUT / BAS**|Faire défiler la couleur de papier (rebouclage 0–7)
+|**ESPACE ou ENTRÉE**|Accepter la combinaison Encre/Papier en surbrillance et revenir au mode principal
+|**ESC**|Revenir au mode principal sans modifier les couleurs Encre/Papier
+|**FUNCT+6**|Basculer la visibilité de la barre d'état
 
 ## Mode sélection
 ([Retour au sommaire](#sommaire))
 
-Appuyer sur **S** en mode principal démarre le mode Sélection.
+Appuyer sur **S** en mode principal entre en mode Sélection. Positionnez le curseur sur un coin de la zone à sélectionner avant d'entrer.
 
-Si elle est activée, la barre d'état affiche ceci à l'entrée dans ce mode :
+*(Capture d'ecran a venir dans une prochaine version.)*
 
-![Barre d'état en mode Sélection](https://github.com/xahmol/OricScreenEditor/blob/main/screenshots/OSE%20statusbar%20Select.png?raw=true)
+**Phase 1 — délimiter la sélection :** les touches curseur agrandissent ou contractent le rectangle depuis le coin de départ. La sélection est mise en surbrillance avec le code écran et les attributs actuels. Appuyez sur **ENTRÉE** pour accepter ; **ESC** annule et revient au mode principal. **FUNCT+8** affiche l'écran d'aide (uniquement avant que la sélection ait commencé à s'agrandir).
 
-Dans ce mode, une sélection peut être faite, sur laquelle différentes opérations peuvent être effectuées comme décrit ci-dessous.
+**Phase 2 — choisir l'action :** après avoir accepté, le champ mode de la barre d'état affiche les actions disponibles. Appuyez sur :
 
 |Touche|Description
 |---|---|
-|**X**|Couper (Cut) : efface la sélection à son ancienne position et la colle à la nouvelle position
-|**C**|**C**opier : copie la sélection à la nouvelle position, en laissant la sélection inchangée à l'ancienne position
-|**D**|Effacer (**D**elete) la sélection (remplit d'espaces)
-|**I**|Peindre avec l'attribut **I**nk (encre) : trace un modificateur d'encre dans la couleur actuellement sélectionnée
-|**P**|Peindre avec l'attribut **P**aper (papier) : trace un modificateur de papier dans la couleur actuellement sélectionnée
-|**M**|Peindre avec l'attribut **M**odificateur de caractère : trace le modificateur de caractère avec les attributs A, D et B actuellement sélectionnés.
-|**RETURN**|Accepter la sélection / accepter la nouvelle position
-|**ESC** |Annuler et revenir au mode principal
-|**Touches curseur**|Agrandir/réduire dans la direction sélectionnée / déplacer le curseur pour sélectionner la position de destination
+|**X**|Couper : copier la sélection à un nouvel emplacement, effacer l'original
+|**C**|**C**opier : copier la sélection à un nouvel emplacement, en laissant l'original intact
+|**D**|Supprimer (**D**elete) : remplir la sélection d'espaces
+|**I**|Peindre avec l'attribut **I**nk : remplir avec le modificateur d'encre actuel
+|**P**|Peindre avec l'attribut **P**aper : remplir avec le modificateur de papier actuel
+|**M**|Peindre avec l'attribut **M**odificateur de jeu de caractères
+|**ESC**|Annuler et revenir au mode principal
+
+**Couper et copier :** après avoir appuyé sur **X** ou **C**, déplacez le curseur jusqu'au coin supérieur gauche de la destination, puis appuyez sur **ENTRÉE** pour confirmer ou **ESC** pour annuler. Si la sélection dépasserait les limites de la zone de dessin, un message "Selection hors limites." apparaît et rien ne change. Couper utilise deux emplacements d'annulation — revenir sur une coupe nécessite deux pressions sur **Z**.
+
+Autres touches en mode Sélection :
+
+|Touche|Description
+|---|---|
+|**Touches curseur**|Agrandir/réduire la sélection (phase 1) ou déplacer le curseur vers la destination (couper/copier)
+|**ENTRÉE**|Accepter la sélection / confirmer la destination
+|**ESC**|Annuler et revenir au mode principal
 |**FUNCT+6**|Basculer la visibilité de la barre d'état
 |**FUNCT+8**|Écran d'aide
-
-*Créer la sélection*
-
-Assurez-vous que le curseur est positionné sur un coin de la sélection à créer avant d'entrer en mode Sélection. À l'entrée du mode sélection, agrandissez la sélection en appuyant sur les **touches curseur** pour augmenter ou diminuer la largeur et la hauteur dans la direction souhaitée depuis l'origine. Ceci est similaire aux touches utilisées dans le [mode Ligne et boîte](#mode-ligne-et-boîte).
-
-La sélection est affichée visuellement en utilisant le code écran et les attributs actuellement sélectionnés. Elle devrait ressembler à ceci :
-
-![Mode Sélection](https://github.com/xahmol/OricScreenEditor/blob/main/screenshots/OSE%20select.png?raw=true)
-
-Acceptez la sélection en appuyant sur **RETURN**, annulez-la en appuyant sur **ESC**.
-
-*Choisir l'action à effectuer*
-
-Après avoir accepté la sélection, appuyez sur **X**, **C**, **D**, **A** ou **P** pour choisir une action, ou appuyez sur **ESC** pour annuler.
-La barre d'état (si activée) affiche ceci comme invite :
-
-![Barre d'état - options de sélection](https://github.com/xahmol/OricScreenEditor/raw/main/screenshots/OSE%20statusbar%20Select%20choose%20option.png)
-
-*Couper et copier*
-
-Après avoir appuyé sur **X** pour couper ou **C** pour copier, déplacez le curseur jusqu'au coin supérieur gauche où la sélection doit être copiée. **C** ne fait qu'une copie, **X** efface la sélection à son ancienne position.
-
-La barre d'état (si activée) affiche Cut ou Copy en conséquence, comme ceci :
-
-![Barre d'état - Cut ou Copy](https://github.com/xahmol/OricScreenEditor/raw/main/screenshots/OSE%20statusbar%20Select%20Copy.png)
-
-*Effacer*
-
-Appuyer sur **D** efface la sélection actuelle (remplit la zone sélectionnée d'espaces).
-
-*Peindre avec un attribut ou seulement une couleur*
-
-Appuyer sur **I**, **P** ou **M** remplit la zone avec, respectivement, la couleur d'encre, la couleur de papier ou les modificateurs de jeu de caractères avec les valeurs actuellement sélectionnées. Ceci est surtout utile en sélectionnant une colonne verticale d'un caractère de large, pour changer les attributs de toutes les lignes à droite de cette colonne.
-
-*Quitter le mode et aide*
-
-Quittez le mode sélection en appuyant sur **ESC**. Appuyer sur **FUNCT+8** à tout moment dans ce mode affiche un écran d'aide avec les commandes clavier de ce mode (impossible si la sélection a été agrandie mais pas encore acceptée).
-
-**Note OSE** : Couper (**X**) et Copier (**C**) déplacent la sélection
-vers une nouvelle position choisie avec les touches curseur (**ENTER**
-pour confirmer, **ESC** pour annuler) -- Copier laisse l'original en
-place, Couper l'efface. Si la destination dépasse les limites de la zone
-de dessin, un message "Selection hors limites." apparaît et rien n'est
-modifié.
 
 ## Mode déplacement
 ([Retour au sommaire](#sommaire))
 
-Appuyer sur **M** en mode principal démarre le mode Déplacement. Utilisez ce mode pour faire défiler la fenêtre visible actuelle dans la direction souhaitée en appuyant sur les **touches curseur**.
+Appuyer sur **M** en mode principal entre en mode Déplacement. Utilisez ce mode pour faire défiler le contenu de la fenêtre visible actuelle dans n'importe quelle direction. Chaque pression sur une touche curseur décale toutes les cellules dans la zone de fenêtre de 40×28 d'un cran dans cette direction dans `screenmap[]` ; le contenu qui sort du bord est perdu.
 
-Notez que le déplacement ne s'effectue que sur la partie visible actuelle de 40x25 de l'écran ; sur des zones de dessin plus grandes, l'écran entier n'est donc pas déplacé. Ceci est dû à des contraintes mémoire.
+**Note :** chaque décalage est appliqué immédiatement — RETOUR et ESC quittent tous les deux le mode Déplacement en conservant les décalages déjà effectués. Il n'y a pas de tampon de travail pour revenir en arrière. Utilisez **Z** (annuler) après avoir quitté si vous souhaitez revenir en arrière.
 
-Il est également important de noter que les caractères qui « sortent » de l'écran sont perdus si le déplacement est accepté.
-
-Une alternative au mode déplacement consiste à utiliser le [mode sélection](#mode-sélection) et la fonction Couper pour déplacer une sélection vers une nouvelle position.
-
-Acceptez avec **RETURN**, annulez avec **ESC**. Les deux quittent ce mode et reviennent au mode principal.
-
-**Note OSE** : dans cette réécriture basée sur LOCI, chaque déplacement est
-appliqué directement dès que vous appuyez sur une touche curseur (il n'y a
-pas de copie de travail séparée pour annuler) -- **RETURN** et **ESC** se
-comportent donc de façon identique ici, conservant les déplacements déjà
-effectués pendant cette session.
+Le mode Déplacement n'agit que sur la zone de la fenêtre visible. Sur une zone de dessin plus grande que 40×28, seule la fenêtre de 40×28 visible est décalée ; les cellules hors de la fenêtre ne sont pas affectées.
 
 |Touche|Description
 |---|---|
-|**Touches curseur**|Se déplacer dans la direction sélectionnée
-|**RETURN**|Accepter la position déplacée
-|**ESC**|Annuler et revenir au mode principal
+|**Touches curseur**|Décaler le contenu de la fenêtre dans la direction sélectionnée
+|**RETOUR ou ESC**|Quitter le mode Déplacement et revenir au mode principal
 |**FUNCT+6**|Basculer la visibilité de la barre d'état
 |**FUNCT+8**|Écran d'aide
 
 ## Mode ligne et boîte
 ([Retour au sommaire](#sommaire))
 
-Appuyer sur **L** en mode principal démarre le mode Ligne et boîte. Dans ce mode, des lignes et des boîtes peuvent être dessinées, tracées avec le code écran et la valeur d'attribut actuellement sélectionnés.
+Appuyer sur **L** en mode principal entre en mode Ligne et boîte. Positionnez le curseur sur un coin de la boîte ou au début de la ligne avant d'entrer.
 
-Assurez-vous que le curseur est positionné sur un coin de la sélection à créer avant d'entrer en mode Sélection. À l'entrée du mode sélection, agrandissez la sélection en appuyant sur les **touches curseur** pour augmenter ou diminuer la largeur et la hauteur dans la direction souhaitée depuis l'origine. Si la largeur ou la hauteur reste à un caractère, une ligne est dessinée, sinon une boîte est dessinée.
+**Phase 1 — délimiter le rectangle englobant :** les touches curseur agrandissent ou contractent le rectangle. Si la largeur ou la hauteur reste à 1, une ligne est tracée ; sinon, une boîte ou une ellipse est tracée. Appuyez sur **ENTRÉE** pour accepter ; **ESC** annule et revient au mode principal.
 
-**Nouveau OSE-LOCI :** pendant l'agrandissement de la boîte, appuyez sur
-**O** pour basculer entre une boîte pleine (par défaut, comme V1) et une
-boîte creuse qui ne trace que les quatre lignes de bordure, laissant
-l'intérieur intact. Le basculement peut être répété autant de fois que
-souhaité avant de valider.
-
-**Nouveau OSE-LOCI :** toujours pendant l'agrandissement, appuyez sur
-**C** pour basculer entre une boîte rectangulaire (par défaut) et une
-ellipse/cercle inscrite dans le même rectangle englobant. Combinez avec
-**O** pour un contour d'ellipse creux, ou laissez **O** désactivé pour
-une ellipse pleine. Notez que les cellules de caractères faisant 6x8
-pixels (non carrées), un rectangle carré s'affichera comme une ellipse
-aplatie, pas un cercle parfait -- élargissez le rectangle si vous
-souhaitez un résultat plus rond. Pour rappel, le champ mode de la barre
-d'état affiche `o:Bte c:El` pendant cette étape.
-
-Acceptez avec **RETURN**, annulez avec **ESC**. Les deux quittent ce mode et reviennent au mode principal.
-
-**FUNCT+8** affiche un écran d'aide avec toutes les commandes pour ce mode.
+**Phase 2 — options de forme :** après avoir accepté, la barre d'état affiche `o:Bte c:El` (avec des majuscules indiquant quelles bascules sont actives). Appuyez sur :
 
 |Touche|Description
 |---|---|
-|**Touches curseur**|Agrandir/réduire dans la direction sélectionnée
-|**O**|**Nouveau OSE-LOCI :** Basculer boîte/ellipse pleine ou creuse
-|**C**|**Nouveau OSE-LOCI :** Basculer forme rectangle/ellipse
-|**RETURN**|Accepter la ligne, la boîte ou l'ellipse
+|**O**|Basculer plein/creux (**O** en majuscule dans l'aide quand creux est activé)
+|**C**|Basculer rectangle/ellipse (**C** en majuscule dans l'aide quand ellipse est activée)
+|**ENTRÉE**|Tracer la forme avec les bascules actuelles
+|**ESC**|Annuler sans tracer
+
+Quatre formes résultent de la combinaison de ces bascules :
+- Boîte pleine (par défaut)
+- Boîte creuse (seules les quatre lignes de bordure sont tracées, l'intérieur reste intact)
+- Ellipse pleine inscrite dans le rectangle englobant
+- Contour d'ellipse creuse
+
+**Note sur les cellules de caractères et les ellipses :** les cellules de caractères Oric font 6 pixels de large × 8 pixels de haut. Un rectangle carré produit donc une ellipse visuellement aplatie, pas un cercle. Élargissez le rectangle si vous souhaitez un résultat plus rond.
+
+|Touche|Description
+|---|---|
+|**Touches curseur**|Agrandir/réduire dans la direction sélectionnée (phase 1)
+|**O**|Basculer plein/creux (phase 2)
+|**C**|Basculer rectangle/ellipse (phase 2)
+|**ENTRÉE**|Accepter (les deux phases)
 |**ESC**|Annuler et revenir au mode principal
 |**FUNCT+6**|Basculer la visibilité de la barre d'état
 |**FUNCT+8**|Écran d'aide
@@ -748,57 +596,50 @@ Acceptez avec **RETURN**, annulez avec **ESC**. Les deux quittent ce mode et rev
 ## Mode écriture
 ([Retour au sommaire](#sommaire))
 
-Appuyer sur **W** en mode principal démarre le mode Écriture. Dans ce mode, du texte peut être saisi librement en utilisant tout le clavier, ce qui rend la saisie de texte bien plus facile que de sélectionner les codes écran appropriés un par un. Tout le clavier est pris en charge, à condition que les caractères saisis soient imprimables (codes écran supérieurs à 32).
+Appuyer sur **W** en mode principal entre en mode Écriture. Tapez librement des caractères avec le clavier — toute touche imprimable (code écran > 32) trace le caractère au curseur et avance d'une cellule vers la droite.
 
-Les couleurs et attributs peuvent être tracés en mode écriture en modifiant d'abord les attributs souhaités, puis en traçant un code d'attribut :
-- Appuyer sur **CTRL+Z** ou **CTRL+X** diminue, respectivement augmente, la couleur d'encre sélectionnée
-- Appuyer sur **CTRL+C** ou **CTRL+V** diminue, respectivement augmente, la couleur de papier sélectionnée
-- Appuyer sur **CTRL+B**, **CTRL+A** ou **CTRL+D** bascule le jeu alternatif, le double ou le clignotement
-- Appuyer sur **CTRL+R** bascule le mode inversé
-- Appuyer sur **FUNCT+1** trace l'encre
-- Appuyer sur **FUNCT+2** trace le papier
-- Appuyer sur **FUNCT+3** trace le modificateur de caractère.
-- **Nouveau OSE-LOCI :** Appuyer sur **FUNCT+4** ouvre une fenêtre pour
-  saisir un attribut directement en hexadécimal : choisissez **1** pour
-  l'encre, **2** pour le papier ou **3** pour le modificateur de
-  caractère, puis saisissez une valeur 0-7. C'est une alternative au
-  basculement avec CTRL+Z/X/C/V quand vous connaissez déjà la valeur
-  exacte souhaitée.
+Les couleurs et attributs peuvent être réglés et tracés en mode écriture :
 
-Quittez le mode Écriture en appuyant sur **ESC**. **FUNCT+8** affiche un écran d'aide avec les commandes clavier de ce mode.
+- **CTRL+Z** / **CTRL+X** — diminuer / augmenter la couleur d'encre
+- **CTRL+C** / **CTRL+V** — diminuer / augmenter la couleur de papier
+- **CTRL+B** / **CTRL+A** / **CTRL+D** — basculer clignotement / jeu alternatif / double hauteur
+- **CTRL+R** — basculer la vidéo inversée (XOR du code écran avec 128)
+- **FUNCT+1** — tracer un modificateur d'encre pour la couleur d'encre actuelle
+- **FUNCT+2** — tracer un modificateur de papier pour la couleur de papier actuelle
+- **FUNCT+3** — tracer un modificateur de jeu de caractères pour les réglages actuels
+- **FUNCT+4** — saisie hexadécimale directe : choisissez **1** Encre / **2** Papier / **3** Modificateur, puis tapez un chiffre hexadécimal 0–7
+
+**DEL** déplace le curseur d'une cellule vers la gauche et efface cette cellule (style retour arrière). Il ne passe pas à la ligne précédente.
+
+Quittez le mode Écriture avec **ESC**. **FUNCT+8** affiche l'écran d'aide pour ce mode.
 
 |Touche|Description
 |---|---|
-|**Touches curseur**|Se déplacer dans la direction sélectionnée
-|**DEL**|Effacer la position actuelle du curseur (trace un espace blanc)
-|**CTRL+A**|Bascule l'attribut jeu de caractères alternatif
-|**CTRL+B**|Bascule l'attribut clignotement
-|**CTRL+D**|Bascule l'attribut double
-|**CTRL+R**|Bascule l'inversion
-|**CTRL+Z**|Diminue la couleur d'encre
-|**CTRL+X**|Augmente la couleur d'encre
-|**CTRL+C**|Diminue la couleur de papier
-|**CTRL+V**|Augmente la couleur de papier
-|**FUNCT+1**|Trace l'encre
-|**FUNCT+2**|Trace le papier
-|**FUNCT+3**|Trace le modificateur de caractère
-|**FUNCT+4**|**Nouveau OSE-LOCI :** Saisir encre/papier/modificateur en hexadécimal
-|**ESC** |Revenir au mode principal
+|**Touches curseur**|Déplacer le curseur (avec défilement automatique)
+|**DEL**|Déplacer vers la gauche et effacer cette cellule (retour arrière)
+|**CTRL+A**|Basculer l'attribut jeu de caractères alternatif
+|**CTRL+B**|Basculer l'attribut clignotement
+|**CTRL+D**|Basculer l'attribut double hauteur
+|**CTRL+R**|Basculer la vidéo inversée
+|**CTRL+Z**|Diminuer la couleur d'encre
+|**CTRL+X**|Augmenter la couleur d'encre
+|**CTRL+C**|Diminuer la couleur de papier
+|**CTRL+V**|Augmenter la couleur de papier
+|**FUNCT+1**|Tracer le modificateur d'encre
+|**FUNCT+2**|Tracer le modificateur de papier
+|**FUNCT+3**|Tracer le modificateur de jeu de caractères
+|**FUNCT+4**|Saisie hexadécimale directe d'attribut
+|**ESC**|Revenir au mode principal
 |**FUNCT+6**|Basculer la visibilité de la barre d'état
 |**FUNCT+8**|Écran d'aide
-|**Autres touches**|Trace le caractère correspondant (si imprimable)
+|**Autres touches imprimables**|Tracer le caractère correspondant et avancer vers la droite
 
 ## Référence des valeurs de couleur
 ([Retour au sommaire](#sommaire))
 
-Vous trouverez ci-dessous la liste des 8 valeurs de couleur.
+L'Oric utilise des valeurs de couleur RGB sur 3 bits (rouge bit 0, vert bit 1, bleu bit 2) :
 
-Les valeurs sont calculées à partir des 3 bits utilisés pour le rouge, le vert et le bleu (RGB) :
-- +1 pour le rouge
-- +2 pour le vert
-- +4 pour le bleu
-
-|Numéro|Couleur|B-V-R|
+|Numéro|Couleur|Bits B-V-R|
 |---|---|---|
 |0|Noir|0-0-0|
 |1|Rouge|0-0-1|
@@ -812,190 +653,143 @@ Les valeurs sont calculées à partir des 3 bits utilisés pour le rouge, le ver
 ## Référence des codes d'attribut série
 ([Retour au sommaire](#sommaire))
 
-L'Oric ne dispose pas d'un espace mémoire d'attributs séparé : changer un attribut se fait en traçant un code d'attribut à l'endroit où se trouverait normalement un caractère, l'effet de cet attribut étant valable pour le reste de la ligne jusqu'à ce qu'un autre code d'attribut le remplace plus loin sur la même ligne.
-Également, un code d'attribut peut soit changer l'encre, soit changer le papier, soit changer les modificateurs de jeu de caractères, soit changer les attributs de contrôle vidéo, mais jamais une combinaison de ces quatre catégories à la fois. Si vous souhaitez changer deux ou plusieurs de ces quatre catégories, vous devez tracer le même nombre de codes d'attribut les uns après les autres. C'est pour cela qu'on les appelle des attributs sériels.
-Cela complique assez la conception d'écrans multicolores, car chaque changement de couleur coûte un emplacement où aucun caractère normal ne peut être placé.
+L'Oric ne dispose pas d'un espace mémoire d'attributs séparé. Un octet dans la grille de caractères dont la valeur est dans la plage 0–31 est interprété comme un attribut sériel plutôt qu'un caractère affichable. Les attributs prennent effet depuis leur colonne jusqu'au bout de la même ligne raster ; au début de chaque nouvelle ligne, le ULA réinitialise l'encre en blanc et le papier en noir. Les attributs de modificateur de jeu de caractères (codes 8–15) ne se réinitialisent **pas** par ligne — ils persistent jusqu'au prochain octet d'attribut de mode jeu.
 
-Dans Oric Screen Editor, tous les attributs sauf les attributs de contrôle vidéo sont pris en charge. Mais OSE n'a pas connaissance des attributs que vous avez placés dans la ligne, donc le placement correct des attributs est de la responsabilité de l'utilisateur lors de la conception.
+Comme une cellule peut être soit un caractère soit un attribut mais pas les deux, insérer un attribut déplace le caractère qui s'y trouvait. Les mises en page multicolores nécessitent une colonne par changement d'attribut.
 
-Les codes d'attribut sont tous des codes de tracé de 0 à 31, les codes de 32 à 127 sont les caractères imprimables selon les codes ASCII standards, les codes à partir de 128 sont les mêmes mais en vidéo inversée.
+Pour le contexte complet : https://osdk.org/index.php?page=articles&ref=ART9
 
-Pour le contexte complet et la référence :
-https://osdk.org/index.php?page=articles&ref=ART9
+*Codes 0–7 : Changer l'encre*
 
-Vue d'ensemble des codes d'attribut possibles :
+|Code|Hex|Couleur d'encre|
+|---|---|---|
+|0|$00|Noir|
+|1|$01|Rouge|
+|2|$02|Vert|
+|3|$03|Jaune|
+|4|$04|Bleu|
+|5|$05|Magenta|
+|6|$06|Cyan|
+|7|$07|Blanc|
 
-*Codes 0-7 : changer l'encre*
+Motif de bits : `0 0 0 0 0 Bleu Vert Rouge`
 
-Pour changer la couleur de l'encre, les codes sont les numéros de couleur de base mentionnés ci-dessus dans la [Référence des valeurs de couleur](#référence-des-valeurs-de-couleur), c'est-à-dire simplement en positionnant les bits 0, 1 et 2 pour la valeur RGB, les bits 3 à 7 étant à zéro.
+*Codes 8–15 : Modificateur de jeu de caractères*
 
-Motif de bits :
+Bit 3 activé. Les bits 0–2 contrôlent le jeu Alternatif (bit 0), la Double hauteur (bit 1), et le Clignotement (bit 2).
 
-|Bit|7-6-5|4|3|2|1|0|
-|---|---|---|---|---|---|---|
-|Signification|0|0|0|Bleu|Vert|Rouge|
+|Code|Hex|Effet|
+|---|---|---|
+|8|$08|Jeu Standard, sans double, sans clignotement|
+|9|$09|Jeu Alternatif|
+|10|$0A|Standard, double hauteur|
+|11|$0B|Alternatif, double hauteur|
+|12|$0C|Standard, clignotement|
+|13|$0D|Alternatif, clignotement|
+|14|$0E|Standard, double hauteur, clignotement|
+|15|$0F|Alternatif, double hauteur, clignotement|
 
+*Codes 16–23 : Changer le papier*
 
-|Code|Hex|0-0-0-P-C-B-G-R|Couleur d'encre|
-|---|---|---|---|
-|00|00|0-0-0-0-0-0-0-0|Noir|
-|01|01|0-0-0-0-0-0-0-1|Rouge|
-|02|02|0-0-0-0-0-0-1-0|Vert|
-|03|03|0-0-0-0-0-0-1-1|Jaune|
-|04|04|0-0-0-0-0-1-0-0|Bleu|
-|05|05|0-0-0-0-0-1-0-1|Magenta|
-|06|06|0-0-0-0-0-1-1-0|Cyan|
-|07|07|0-0-0-0-0-1-1-1|Blanc|
+Bit 4 activé. Les bits 0–2 sont la valeur RGB (identique à l'encre).
 
-*Codes 8-15 : modificateur de jeu de caractères*
-
-Avec le bit 3 activé (donc +8), les bits 0, 1 et 2 sont utilisés pour modifier le comportement du jeu de caractères. Les différents comportements du jeu de caractères peuvent être définis en une seule fois avec un seul code.
-
-Motif de bits :
-
-|Bit|7-6-5|4|3|2|1|0|
-|---|---|---|---|---|---|---|
-|Signification|0|0|Modificateur de jeu activé|Clignotement activé|Taille double activée|Alternatif activé|
-
-|Code|Hex|0-0-0-P-C-B-D-A|Effet sur le jeu de caractères|
-|---|---|---|---|
-|08|08|0-0-0-1-0-0-0-0|Utilise le jeu de caractères standard|
-|09|09|0-0-0-1-0-0-0-1|Utilise le jeu de caractères alternatif|
-|10|0A|0-0-0-1-0-0-1-0|Utilise le jeu standard en taille double|
-|11|0B|0-0-0-1-0-0-1-1|Utilise le jeu alternatif en taille double|
-|12|0C|0-0-0-1-0-1-0-0|Utilise le jeu standard clignotant|
-|13|0D|0-0-0-1-0-1-0-1|Utilise le jeu alternatif clignotant|
-|14|0E|0-0-0-1-0-1-1-0|Utilise le jeu standard en taille double clignotant|
-|15|0F|0-0-0-1-0-1-1-1|Utilise le jeu alternatif en taille double clignotant|
-
-*Codes 16-23 : changer le papier*
-
-Pour changer la couleur du papier, les codes sont les numéros de couleur de base mentionnés ci-dessus dans la [Référence des valeurs de couleur](#référence-des-valeurs-de-couleur), c'est-à-dire simplement en positionnant les bits 0, 1 et 2 pour la valeur RGB, en plus du bit 4 (donc +16). Le bit 3, et les bits 5, 6 et 7 doivent être à 0.
-
-Motif de bits :
-
-|Bit|7-6-5|4|3|2|1|0|
-|---|---|---|---|---|---|---|
-|Signification|0|Modificateur de papier activé|0|Bleu|Vert|Rouge|
-
-|Code|Hex|0-0-0-P-C-B-G-R|Couleur de papier|
-|---|---|---|---|
-|16|10|0-0-0-1-0-0-0-0|Noir|
-|17|11|0-0-0-1-0-0-0-1|Rouge|
-|18|12|0-0-0-1-0-0-1-0|Vert|
-|19|13|0-0-0-1-0-0-1-1|Jaune|
-|20|14|0-0-0-1-0-1-0-0|Bleu|
-|21|15|0-0-0-1-0-1-0-1|Magenta|
-|22|16|0-0-0-1-0-1-1-0|Cyan|
-|23|17|0-0-0-1-0-1-1-1|Blanc|
-
-Notez que dans OSE, il n'est pas nécessaire de calculer ces codes d'attribut vous-même : le programme le fait pour vous en fonction des attributs et de la couleur sélectionnés. En mémoire, cependant, c'est ainsi que les codes sont stockés.
+|Code|Hex|Couleur de papier|
+|---|---|---|
+|16|$10|Noir|
+|17|$11|Rouge|
+|18|$12|Vert|
+|19|$13|Jaune|
+|20|$14|Bleu|
+|21|$15|Magenta|
+|22|$16|Cyan|
+|23|$17|Blanc|
 
 ## Référence du format de fichier
 ([Retour au sommaire](#sommaire))
 
-Tous les formats utilisés par OSE sont des dumps binaires sans en-tête --
-pas de nombres magiques, pas de champs de métadonnées, pas de rembourrage.
-Les fichiers sont écrits et lus par `loci_write()`/`loci_read()` directement
-depuis/vers les adresses mémoire Oric concernées. La seule exception est
-`PJ.BIN` (en-tête de projet), qui contient un marqueur `FILEIO_MAGIC`
-(`$4F53`) permettant la détection automatique du format V1.
+Tous les formats utilisés par OSE-LOCI sont des dumps binaires sans en-tête — pas de nombres magiques, pas de champs de métadonnées, pas de rembourrage. La seule exception est `PJ.BIN` (en-tête de projet), qui contient un marqueur `FILEIO_MAGIC` (`$4F53`) permettant la détection automatique du format V1.
 
 ### Ecran (`<nom>.BIN` — Fichier > Sauver/Charger écran)
 
-Dump brut de `screenmap[]`, le tampon canevas largeur×hauteur.
-Sans en-tête : la largeur et la hauteur ne sont pas stockées dans le
-fichier. Le chargement vous demande de les saisir.
+Dump brut de `screenmap[]`.
 
 | Offset | Taille | Contenu |
 |--------|--------|---------|
-| 0 | largeur × hauteur octets | codes d'écran du canevas (ligne par ligne, de haut en bas) |
+| 0 | largeur × hauteur octets | Codes écran du canevas, ligne par ligne (de haut en bas) |
 
-Ecran standard 40×28 = 1 120 octets. Toute taille de canevas est valide.
+Sans en-tête : la largeur et la hauteur ne sont pas stockées dans le fichier — Charger écran vous demande de les saisir. Ecran standard 40×28 = 1 120 octets. Toute taille de canevas est valide.
 
 ### Combiné (`<nom>.BIN` — Fichier > Sauver/Charger combiné)
 
-Dump de carte mémoire couvrant les deux jeux de caractères et l'écran,
-dans l'ordre exact qu'ils occupent en RAM Oric. Le format reflétant une
-région mémoire fixe, seules les deux hauteurs d'écran Oric standard sont
-acceptées : **40×28 ou 40×27**. Les autres dimensions sont rejetées.
-
-Le chargement ne demande pas les dimensions -- la hauteur est détectée
-automatiquement d'après la taille du fichier.
+Dump de carte mémoire couvrant les deux jeux de caractères et le canevas. Seules les dimensions **40×28** et **40×27** sont acceptées. Le chargement détecte automatiquement la hauteur depuis la taille du fichier.
 
 | Offset | Taille | Adresse de chargement | Contenu |
 |--------|--------|-----------------------|---------|
-| 0 | 768 | $B500–$B7FF | Plage affichable du jeu standard (codes $20–$7F, 96 glyphes × 8 octets) |
-| 768 | 256 | $B800–$B8FF | Préfixe non-affichable du jeu alternatif (codes $00–$1F ; non affiché comme glyphes mais partie de la banque Alt contiguë) |
-| 1 024 | 640 | $B900–$BB7F | Plage affichable du jeu alternatif (codes $20–$6F, 80 glyphes × 8 octets ; s'arrête avant la RAM écran en $BB80) |
-| 1 664 | 40 × hauteur | $BB80+ | Données d'écran (codes d'écran, ligne par ligne) |
+| 0 | 768 | $B500–$B7FF | Plage affichable du jeu Standard (codes $20–$7F, 96 glyphes × 8 octets) |
+| 768 | 256 | $B800–$B8FF | Préfixe non-affichable du jeu Alternatif (codes $00–$1F) |
+| 1 024 | 640 | $B900–$BB7F | Plage affichable du jeu Alternatif (codes $20–$6F, 80 glyphes × 8 octets) |
+| 1 664 | 40 × hauteur | $BB80+ | Codes écran du canevas, ligne par ligne |
 
-Taille totale du fichier : **2 784 octets** (40×28) ou **2 744 octets** (40×27).
+Taille totale : **2 784 octets** (40×28) ou **2 744 octets** (40×27).
 
 ### Projet (quatre fichiers — Fichier > Sauver/Charger projet)
 
-Un projet se compose de jusqu'à quatre fichiers partageant un nom de base :
-
 | Fichier | Taille | Contenu |
 |---------|--------|---------|
-| `<nom>PJ.BIN` | 22 octets | Structure `ProjectHeader` : taille du canevas, position curseur/décalage, attributs de tracé (`plotscreencode`/encre/papier/clignotement/double/altchar), indicateurs `stdchanged`/`altchanged`, marqueur `FILEIO_MAGIC` (`$4F53`) |
-| `<nom>SC.BIN` | largeur × hauteur octets | Codes d'écran du canevas (brut, sans en-tête ; taille issue de `PJ.BIN`) |
-| `<nom>CS.BIN` | 768 octets | Plage affichable du jeu standard (écrit/lu uniquement si `stdchanged` est actif) |
-| `<nom>CA.BIN` | 640 octets | Plage affichable du jeu alternatif (codes $20–$6F uniquement ; écrit/lu uniquement si `altchanged` est actif) |
+| `<nom>PJ.BIN` | 22 octets | `ProjectHeader` : taille du canevas, positions curseur/décalages, attributs de tracé, indicateurs `stdchanged`/`altchanged`, marqueur `FILEIO_MAGIC` ($4F53) |
+| `<nom>SC.BIN` | largeur × hauteur octets | Codes écran du canevas (brut, sans en-tête ; taille issue de PJ.BIN) |
+| `<nom>CS.BIN` | 768 octets | Plage affichable du jeu Standard (écrit/lu uniquement si `stdchanged` est actif) |
+| `<nom>CA.BIN` | 640 octets | Plage affichable du jeu Alternatif, codes $20–$6F (écrit/lu uniquement si `altchanged` est actif) |
 
-Charger projet accepte aussi directement les fichiers `.PJ.BIN` de V1 (version CC65) -- le format 19 octets de V1 est détecté automatiquement via le champ magic.
+Les fichiers de projet V1 (version CC65) utilisent un format d'en-tête de 19 octets, détecté automatiquement via le marqueur magic.
 
-### Fichiers jeu de caractères (menu Charset)
+### Fichiers jeu de caractères (menu Caract.)
 
 | Format | Fichier | Taille | Contenu |
 |--------|---------|--------|---------|
 | Standard | `<nom>.BIN` | 768 octets | Plage affichable CHARSET_STD, $B500–$B7FF |
-| Alternatif | `<nom>.BIN` | 640 octets | Plage affichable CHARSET_ALT, $B900–$BB7F (80 glyphes uniquement ; les codes $70–$7F chevaucheraient la RAM écran) |
-| Combiné | `<nom>.BIN` | 1 664 octets | **Menu Charset uniquement** — même disposition que Fichier > Combiné mais sans l'écran : 768 octets standard affichable ($B500–$B7FF) + 256 octets préfixe non-affichable alternatif ($B800–$B8FF) + 640 octets alternatif affichable ($B900–$BB7F). Charge les deux banques. |
+| Alternatif | `<nom>.BIN` | 640 octets | Plage affichable CHARSET_ALT, $B900–$BB7F (codes $20–$6F uniquement ; les codes $70–$7F chevaucheraient la RAM écran) |
+| Combiné | `<nom>.BIN` | 1 664 octets | Même disposition que Fichier > Combiné mais sans l'écran : 768 octets Standard + 256 octets préfixe non-affichable Alternatif + 640 octets Alternatif affichable. Les deux banques sont chargées/sauvegardées ensemble. |
 
 ## Crédits
 ([Retour au sommaire](#sommaire))
 
-Oric Screen Editor
+Oric Screen Editor pour LOCI
 
 Éditeur d'écran pour l'Oric Atmos
 
-Écrit en 2022 par Xander Mol
+OSE-LOCI écrit en 2024–2026 par Xander Mol
 
-Basé sur VDC Screen Editor pour le C128
+Basé sur OricScreenEditor V1 (2022) par Xander Mol
 
-https://github.com/xahmol/OricScreenEditor
+https://github.com/xahmol/OricScreenEditorLOCI
 
 https://www.idreamtin8bits.com/
 
 Code et ressources d'autres personnes utilisés :
 
--   Compilateur croisé CC65 :
+-   **Compilateur croisé Oscar64** par drmortalwombat (compilateur C 6502 utilisé pour ce projet)
 
-    https://cc65.github.io/
+    https://github.com/drmortalwombat/oscar64
 
--   6502.org : Practical Memory Move Routines : point de départ pour les routines de déplacement mémoire
+-   **ROM et matériel LOCI** par Sodiumlightbaby et sodiumlb
 
-    http://6502.org/source/general/memory_move.html
+    https://github.com/sodiumlb/loci-rom
+    https://github.com/sodiumlb/loci-hardware
 
--   Code source de DraBrowse pour la commande DOS et la routine de saisie de texte
+-   **Émulateur Phosphoric** par benedictemarty (utilisé pour la suite de tests automatisés)
 
-    DraBrowse (db*) est un simple navigateur de fichiers.
-    Créé à l'origine en 2009 par Sascha Bader.
-    Version utilisée adaptée par Dirk Jagdmann (doj)
-    https://github.com/doj/dracopy
+    https://github.com/benedictemarty/Phosphoric
 
--   lib-sedoric de oricOpenLibrary (pour les opérations sur fichiers SEDORIC)
-    Par Raxiss, (c) 2021
-    https://github.com/iss000/oricOpenLibrary/blob/main/lib-sedoric/libsedoric.s
+-   **Driver joystick Raxiss IJK** depuis oricOpenLibrary
 
--   Bart van Leeuwen et forum.defence-force.org : pour l'inspiration et les conseils pendant le développement.
+    https://github.com/iss000/oricOpenLibrary
 
--   jab / Artline Designs (Jaakko Luoto) pour l'inspiration du mode Palette et du mode visuel PETSCII
+-   **jab / Artline Designs (Jaakko Luoto)** pour l'inspiration du mode plan de caractères visuel en palette
 
--   Code original du système de fenêtrage sur Commodore 128, par un auteur inconnu.
+-   **Bart van Leeuwen et forum.defence-force.org** pour l'inspiration et les conseils
 
--   Testé sur matériel réel Oric Atmos avec Cumana Reborn, et avec Oricutron pour Windows et Linux
+-   Testé sur matériel réel Oric Atmos avec LOCI, et avec les émulateurs Phosphoric et Oricutron
 
 Le code peut être utilisé librement à condition de conserver
 une mention décrivant la source et l'auteur d'origine.

@@ -1,15 +1,15 @@
-# Oric Screen Editor
-Screen editor for the Oric Atmos
+# Oric Screen Editor for LOCI
+Screen editor for the Oric Atmos — Oscar64 rewrite with LOCI mass-storage support
 
-## Contents:
+## Contents
 
 [Version history and download](#version-history-and-download)
 
 [Introduction](#introduction)
 
-[Known issues](#known-issues)
-
 [Start program](#start-program)
+
+[Build from source](#build-from-source)
 
 [Main mode](#main-mode)
 
@@ -40,96 +40,152 @@ Screen editor for the Oric Atmos
 [Credits](#credits)
 
 
-![OSE Title Screen](https://github.com/xahmol/OricScreenEditor/blob/main/screenshots/OSE%20Titlescreen.png?raw=true)
+*(Title screen screenshot will be updated in a future release.)*
 
 ## Version history and download
 ([Back to contents](#contents))
 
-Link to latest builds:
-- [.DSK disk image](https://github.com/xahmol/OricScreenEditor/raw/main/BUILD/OSE.dsk)
-- [.HFE disk image](https://github.com/xahmol/OricScreenEditor/raw/main/BUILD/OSE.hfe)
+Link to the latest release:
+https://github.com/xahmol/OricScreenEditorLOCI/releases/latest
 
-Version v099-20220824-1345:
-- File picker added
-- Minor other tweaks and fixes
+Version v0.1.0 (initial OSE-LOCI release):
 
-Version v099-20220615-1454:
-- First released beta version based on [VDCSE](https://github.com/xahmol/VDCScreenEdit) version v099-20220324-1527
+- From-scratch rewrite in Oscar64 C targeting the Oric Atmos 6502A bare-metal
+- **LOCI mass-storage device required** — canvas lives in overlay RAM; all file I/O is LOCI-based
+- Full localisation: English (`oseloci.tap`) and French (`oseloci_fr.tap`) builds, each with their own title screen and help screens
+- Canvas-edit undo/redo (up to 40 levels, backed by overlay RAM)
+- LOCI XRAM-backed file picker with full filesystem traversal across drives and subdirectories
+- Save/Load Screen, Project (4-file scheme), Combined (both charsets + screen), and Charset (Std / Alt / Combined) formats; full V1 project file compatibility
+- Character editor: direct live charset RAM edits, per-row hex input, inline undo
+- Charset-swap mechanism protecting popup chrome from user-redefined glyphs
+- Colour picker for visual ink/paper selection
+- IJK joystick support (Raxiss interface), detected automatically
+- Try mode, Goto/Home, Find/Replace, hollow box + ellipse in Line/Box mode
+- Charset > Reset Std→ROM and Reset Alt→Boot
+- Hex-direct attribute entry in Write mode (FUNCT+4)
+- Phosphoric headless automated test suite: 200/200 tests passing
 
 ## Introduction
 ([Back to contents](#contents))
 
-Oric Screen Editor is an editor to create text based screens for the Oric Atmos. It fully supports using user defined character sets.
+Oric Screen Editor for LOCI (OSE-LOCI) is a character-set-aware screen editor for the Oric Atmos, rewritten from scratch in Oscar64 C. It is based on [OricScreenEditor V1](https://github.com/xahmol/OricScreenEditor) (the original CC65 version) and extends it with LOCI mass-storage support, canvas-edit undo/redo, and several new editing features.
 
-**OSE-LOCI note**: this rewrite requires a **LOCI mass-storage device** to
-be attached to even start -- the canvas itself is stored in LOCI-backed
-overlay RAM, not just file loading/saving. If no LOCI device is detected,
-the program shows a message and exits instead of starting the editor.
+**A LOCI mass-storage device is required to run the program at all.** The canvas itself lives in LOCI-backed overlay RAM ($C000–$E7FF) rather than in the Oric's main RAM. If no LOCI device is detected at startup, the program shows a message and exits rather than entering the editor.
 
-Main features of the program:
-- Support for screen maps larger than 40x25 characters. Screens can be up to 10 KiB (10,240 bytes), all sizes fitting in that memory with width of 40 at minimum and height of 28 at minimum are supported.
-- Supports resizing canvas size, clear or fill the canvas
-- Support for loading user defined charsets (should be standard charsets of 96 characters of 6 bits width and 8 bits height, alternate charsets of 80 characters or combined charsets of 176 characters).
-- Includes a simple character editor to change characters on the fly and directly see the result in your designed screen.
-- Supports the Oric serial atribites for ink, paper and character modifiers (standard vs alternate charset, double height, blink).
-- Write mode to freely type characters with the keyboard
-- Line and box mode for drawing lines and boxes
-- Select mode to cut, copy, delete or repaint (only color or all attributes) the selection.
-- Move mode to scroll the screen contents (due to memory constraints only for the 40x28 viewport)
-- Palette mode, including visual charmap mode, to visually select characters and colors
-- Favorite slots to quickly select 10 favorite characters
-- **OSE-LOCI addition**: supports an IJK-compatible joystick (Raxiss IJK
-  interface) as an alternative to the keyboard everywhere cursor keys and
-  ENTER are used -- no separate mode or setting needed, it is detected
-  automatically at startup and simply works alongside the keyboard.
-- **OSE-LOCI additions**: Try mode to preview a character before
-  plotting it; Jump (**J**) and Home (**H**) to move the cursor and
-  viewport straight to a typed or fixed coordinate; a unified Find/
-  Replace (**F**) for screencodes and ink/paper colors across the whole
-  canvas; a hollow-box and ellipse/circle option in Line and box mode;
-  a Charset menu option to reset the standard character set from ROM in
-  one step; and a hex-direct attribute entry shortcut in Write mode.
+Main features:
 
-## Known issues
-- Filepicker routine only is properly working with SEDORIC3 disks created by the TAP2DSK tool from OSDK. If you want to import screens or charsets from other disks, please copy them to a TAP2DSK created image first.
+- Support for canvas sizes larger than 40×28 characters. Canvases can be any size from 1×1 upward, up to 10 KiB (10,240 bytes) total. Width and height are not limited to the 40×28 viewport — the editor auto-scrolls the viewport when the cursor reaches an edge.
+- Resize, clear or fill the canvas at any time via the Screen menu
+- Full LOCI file I/O with an XRAM-backed file picker supporting full filesystem traversal. Save/Load Screen, Project, Combined, and Charset formats. Saves both Standard and Alternate charset banks when edited.
+- Includes a character editor (sidebar popup) to modify glyphs live — edits apply directly to charset RAM and update all canvas cells using that glyph in real time
+- Supports Oric serial attributes: ink color, paper color, and character modifiers (standard vs alternate charset, double height, blink)
+- Canvas-edit undo/redo (**Z**/**Y**) backed by overlay RAM, up to 40 levels
+- Write mode for freely typing text with the full keyboard
+- Line and box mode: filled box, hollow box, filled ellipse, or hollow ellipse inscribed in the bounding box
+- Select mode: grow a rectangle, then cut, copy, delete, or fill with ink/paper/modifier attribute
+- Move mode: scroll the viewport's content in any direction
+- Palette mode with a visual charmap option for the alternate charset
+- Colour picker for selecting ink and paper colors together from a visual grid
+- Favorite slots to quickly access 10 frequently-used characters
+- **IJK joystick support** (Raxiss IJK interface) — detected automatically at startup, works alongside the keyboard everywhere cursor keys and ENTER are used
+- **Try mode** (**T**): preview a character without committing it; SPACE confirms, any other key cancels
+- **Goto** (**J**): open a popup to jump the cursor and viewport to any typed canvas coordinate
+- **Home** (**H**): jump straight to the canvas origin (0,0) without a popup
+- **Find/Replace** (**F**): locate or replace screencodes and ink/paper colors across the whole canvas
+- **Hollow box and ellipse** toggles in Line/Box mode (**O**, **C**)
+- **Charset > Reset Std→ROM**: restore the standard charset from ROM in one step
+- **Charset > Reset Alt→Boot**: restore the alternate (mosaic) charset from the boot-time snapshot
+- **Hex-direct attribute entry** in Write mode (**FUNCT+4**)
+- Available in English and French (both title screen and help screens localised)
 
 ## Start program
 ([Back to contents](#contents))
 
-Mount the OSE disk image. Choose the .DSK or .HFE image depending on what is supported on the hardware or emulator you use (in general: .HFE for Cumana Reborn, .DSK for emulator).
+**Requirements:** an Oric Atmos with a LOCI mass-storage device attached. The editor will not start without one — when no LOCI is detected, it shows a message and exits.
 
-The OSE executable will autostart on mounting the disk. If not, just type OSE\<ENTER\>.
+**Installation:**
 
-Description of contents of the disk image:
+1. Download the latest release ZIP from the [Releases page](https://github.com/xahmol/OricScreenEditorLOCI/releases/latest).
 
-|Filename|Extension|Description|
-|---|---|---|
-|OSE|.COM|Main executable
-|OSEHS1|.BIN|Help screen for main mode
-|OSEHS2|.BIN|Help screen for character edit and palette modes
-|OSEHS3|.BIN|Help screen for select, move and line/box modes
-|OSEHS4|.BIN|Help screen for write and color write modes
-|OSETSC|.BIN|Title screen
+2. Unzip the entire contents into a single folder on the LOCI device's SD card. You can choose any folder name. The program loads its asset files (title screen, help screens) relative to the directory it was launched from, so all files must be in the same folder.
 
+3. Use the LOCI interface to navigate to the folder and launch the `.tap` file for your preferred language:
+   - `oseloci.tap` — English build
+   - `oseloci_fr.tap` — French build
 
-(Fun fact: all screens have actually been created using OSE as editor)
+   For instructions on navigating directories and launching `.tap` files with the LOCI hardware, see the [LOCI User Manual](https://github.com/sodiumlb/loci-hardware/wiki/LOCI-User-Manual).
 
-Leave the title screen by pressing any key.
+**Files included in the release ZIP:**
+
+| Filename | Description |
+|---|---|
+| `oseloci.tap` | Main program — English |
+| `oseloci_fr.tap` | Main program — French |
+| `OSETSC.BIN` | Title screen (EN) |
+| `OSETSF.BIN` | Title screen (FR) |
+| `OSEHS1.BIN`–`OSEHS4.BIN` | Help screens EN: main mode / character editor / select+move+line-box / write |
+| `OSEHF1.BIN`–`OSEHF4.BIN` | Help screens FR |
+| `PETSCIIPJ/SC/CS/CA.BIN` | Demo project: PETSCII art (from OricScreenEditor V1) |
+| `OSEDEMOPJ/SC/CS/CA.BIN` | Demo project: colour swatch + pixel-art sun |
+| `OSEDEMO.BIN` | Same demo in Combined format (File > Load Combined) |
+| `OSELOGOPJ/SC/CS/CA.BIN` | Demo project: Oric company logo in hand-drawn glyphs |
+| `LUDOTITLPJ/SC/CS/CA.BIN` | Demo project: Ludo title screen |
+| `LUDOSCRMPJ/SC/CS/CA.BIN` | Demo project: Ludo game screen |
+| `README.pdf` | This manual (EN) |
+| `README_fr.pdf` | This manual (FR) |
+
+All demo projects are loadable via **File > Load Project**. `OSEDEMO.BIN` is also loadable via **File > Load Combined**.
+
+Leave the title screen by pressing any key. The editor starts in Main mode.
+
+## Build from source
+([Back to contents](#contents))
+
+**Prerequisites:**
+
+- [Oscar64](https://github.com/drmortalwombat/oscar64) compiler. Set `OSCAR64_HOME` to the Oscar64 install directory (default: `~/oscar64`).
+- Python 3 (for the `mktap.py` tape-wrapping tool).
+- GNU Make.
+- Optional: `pandoc` + `texlive-xetex` for regenerating the PDF manuals (`make docs`).
+- Optional: [Phosphoric](https://github.com/benedictemarty/Phosphoric) emulator for the automated test suite (`make test`).
+
+**Building:**
+
+```
+git clone https://github.com/xahmol/OricScreenEditorLOCI.git
+cd OricScreenEditorLOCI
+make              # EN build → build/oseloci.tap
+make LANG=FR      # FR build → build/oseloci_fr.tap
+make all-langs    # build both language variants
+make docs         # regenerate README.pdf / README_fr.pdf
+make zip          # build release ZIP (both taps + all assets + READMEs)
+```
+
+**Copying to a LOCI device:**
+
+1. Copy `.env.example` to `.env` and set `USBPATH` to the target directory on the LOCI SD card (e.g. `/mnt/e/idi8b/OSEforLOCI` on WSL2, or `/media/yourname/SDCARD/ose` on Linux).
+2. Run `make usb` — builds both language variants, then copies all `.tap` and asset `.BIN` files to `USBPATH`. On WSL2, auto-mounts and unmounts the Windows drive.
+
+**Compiler flags (for reference):**
+
+```
+oscar64 -n -tf=bin -rt=include/oric_crt.c -i=include -i=src -O2 -dNOFLOAT
+```
+
+`-n` = native 6502 mode; `-tf=bin` = raw binary output; `-O2` = whole-program optimiser.
 
 ## Main mode
 ([Back to contents](#contents))
 
-After the title screen, the program starts in this mode. At start the screen shows this:
+After the title screen, the program starts in this mode. An inverted cursor showing the presently selected screencode is visible at the canvas origin.
 
-![Screen in main mode](https://github.com/xahmol/OricScreenEditor/blob/main/screenshots/OSE%20empty%20startscreen.png?raw=true)
-
-Only a inversed cursor with the presently selected screencode is visible.
+*(Screenshot pending — will be updated in a future release.)*
 
 Press these keys in main mode for editing:
 
 |Key|Description
 |---|---|
-|**Cursor keys**|Move cursor
+|**Cursor keys**|Move cursor (auto-scrolls the viewport if the canvas is larger than 40×28)
 |**+** or **=**|Next character (increase screen code)
 |**-**|Previous character (decrease screen code)
 |**0-9**|Select character from favorite slot with corresponding number
@@ -144,650 +200,461 @@ Press these keys in main mode for editing:
 |**A**|Toggle **A**lternate or Standard character set
 |**D**|Toggle **D**ouble height attribute
 |**I**|Plot a change **I**nk modifier attribute for the present selected ink color
-|**O**|Plot a change Paper modifier attribute for the present selected paper color
-|**U**|Plot a characterset modifier attribute for the present selected charset selection, double size and blink attributes
+|**O**|Plot a change Paper m**o**difier attribute for the present selected paper color
+|**U**|Plot a character-set modifier attrib**u**te for the present selected charset, double size and blink attributes
 |**E**|Go to 'character **E**dit mode' with present screen code
-|**G**|**G**rab underlying character and attribute at cursor position
+|**G**|**G**rab: read the character or attribute under the cursor into the plot settings
 |**W**|Go to '**W**rite mode'
 |**L**|Go to '**L**ine and box mode'
 |**M**|Go to '**M**ove mode'
 |**S**|Go to '**S**elect mode'
 |**P**|Go to '**P**alette mode'
 |**C**|Go to '**C**olour picker'
-|**T**|**T**ry mode
-|**R**|Toggle '**R**everse': toggle increase/decrease screencode by 128
-|**J**|**OSE-LOCI new:** **J**ump (go to) a typed canvas X/Y coordinate
-|**H**|**OSE-LOCI new:** **H**ome -- jump cursor and viewport to the canvas origin (0,0)
-|**F**|**OSE-LOCI new:** **F**ind/Replace a screencode or ink/paper color across the whole canvas
-|**Z**|**OSE-LOCI only:** Undo the most recent canvas edit
-|**Y**|**OSE-LOCI only:** Redo the most recently undone edit
+|**T**|**T**ry mode — preview current character without committing
+|**R**|Toggle '**R**everse video': XOR screencode with 128
+|**J**|**J**ump (Goto) — jump cursor and viewport to a typed canvas X/Y coordinate
+|**H**|**H**ome — jump cursor and viewport to canvas origin (0,0)
+|**F**|**F**ind/Replace a screencode or ink/paper color across the whole canvas
+|**Z**|Undo the most recent canvas edit
+|**Y**|Redo the most recently undone edit
 |**FUNCT+1**|Go to main menu
 |**FUNCT+6**|Toggle statusbar visibility
-|**FUNT+8**|Help screen
+|**FUNCT+8**|Help screen
 
-**NB**: Within Oricutron using the default keyboard mapping, the FUNCT key is assigned to the ALT key on the PC keyboard.
+**NB:** In Oricutron with the default keyboard mapping, the FUNCT key is mapped to the PC ALT key.
 
-*Moving cursor*
+*Moving the cursor*
 
-Press the **cursor keys** to move the cursor around the screen. If the canvas size is bigger than the 40x28 screensize, the screen will scroll on reaching the edges.
+Press the **cursor keys** to move the cursor around the screen. If the canvas is larger than the 40×28 viewport, the screen auto-scrolls when the cursor reaches an edge.
 
 *Selecting the screencode to plot*
 
-The **+** or **-** key will increase resp. decrease the selected screencode by one. The cursor will update to the presently selected screencode.
+The **+** or **=** key increases the selected screencode by one; **-** decreases it. The cursor preview updates to show the currently selected screencode.
 
-Pressing **R** will increase the screencode by 128 if the present screencode is lower than 128, otherwise decrease by 128. This will enable/disable the reverse bit for the hardware reversing of the character.
+Pressing **R** XORs the screencode with 128, toggling the reverse-video bit (hardware pixel inversion).
 
-*Selecting the screencode to plot from a favorite slot*
+*Selecting screencodes from a favorite slot*
 
-In OSE 10 positions are available to store your most frequently used characters in. Pressing one of the **0-9** keys selects the favorite with the corresponding number.
-
-*Storing the present screencode to a favorite slot*
-
-Pressing **SHIFT** plus **0-9** stores the presently selected character to the corresponding favorite slot.
+Ten favorite slots are available. Pressing **0-9** selects the corresponding favorite; **SHIFT+0-9** stores the currently selected character into that slot.
 
 *Selecting the attributes to plot*
 
-Increase or decrease the [color code](#color-value-reference) by one by pressing the **.** resp. **,** key for the Ink color, or **;** resp. **\'** for the Paper color. Pressing **B**, **D** or **A** will toggle the **B**link, **D**ouble size or **A**lternate charset attribute. Alternatively, press **C** to open the [colour picker](#colour-picker) and select the Ink and Paper colors together from a visual grid.
+Increase or decrease the [color code](#color-value-reference) by pressing **.** / **,** for ink, or **;** / **\'** for paper. Press **B**, **D** or **A** to toggle **B**link, **D**ouble size or **A**lternate charset. Alternatively, press **C** to open the [colour picker](#colour-picker) and choose ink and paper together from a visual grid.
 
 *Plotting and deleting a character*
 
-Press **SPACE** to plot the presently selected character at the present cursor position. **DEL** will delete the character or attribute value at the present position and replace it with a SPACE as character.
-Press **T** to preview how the selected character would look like if plotted without cursor blinking. Then press **SPACE** to confirm plotting the character, or any other key to cancel.
+Press **SPACE** to plot the presently selected character at the cursor position. **DEL** replaces the cell with a space.
+
+Press **T** to preview how the selected character would look when plotted. Press **SPACE** to confirm and commit it, or any other key to cancel.
 
 *Plotting serial attributes*
 
-Due to the way the Oric handles [color and attribute changes](#serial-attribute-code-reference), every screen position is either an attribute modifier or a character, but never both at the same time. For this reason, on plotting a character no attribute is plotted. The user of OSE needs to plot the serial attributes separately by its own desire.
-To do so, press **I** for plotting an **I**nk modifier for the present ink color, **P** for plotting a **P**aper modifier for the present paper color and **U** for plotting a characterset modifier for the present character attributes (the alternate, double and blink toggles).
+Due to the way the Oric handles [color and attribute changes](#serial-attribute-code-reference), every screen position is either an attribute modifier or a character — never both. For this reason, plotting a character does not automatically plot any attribute.
+
+Press **I** to plot an **I**nk modifier for the current ink color, **O** to plot a Paper modifier for the current paper color, and **U** to plot a character-set modifier reflecting the current alternate, double and blink settings.
 
 *Grabbing a character*
 
-Pressing **G** will 'grab' the character or attributes at the present cursor position and change the selected character screencode or attribute to these values for use in all other edit functions.
+Pressing **G** reads the character or attribute at the cursor position into the plot settings: a code >31 sets `plotscreencode`; a code <8 sets ink; a code >15 sets paper; codes 8–15 decode the charset, double and blink toggles. The cursor preview updates accordingly.
 
 *Character edit mode*
 
-This will enter [character edit mode](#character-editor) and start with editing the presently selected screencode. Tip: if you want to edit a specific character on the screen, grab that character first by moving the cursor on that character and press **G** for grab.
+Press **E** to enter [character edit mode](#character-editor) for the currently selected screencode. Tip: move the cursor over a character you want to edit, press **G** to grab it, then **E** to edit it.
 
 *Enter edit modes*
 
-Press **S** ([Select mode](#select-mode)) , **M** ([Move mode](#move-mode)), **L** ([Line and box mode](#line-and-box-mode)) or **W** ([Write mode](#write-mode)) for entering the corresponding edit modes.
-Reference is made to the specific sections in this readme for these modes (click the links). From all modes, return to main mode by pressing **ESC**.
+Press **S** ([Select mode](#select-mode)), **M** ([Move mode](#move-mode)), **L** ([Line and box mode](#line-and-box-mode)) or **W** ([Write mode](#write-mode)) to enter the corresponding mode. Press **ESC** in any mode to return to main mode.
 
-*Jump to coordinates and Home (OSE-LOCI new)*
+*Jump to coordinates and Home*
 
-Press **J** to open a popup asking for an X then a Y canvas coordinate
-(both pre-filled with the cursor's current position). Confirming both
-jumps the cursor and viewport there in one step, scrolling as needed --
-much quicker than scrolling cell by cell on a canvas bigger than the
-40x28 screen. ESC at either field cancels with no change. Press **H** to
-jump straight back to the canvas origin (0,0) without any popup.
+Press **J** to open a popup asking for an X then a Y canvas coordinate (both pre-filled with the cursor's current position). Confirming both jumps the cursor and viewport there in one step — much quicker than scrolling cell by cell on a canvas larger than the 40×28 screen. ESC at either field cancels with no change.
 
-*Find/Replace (OSE-LOCI new)*
+Press **H** to jump straight back to the canvas origin (0,0) without any popup.
 
-Press **F** to open the Find/Replace popup. First choose what to search
-for: **1** for screencode, **2** for ink color, or **3** for paper color.
-Next, enter the value to find (a hexadecimal screencode, or a color
-number 0-7). Finally, either press **ENTER** with a replacement value to
-replace every matching occurrence across the whole canvas (this can be
-undone afterwards with **Z**), or press **ESC** at that step to instead
-jump the cursor straight to the next occurrence of the value you searched
-for, without changing the canvas. ESC at the first two steps cancels the
-whole operation.
+*Find/Replace*
 
-*Undo and redo (OSE-LOCI only)*
+Press **F** to open the Find/Replace popup. First choose what to search for: **1** for screencode, **2** for ink color, or **3** for paper color. Next, enter the value to find (a hexadecimal screencode, or a color number 0–7). Finally, either:
+- Press **ENTER** with a replacement value to replace every matching occurrence across the whole canvas (undoable with **Z** afterwards).
+- Press **ESC** at the replacement step to instead jump the cursor to the next occurrence of the found value without changing the canvas.
 
-Press **Z** to undo the most recent canvas edit (plotting, Line/Box,
-Select fills/cut/copy, Move, Write mode, or Screen > Clear/Fill), and
-**Y** to redo the most recently undone edit. This needs a LOCI device
-attached (undo history is stored in the Oric's overlay RAM, which only a
-LOCI device can enable) — without one, **Z**/**Y** simply do nothing.
-There is no V1 equivalent of this feature.
+ESC at the first two steps cancels the whole operation.
+
+*Undo and redo*
+
+Press **Z** to undo the most recent canvas edit (plotting, Line/Box, Select fills/cut/copy, Move, Write mode, or Screen > Clear/Fill), and **Y** to redo the most recently undone edit. Undo history is stored in overlay RAM ($E800–$FFFF, 6 KiB), holding up to 40 levels. Screen > Clear/Fill on a canvas larger than 6 KiB is explicitly non-undoable.
 
 *Toggle statusbar visibility*
-Press **FUNCT+6** to toggle between the statusbar being visible (default) or not.
+
+Press **FUNCT+6** to toggle the statusbar on/off in any mode.
 
 *Help screen*
-Press **FUNCT+8** to show a help screen with all keyboard commands for this mode.
+
+Press **FUNCT+8** to show a help screen with all keyboard commands for the current mode.
 
 ## Statusbar
 ([Back to contents](#contents))
 
-If enabled, the statusbar is plotted as this at the lowest line of the screen:
+If enabled, the statusbar occupies the last row of the screen (row 27). It auto-hides when the cursor moves to that row (showing the real canvas content there instead), and reappears when the cursor moves away.
 
-![Status bar](https://github.com/xahmol/OricScreenEditor/raw/main/screenshots/OSE%20statusbar.png)
+*(Screenshot pending — will be updated in a future release.)*
 
-From left to right, this status bar shows:
+From left to right:
 
-- Mode: mode the program is in (such as Main, Select, Line/Box, Palette or Character Editor).
-- X,Y: X and Y coordinates of the cursor (coordinates of the large full screen, and not only the visible screen, if a larger screen than 40 by 27 characters is selected. Normally shows in decimal, but shows in hexadecimal if X or Y maximum size is higher than 99)
-- C: Screemcode, the present selected character to plot, first as screencode number in hexadecimal, second as actual visual character.
-- S: The screencode in memory underneath the cursor position. Will show either the character code (bigger than $20) or the attribute code (smaller than $20) in hexadecimal
-- I: Ink, the present selected color for the ink. First as number 0-7, then as visual color.
-- P: Paper, the present selected color for the paper. First as number 0-7, then as visual color.
-- The last three positions show the character set modifier attributes that are enabled: A if the alternate charset is enabled, D for double size and B for blink.
-
-The status bar auto hides if the cursor is moved to the lowest visible line on the screen, and pops up again (if enabled in the first place) when the cursor moves up.
+- **Mode**: current mode (Main, Select, Line/Box, Palette, Character Editor, etc.)
+- **X,Y**: absolute canvas coordinates of the cursor (row and column counting from the canvas origin, not the viewport). Displayed in decimal; switches to hexadecimal if either canvas dimension exceeds 99.
+- **C**: selected screencode — numeric (hex) then visual character
+- **S**: byte in canvas memory at the cursor position — either a character code (>$20) or an attribute code (<$20), in hex
+- **I**: selected ink color — number 0–7, then a color swatch
+- **P**: selected paper color — number 0–7, then a color swatch
+- **A / S**: alternate charset toggle (A=Alt, S=Std)
+- **D / _**: double height toggle
+- **B / _**: blink toggle
 
 Pressing **FUNCT+6** toggles statusbar visibility in every mode.
 
 ## Main menu
 ([Back to contents](#contents))
 
-From [main mode](#main-mode), press **FUNCT+1*** to go to the main menu. The following menu will pop up:
-![OSE Main Menu](https://github.com/xahmol/OricScreenEditor/blob/main/screenshots/OSE%20Main%20menu.png?raw=true)
-
-(NB: Note that if your design uses a changed character set, the program will load the standard system font and your design might temporarily look incorrect. This will be restored on exiting the main menu. Also, the pulldown menus will show a black shade to the right due to Oric system limitations).
-
-Navigation in this menu is performed by the following keys:
+From main mode, press **FUNCT+1** to open the menu bar. Navigate with:
 
 |Key|Description
 |---|---|
-|**Cursor LEFT / RIGHT**|Move between main menu options
-|**Cursor UP/ DOWN**|Move between pulldown menu options
-|**RETURN**|Select highlighted menu option
-|**ESC** |Leave menu and go back
+|**Cursor LEFT / RIGHT**|Move between menu bar entries
+|**Cursor UP / DOWN**|Move between pulldown options
+|**RETURN**|Select highlighted option
+|**ESC**|Leave menu and go back
+
+(Note: if the canvas uses a modified character set, the program temporarily restores the ROM font while the menu is open so the popup chrome renders correctly. Your canvas is restored when the menu closes — this is the charset-swap mechanism.)
 
 **_Screen menu_**
 
-![Screen menu](https://github.com/xahmol/OricScreenEditor/blob/main/screenshots/OSE%20Screen%20menu.png?raw=true)
+*(Screenshot pending — will be updated in a future release.)*
 
 *Width: Resize width*
 
-Resize the canvas width by entering the new width. You can both shrink as expand the width. Minimum width is 40, maximum width depends on the canvas height and the result fitting in the maximum of 10 KiB memory size allocation.
-
-Note that with shrinking the width you might loose data, as all characters right of the new width will be lost. That is why on shrinking a pulldown menu will pop-up asking if you are sure. Select the desired answer (yellow highlighted position if using a black background).
-
-![Resize width](https://github.com/xahmol/OricScreenEditor/blob/main/screenshots/OSE%20Screen%20menu%20-%20width.png?raw=true)
+Resize the canvas width by entering the new width. Any width from 1 upward is accepted, provided width×height does not exceed 10,240 bytes. Shrinking below the current width discards any columns to the right of the new boundary; a confirmation dialog appears before shrinking.
 
 *Height: Resize height*
 
-Similar to resize width, with this option you can resize the height in the same way. Minimum height is 28, maximum again dependent on width given maximum of 10 KiB memory allocation.
-
-Also here: on shrinking you might loose data, which is lost if you confirm.
-
-![Resize height](https://github.com/xahmol/OricScreenEditor/blob/main/screenshots/OSE%20Screen%20menu%20-%20height.png?raw=true)
+As above for height. Any height from 1 upward, same ceiling constraint. After resize, `canvas_goto(0,0)` re-centers the viewport.
 
 *Clear: Clear the canvas*
 
-Selecting this menu option will clear the canvas (which means filling the canvas with spaces, with attribute code for the selected color and selected paper plotted in the first two columns of the screen). No confirmation will be asked.
+Fills the entire canvas with spaces and resets ink/paper attributes in the first two columns of each row to the currently selected values. This operation is undoable with **Z** only if the canvas is 6 KiB or smaller; on larger canvases it is not undoable.
 
 *Fill: Fill the canvas*
 
-Similar to clear, but this will fill the canvas with the present selected screencode (so the values that the cursor was showing).
+Like Clear, but fills with the currently selected screencode rather than a space. Same undo limit applies.
 
 **_File menu_**
 
-![File menu](https://github.com/xahmol/OricScreenEditor/blob/main/screenshots/OSE%20filemenu.png?raw=true)
+*(Screenshot pending — will be updated in a future release.)*
 
-**OSE-LOCI note**: this rewrite uses the **LOCI mass-storage device** for
-all file I/O instead of V1's tape commands. Both **Save** and **Load**
-actions now open the same file-picker directory browser first: **Save**
-actions let you browse to and confirm the directory to save into (press
-**S** once you're in the right place), then ask for a typed filename (up
-to 48 characters); **Load** actions browse and select the file directly.
-Load Project shows only project files (`*PJ.BIN`) since the other three
-project files it needs (`SC.BIN`/`CS.BIN`/`CA.BIN`) are derived from that
-name; every other Load action (Screen/Combined/Charset) shows **every**
-file in the directory, with no filtering by name or extension, so you
-can load a raw binary dump that doesn't follow OSE's own naming
-convention. If no LOCI device is detected, every
-File/Charset menu item shows a "No LOCI device detected" message instead
-of attempting the operation, so the rest of the editor keeps working
-normally without one attached.
+All File menu actions use the **LOCI mass-storage device** — no tape commands. Both Save and Load actions open the same XRAM-backed file picker directory browser first.
 
-The file picker supports full filesystem traversal, not just the
-directory you started in:
+**Save actions** present a `<new file>` entry at the top of the listing plus the existing files. Press ENTER on `<new file>` to type a fresh filename (up to 48 characters); press ENTER on an existing file to overwrite it (with a confirmation prompt).
+
+**Load actions** let you browse and select the file directly from the listing. Load Project shows only project files (`*PJ.BIN`); all other Load actions (Screen, Combined, Charset) show every file in the directory with no filtering.
+
+The file picker supports full filesystem traversal:
 
 |Key|Description
 |---|---|
 |**Cursor UP/DOWN**|Move the highlighted entry
 |**Cursor LEFT**|Go up to the parent directory
 |**Cursor RIGHT / RETURN**|Enter a highlighted directory
-|**RETURN**|Select a highlighted file (Load actions only)
-|**S**|Confirm the current directory (Save actions only)
+|**RETURN**|Select a highlighted file (Load actions) or confirm overwrite (Save actions)
 |**T**|Jump to the top of the listing
 |**B**|Jump to the bottom of the listing
 |**D**|Page down
 |**P**|Page up
 |**\\**|Jump to the root of the current drive
-|**. / ,**|Switch to the next/previous drive (0-9)
+|**. / ,**|Switch to the next/previous drive (0–9, skipping absent drives)
 |**E**|Create a new subdirectory here
 |**FUNCT+6**|Toggle the statusbar
 |**ESC**|Cancel and go back
 
-Copying, renaming and deleting files/directories aren't supported --
-use a LOCI-aware tool on the host side for that.
+Copying, renaming and deleting files/directories are not supported — use a LOCI-aware tool on the host PC for those operations.
 
 *Save screen / Load screen*
 
-Saves or loads just the canvas (no character sets) to/from
-`<filename>.BIN` on the LOCI device: a bare dump of the screen data, with
-no header or metadata of any kind -- this is deliberate, matching V1
-exactly: a saved screen is meant to be a portable file you can load or
-embed from any source, not just from OSE itself. Because of that, Load
-screen asks you to enter the width and height yourself (pre-filled with
-the canvas' current size) before loading -- there's nothing in the file
-to auto-detect it from.
+Saves or loads just the canvas (no character sets) as `<filename>.BIN` on the LOCI device: a bare dump of the screen data with no header or metadata — matching V1 exactly for portability. Because there is no header, Load screen asks you to enter the canvas width and height (pre-filled with the current canvas size) before loading.
 
 *Save project / Load project*
 
-Saves or loads the canvas together with its metadata (cursor position,
-viewport, ink/paper/blink/double/altchar selection) and, if you've edited
-them this session, both character sets -- as up to four files sharing your
-typed filename: `<filename>PJ.BIN` (metadata, including the canvas size --
-so, unlike standalone Load screen above, Load project does not ask you to
-re-enter width/height), `<filename>SC.BIN` (screen, same bare format as
-Save/Load screen), `<filename>CS.BIN` (standard charset, only
-written/expected if you edited it) and `<filename>CA.BIN` (alternate
-charset, same condition). Loading a project that was saved with only one
-charset edited leaves the other charset bank untouched (still whatever
-was loaded/default beforehand). **Load project also accepts V1's own
-project files directly** -- no conversion needed, just point the file
-picker at a project saved by the original OricScreenEditor.
+Saves or loads the canvas together with all metadata: cursor position, viewport offsets, ink/paper/blink/double/altchar selection, and — if edited this session — either or both character sets. Up to four files share the base name:
+
+- `<filename>PJ.BIN` — project header (canvas size, cursor/offset, plot attributes, magic sentinel)
+- `<filename>SC.BIN` — canvas screencodes (bare, no header)
+- `<filename>CS.BIN` — standard charset (only written/expected if you edited it this session)
+- `<filename>CA.BIN` — alternate charset (same condition)
+
+Load project auto-detects the canvas size from `PJ.BIN` — no width/height prompt. It also **transparently accepts V1 (CC65 version) project files** — the 19-byte V1 header format is auto-detected via the magic sentinel field.
 
 *Save combined / Load combined*
 
-Saves or loads both character sets and the canvas in a single
-`<filename>.BIN` file in memory-map order (standard charset displayable
-range, alternate charset region, screen data — see the
-[File format reference](#file-format-reference) for the exact layout).
-Because the format mirrors a fixed region of Oric RAM, the canvas must
-be exactly 40×28 or 40×27 — other sizes are rejected. Load combined
-auto-detects the height from the file size, so no width/height prompt
-is needed.
+Saves or loads both character sets and the canvas in a single `<filename>.BIN` file in memory-map order. Because the format mirrors a fixed region of Oric RAM, the canvas must be exactly 40×28 or 40×27 — other sizes are rejected. Load combined auto-detects the height from the file size, so no width/height prompt is needed. See the [File format reference](#file-format-reference) for the exact byte layout.
 
-**_Charset: Load and save character set_**
+**_Charset menu_**
 
-![Charset menu](https://github.com/xahmol/OricScreenEditor/blob/main/screenshots/OSE%20charsetmenu.png?raw=true)
+*(Screenshot pending — will be updated in a future release.)*
 
-Load or save the standard or alternate character set separately
-(`<filename>.BIN`: 768 bytes for the standard set, 640 for the alternate
-set -- the alternate character set only has 640 bytes of usable memory
-on real Oric hardware, the rest physically overlaps the screen), or
-"combined": saves 768 bytes standard + 256 bytes alternate non-displayable
-prefix + 640 bytes alternate displayable = 1,664 bytes total, in
-memory-map order. Both banks are saved and loaded together. See the
-[File format reference](#file-format-reference) for the exact layout.
+Load or save the standard or alternate character set separately (`<filename>.BIN`: 768 bytes for the standard set, 640 bytes for the alternate set — the alternate charset only has 640 bytes of usable glyph space on real Oric hardware, since the rest of the bank physically overlaps the screen RAM), or "combined": 768 bytes standard + 256 bytes alternate non-displayable prefix + 640 bytes alternate displayable = 1,664 bytes total, both banks saved and loaded together. See the [File format reference](#file-format-reference) for the exact layout.
 
-*Reset Std->ROM (OSE-LOCI new)*
+*Reset Std→ROM*
 
-Restores the standard character set from the Oric's ROM font in one
-step, discarding any edits made to it via the character editor this
-session. Asks for confirmation first, since this cannot be undone (use
-this if you want to start a fresh standard character set without
-re-entering the editor and pressing **S** glyph by glyph). Only the
-standard set can be reset this way -- the Oric's ROM has no alternate
-character set table to restore from.
+Restores the standard character set from the Oric's ROM font in one step, discarding any edits made to it this session. Asks for confirmation first. Only the standard set can be reset this way — use Reset Alt→Boot for the alternate set.
 
-**_Information: Version information, exit program_**
+*Reset Alt→Boot*
 
+Restores the alternate (mosaic) character set from the snapshot taken when the program first started, discarding any edits made to it this session. Asks for confirmation first. This uses the boot-time snapshot rather than the ROM, because the Oric generates the alternate/mosaic font algorithmically at startup — it is not stored as a static table in ROM.
 
-![Information menu](https://github.com/xahmol/OricScreenEditor/blob/main/screenshots/OSE%20Screen%20Information.png?raw=true)
+**_Information menu_**
 
+*(Screenshot pending — will be updated in a future release.)*
 
 *Information*
 
-**OSE-LOCI note**: this option shows a 2-page popup instead of V1's single
-text screen, identical to the locifilemanager-v2 LOCI file manager's own
-version screen: a page with the IDreamtIn8Bits.com logo plus version and
-credits text, followed by a page with a QR code linking to this project's
-GitHub page. Press any key to advance through the pages and to return to
-the main menu afterwards.
+Shows a 2-page popup: a page with the IDreamtIn8Bits logo, version number, and credits; followed by a page with a QR code linking to this project's GitHub page. Press any key to advance between pages and to return to the menu afterwards.
 
 *Exit program*
 
-**OSE-LOCI note**: since this rewrite's bare-metal runtime has no
-underlying tape-loader process to return to (unlike the original
-CC65-based OricScreenEditor), this option resets the machine back to its
-cold-start state instead. NB: No confirmation will be asked and unsaved
-work will be lost.
+Resets the Oric back to its cold-start state (jumps through the RESET vector). No confirmation is asked and unsaved work will be lost.
 
-## Character editor:
+## Character editor
 ([Back to contents](#contents))
 
-Pressing **E** from the main mode will result in the character editor popping up, which looks like this:
+Pressing **E** from main mode opens the character editor as a narrow sidebar popup (columns 26–39, rows 0–14). The rest of the canvas remains visible and continues to show the effect of any glyph edits live — character edits apply directly to charset RAM, so every occurrence of the edited character on the canvas updates in real time.
 
-![Character editor](https://github.com/xahmol/OricScreenEditor/blob/main/screenshots/OSE%20Chaedit.png?raw=true)
+The popup header shows the current screencode (hex) and whether the Standard (Std) or Alternate (Alt) charset is active. Rows below the header show the 8×6 pixel grid, with the row's hex byte value shown immediately to the left of each grid row.
 
-It shows a magnified grid of the bits in the present character. The header shows the screencode of the present character (in hex) and if the Standard (Std) or Alternate (Alt) character set is active. On the left of the grid the byte values of the 8 lines of the character are shown in hex.
+*(Screenshot pending — will be updated in a future release.)*
 
 Keyboard commands in this mode:
 
 |Key|Description
 |---|---|
-|**Cursor keys**|Move cursor
+|**Cursor keys**|Move cursor within the 8×6 pixel grid
 |**+**|Next character (increase screen code)
 |**-**|Previous character (decrease screen code)
-|**0-9**|Select character from favorite slot with corresponding number
-|**SHIFT + 0-9**|Store character to favorite slot with corresponding number
-|**SPACE**|Toggle pixel at cursor position (plot/delete pixel)
-|**DEL**|Clear character (delete all pixels of present character)
-|**I**|**I**nverse character
-|**Z**|**U**ndo: revert present character to original state
-|**S**|Re**s**tore character from system character set (=lower case system ROM charset)
-|**C**|**C**opy present character
-|**V**|Paste present character
-|**X / Y**|Mirror in **X** axis or **Y**-axis
-|**L** / **R** / **U** / **D**|Scroll **L**eft, **R**ight, **U**p or **D**own
-|**H**|Input **H**ex value for line at cursor position
-|**ESC**|Leave character mode and go back to main mode
+|**=**|Same as **+**
+|**A**|Toggle between Standard and **A**lternate charset
+|**0-9**|Select character from favorite slot
+|**SHIFT + 0-9**|Store character to favorite slot
+|**SPACE**|Toggle pixel at cursor position
+|**DEL**|Clear all pixels in the current character
+|**I**|**I**nvert all pixels (XOR with $3F)
+|**Z**|Undo the last edit to the current character (single-level, not the canvas undo)
+|**S**|Re**s**tore current character from the ROM system charset (Standard charset only)
+|**C**|**C**opy current character to buffer
+|**V**|Paste buffer into current character
+|**X**|Mirror horizontally (flip bits left/right)
+|**Y**|Mirror vertically (flip rows up/down)
+|**L** / **R** / **U** / **D**|Scroll glyph pixels Left / Right / Up / Down (wrapping)
+|**H**|Input the **H**ex value for the row at the cursor position
+|**ESC**|Leave character editor and return to main mode
 |**FUNCT+6**|Toggle statusbar visibility
 |**FUNCT+8**|Help screen
 
-*Moving cursor*
+*Moving the cursor*
 
-Press the **cursor keys** to move the cursor around the 8 by 8 grid.
+Press the **cursor keys** to move the cursor around the pixel grid. The current pixel state toggles with **SPACE**.
 
-*Selecting the screencode to plot*
+*Selecting which character to edit*
 
-The **+** or **-** key will increase resp. decrease the selected screencode by one. Pressing A will toggle the character set to be used between Standard and Alternate.
+**+** or **=** increases the screencode; **-** decreases it. **A** toggles between Standard (codes $20–$7F) and Alternate (codes $20–$6F; codes $70–$7F would overlap screen RAM and are excluded).
 
-*Selecting the screencode to plot from a favotite slot*
+*Toggling pixels*
 
-In OSE 10 positions are available to store your most frequently used characters in. Pressing one of the **0-9** keys selects the favorite with the corresponding number.
+**SPACE** toggles the pixel at the cursor. **DEL** clears all pixels. **I** inverts all pixels. **Z** reverts the current character to its state before this edit session (single-level undo — switching to a different screencode does not preserve the previous one's undo history).
 
-*Storing the present screencode to a favorite slot*
+*Copy, paste, mirror, scroll*
 
-Pressing **SHIFT** plus **0-9** stores the presently selected character to the corresponding favorite slot.
-
-*Toggling bits in the grid*
-
-Press **SPACE** to toggle the bit at the present cursor position. **DEL** clears all bits in the grid, **I** inverts all bits in the grid.
-
-*Undo and restore*
-
-**U** reverts the present character to the original values. Note that after changing to a different screencode to edit, the previous screencode can no longer be reverted.
-
-**S** copies the present screencode from the system font.
-
-*Copy and paste*
-
-**C** copies the present screencode to buffer memory to be pasted with pressing **V** at a different screencode after selecting this other screencode.
-
-*Mirror and scroll*
-
-Press **X** or **Y** to mirror the grid on the X resp. Y axis. **L**, **R**, **U** and **D** scrolls the grid to the **L**eft, **R**ight, **U**p or **D**own.
+**C** copies the current glyph to a buffer; **V** pastes it at the current screencode. **X** / **Y** mirror the glyph horizontally/vertically. **L**, **R**, **U**, **D** scroll the pixel grid one step in the named direction with wrapping.
 
 *Hex input*
 
-Press **H** to edit the full present row of the grid by entering the hex value of the byte representing the bits in that byte for the line.
+Press **H** to edit the current row by typing its 8-bit value as two hex digits directly on screen at the row's position.
 
-*Leave mode and help*
+*Restore from ROM*
 
-Pressing **ESC** leaves the character mode and returns to main mode. **FUNCT+8** will show a help screen with all keyboard commands of the character mode.
+Press **S** (Standard charset only) to copy the ROM glyph for the current screencode into the live charset RAM, overwriting any edits. The ROM glyph covers codes $20–$7F (printable ASCII range). There is no ROM source for the Alternate charset — use **Charset > Reset Alt→Boot** from the main menu to restore the whole Alt bank from the boot-time snapshot.
 
-## Palette mode:
+## Palette mode
 ([Back to contents](#contents))
 
-Pressing **P** in the main mode starts the Palette mode. In this mode a character for plotting can be selected from the character set, the full 121 color palette and the 10 favorite slots.
+Pressing **P** in main mode opens the Palette mode. A popup shows the 10 favorite slots as the first row, followed by the full Standard charset (codes $20–$7F, 6 rows of 16), then the full Alternate charset (or a visual-charmap reordering of it, see below).
 
-A window like this appears:
+*(Screenshot pending — will be updated in a future release.)*
 
-![Palette mode screenshot](https://github.com/xahmol/OricScreenEditor/blob/main/screenshots/OSE%20Palette.png?raw=true)
-
-The window shows the 10 favorite slots as first line, below that the standard character set and below that the alternate character set.
-
-Keyboard commands in this mode:
+Keyboard commands:
 
 |Key|Description
 |---|---|
-|**Cursor keys**|Move cursor
-|**SPACE or ENTER**|Select character
-|**0-9**|Store character in corresponding favorite slot
-|**V**|Toggle between normal mode and visual charmap mode
-|**ESC** |Leave character mode and go back to main mode
+|**Cursor keys**|Move cursor (wraps between sections)
+|**SPACE or ENTER**|Select highlighted character and return to main mode
+|**0-9**|Store highlighted character to the corresponding favorite slot
+|**V**|Toggle between normal mode and **v**isual charmap mode
+|**ESC**|Return to main mode without changing the selected character
 |**FUNCT+6**|Toggle statusbar visibility
 
-*Moving cursor*
+*Visual charmap mode*
 
-Press the **cursor keys** to move the cursor around the grid. You can move over to the different sections by just moving out of a section to the other.
+Pressing **V** toggles visual charmap mode, which reorders the Alternate charset section so that characters are arranged in a logical drawing order (designed around the Oric's native mosaic/semigraphics font). This mode only makes sense for an unmodified Alternate charset. Visual charmap mode covers codes $20–$6F; codes $70–$7F always remain in their natural order.
 
-*Selecting character or color*
-
-Press **SPACE** or **ENTER** to select the highlighted character or color as new character or color to plot with. This leaves the palette mode.
-
-*Storing to a favorite slot*
-
-Pessing **0-9** stores the presently highlighted character to the corresponding favorite slot.
-
-*Toggle visual charmap mode*
-
-Visual charmap mode is a mode in which the palette for the alternate charset is mapped in such a way that characters are ordered in a logical order for drawing. This mode makes only sense for unchanged alternate charsets.
-
-This looks like this:
-
-![Visual PETSCII palette](https://github.com/xahmol/OricScreenEditor/blob/main/screenshots/OSE%20Palette%20Visual.png?raw=true)
-
-Pressing **V** toggles between normal and visual mode.
-
-*Leave mode and help*
-
-Pressing **ESC** leaves the palette mode and returns to main mode. There is no separate help screen for the palette mode.
+*(Visual charmap screenshot pending — will be updated in a future release.)*
 
 ## Colour picker
 ([Back to contents](#contents))
 
-Pressing **C** in main mode starts the Colour picker. This is an addition over the original OricScreenEditor: a visual grid for selecting the Ink and Paper colors to plot with together, including a preview of the resulting normal and inverse color combination.
+Pressing **C** in main mode opens the Colour picker, which provides a visual grid for selecting the Ink and Paper colors to plot with.
 
-A window like this appears, showing all 64 Ink/Paper combinations as a
-4-column x 16-row grid (split this way, rather than 8x8, so each cell
-can show both a normal and an inverse swatch side by side without
-running out of screen width), plus feedback lines for the currently
-highlighted Ink, Paper and the resulting normal/inverse preview:
+The popup shows all 64 Ink/Paper combinations as an 8×8 grid (one row per Paper value, one column per Ink value). Each cell shows a normal and an inverse color swatch side by side. Three rows below the grid show feedback for the currently highlighted Ink, Paper, and the resulting normal/inverse preview.
 
-```
-Select ink and paper colour
-<4-wide x 16-row grid of ink x paper colour cells, each showing the normal and inverse swatch for that combination>
-Ink:    N <swatch>
-Paper:  N <swatch>
-Result: <normal/inverse preview>
-```
+*(Screenshot pending — will be updated in a future release.)*
 
-*(Screenshot to follow -- this section currently has no V1 equivalent
-to borrow a placeholder image from, since the colour picker is new to
-OSE-LOCI.)*
-
-Keyboard commands in this mode:
+Keyboard commands:
 
 |Key|Description
 |---|---|
-|**Cursor keys**|Move cursor (LEFT/RIGHT cycle Ink, UP/DOWN cycle Paper, both wrap 0-7)
-|**SPACE or ENTER**|Select the highlighted Ink/Paper combination
-|**ESC**|Leave the colour picker and go back to main mode, leaving the selected Ink/Paper colors unchanged
-
-*Moving cursor*
-
-Press the **cursor keys** to move the cursor around the grid. **LEFT**/**RIGHT** cycle the Ink color (wrapping between the grid's two 4-wide halves), **UP**/**DOWN** cycle the Paper color by two grid rows at a time, both wrapping between color 0 and 7.
-
-*Selecting ink and paper*
-
-Press **SPACE** or **ENTER** to select the highlighted Ink/Paper combination as the new colors to plot with. This leaves the colour picker and returns to main mode; the statusbar's I and P fields update accordingly.
-
-*Leave mode*
-
-Pressing **ESC** leaves the colour picker without changing the selected Ink/Paper colors, and returns to main mode.
-
-## Select mode:
-([Back to contents](#contents))
-
-Pressing **S** in the main mode starts the Select mode.
-
-If enabled, the statusbar shows this on entering this mode:
-
-![Status bar in Select mode](https://github.com/xahmol/OricScreenEditor/blob/main/screenshots/OSE%20statusbar%20Select.png?raw=true)
-
-In this mode a selection can be made on which different operations can be performed as described below.
-
-|Key|Description
-|---|---|
-|**X**|Cut: Delete selection at old position and paste at new position
-|**C**|**C**opy: Copy selection at new position, leaving selection unchanged at old position
-|**D**|**D**elete selection (fill with spaces)
-|**I**|Paint with **I**nk attribute: plot ink modifier in presently selected color
-|**P**|Paint with **P**aper attribute: plot paper modifier in presently selected color
-|**M**|Paint with Character **M**odifier attribute: plot character modifier in presently selected A,D and B attributes.
-|**RETURN**|Accept selection / accept new position
-|**ESC** |Cancel and go back to main mode
-|**Cursor keys**|Expand/shrink in the selected direction / Move cursor to select destination position
+|**Cursor LEFT / RIGHT**|Cycle Ink color (wraps 0–7)
+|**Cursor UP / DOWN**|Cycle Paper color (wraps 0–7)
+|**SPACE or ENTER**|Accept highlighted Ink/Paper combination and return to main mode
+|**ESC**|Return to main mode without changing the selected Ink/Paper colors
 |**FUNCT+6**|Toggle statusbar visibility
-|**FUNCT+8**|Help screen
 
-*Making the selection*
-
-Ensure that the cursor is located at a corner of the selection to be made before entering Select mode. On entering select mode, grow the selection by pressing the **Cursor keys** to increase or decrease width and height in the desired direction from the origin. This is similar to the keys used in the [Line and box mode](#line-and-box-mode).
-
-The selection will be visually shown with plotting in the present selected screencode and attributes. It should look like this:
-
-![Select mode](https://github.com/xahmol/OricScreenEditor/blob/main/screenshots/OSE%20select.png?raw=true)
-
-Accept the selection by pressing **RETURN**, cancel the selection by pressing **ESC**.
-
-*Choose action to perform*
-
-After accepting the selection, press **X**, **C**, **D**, **A** or **P** to choose an action, or press **ESC**  to cancel.
-Statusbar (if enabled) shows this as prompter:
-
-![Statusbar Select Options](https://github.com/xahmol/OricScreenEditor/raw/main/screenshots/OSE%20statusbar%20Select%20choose%20option.png)
-
-*Cut and copy*
-
-After pressing **X** for cut or **C** for copy, move cursor to the upper left corner where the selection should be copied to. **C** will only make a copy, **X** will delete the selection at the old location.
-
-Statusbar (if enabled) displays Cut or Copy correspondingly, like:
-
-![Statusbar Cut or Copy](https://github.com/xahmol/OricScreenEditor/raw/main/screenshots/OSE%20statusbar%20Select%20Copy.png)
-
-*Delete*
-
-Pressing **D** will erase the present selection (fill the selected area with spaces).
-
-*Paint with attribute or only color*
-
-Pressing **I**, **P** or **M** will fill the area with resp. ink color, paper color or character set modifiers with the presently selected values. Makes most sense in selecting a vertical length of one character wide to change attributes for all lines right of that line.
-
-*Leaving mode and Help*
-
-Leave selection mode by pressing **ESC** . Pressing **FUNCT+8** at any time in this mode will provide a helpscreen with the key commands for this mode (not possible if the selection is grown but not yet accepted).
-
-**OSE note**: Cut (**X**) and Copy (**C**) move the selection to a new
-position you pick with the cursor keys (**ENTER** to confirm, **ESC** to
-cancel) — Copy leaves the original in place, Cut clears it. If the
-destination would extend past the edge of the canvas, a "Selection does
-not fit." message appears and nothing is changed.
-
-## Move mode:
+## Select mode
 ([Back to contents](#contents))
 
-Pressing **M** in the main mode starts the Move mode. Use this mode to scroll the present viewport in the desired direction by pressing the **Cursor keys**.
+Pressing **S** in main mode enters Select mode. Position the cursor at one corner of the area to select before entering.
 
-Note that moving is only performed on the present 40x25 viewable part of the screen, so on larger canvas sizes not the whole screen will be moved. This is due to memory constraints.
+*(Screenshot pending — will be updated in a future release.)*
 
-It is also important to note that characters that 'fall off' of the screen are lost if the move is accepted.
+**Phase 1 — grow the selection:** cursor keys expand or contract the rectangle from the starting corner. The selection is highlighted using the current screencode and attributes. Press **RETURN** to accept; **ESC** cancels and returns to main mode. **FUNCT+8** shows the help screen (only before the selection has started growing).
 
-Alternative to move mode is using [select mode](#select-mode) and use Cut to move a selection to a new position.
-
-Accept with **RETURN**, cancel with **ESC**. Both will leave this mode and return to main mode.
-
-**OSE note**: in this LOCI-based rewrite, each move is applied directly as
-you press a cursor key (there's no separate scratch copy to roll back from)
-— so **RETURN** and **ESC** behave identically here, both keeping whatever
-shifts you've already made this session.
+**Phase 2 — choose action:** after accepting, the statusbar mode field shows the available actions. Press one of:
 
 |Key|Description
 |---|---|
-|**Cursor keys**|Move in the selected direction
-|**RETURN**|Accept moved position
+|**X**|Cut: copy selection to a new position, clearing the original
+|**C**|**C**opy: copy selection to a new position, leaving the original intact
+|**D**|**D**elete: fill selection with spaces
+|**I**|Paint with **I**nk attribute: fill with ink modifier for the current ink color
+|**P**|Paint with **P**aper attribute: fill with paper modifier for the current paper color
+|**M**|Paint with character **M**odifier attribute
+|**ESC**|Cancel and return to main mode
+
+**Cut and copy:** after pressing **X** or **C**, move the cursor to the upper-left corner of the destination, then press **RETURN** to confirm or **ESC** to cancel. If the selection would extend past the canvas edge, a "Selection does not fit." message appears and nothing changes. Cut uses two undo slots (one for the destination, one for the source) — reverting a cut requires two **Z** presses.
+
+**Delete and paint:** fill the selection immediately with no further input needed. These use one undo slot.
+
+Other keys while in Select mode:
+
+|Key|Description
+|---|---|
+|**Cursor keys**|Expand/shrink selection (phase 1) or move cursor to destination (cut/copy phase)
+|**RETURN**|Accept selection / confirm destination
 |**ESC**|Cancel and go back to main mode
 |**FUNCT+6**|Toggle statusbar visibility
 |**FUNCT+8**|Help screen
 
-## Line and box mode:
+## Move mode
 ([Back to contents](#contents))
 
-Pressing **L** in the main mode starts the Line and box mode. In this mode lines and boxes can be drawn, plotting with the present selected screencode and attribute value.
+Pressing **M** in main mode enters Move mode. Use this mode to scroll the current viewport's content in any direction using the cursor keys. Each keypress shifts all cells in the 40×28 viewport area one step in that direction within `screenmap[]`; content that scrolls off the edge is lost.
 
-Ensure that the cursor is located at a corner of the selection to be made before entering Select mode. On entering select mode, grow the selection by pressing the **Cursor keys** to increase or decrease width and height in the desired direction from the origin. Leaving with or height at one character draws a line, otherwise a box is drawn.
+**Note:** each shift is applied immediately — RETURN and ESC both leave Move mode and both keep whatever shifts you have already made. There is no scratch buffer to roll back from. Use **Z** (undo) after exiting if you want to revert.
 
-**OSE-LOCI new:** while growing the box, press **O** to toggle between a
-filled box (default, matching V1) and a hollow box that only plots the
-four border lines, leaving the interior untouched. The toggle can be
-flipped back and forth as many times as you like before accepting.
-
-**OSE-LOCI new:** also while growing the box, press **C** to toggle
-between a rectangular box (default) and an ellipse/circle inscribed in
-the same bounding box. Combine with **O** for a hollow ellipse outline,
-or leave **O** off for a filled ellipse. Note that since character cells
-are 6x8 pixels (not square), a square bounding box renders as a
-flattened ellipse, not a perfect circle -- widen the box if you want a
-rounder result. As a reminder, the statusbar's mode field shows
-`o:Box c:El` for the duration of this step.
-
-Accept with **RETURN**, cancel with **ESC**. Both will leave this mode and return to main mode.
-
-**FUNCT+8** will show a help screen with all screen commands for this mode.
+Move mode operates on the viewport area only. On a canvas larger than 40×28, only the visible 40×28 window is shifted; canvas cells outside the viewport are not affected.
 
 |Key|Description
 |---|---|
-|**Cursor keys**|Expand/shrink in the selected direction
-|**O**|**OSE-LOCI new:** Toggle filled/hollow box or ellipse
-|**C**|**OSE-LOCI new:** Toggle rectangle/ellipse shape
-|**RETURN**|Accept line, box or ellipse
+|**Cursor keys**|Shift viewport content in the selected direction
+|**RETURN or ESC**|Leave Move mode and return to main mode
+|**FUNCT+6**|Toggle statusbar visibility
+|**FUNCT+8**|Help screen
+
+## Line and box mode
+([Back to contents](#contents))
+
+Pressing **L** in main mode enters Line and box mode. Position the cursor at one corner of the box or at the start of the line before entering.
+
+**Phase 1 — grow the bounding box:** cursor keys expand or contract the rectangle. Leaving width or height at 1 draws a line; otherwise a box or ellipse is drawn. Press **RETURN** to accept; **ESC** cancels and returns to main mode.
+
+**Phase 2 — shape options:** after accepting, the statusbar shows `o:Box c:El` (or with capitals indicating which toggles are active). Press:
+
+|Key|Description
+|---|---|
+|**O**|Toggle filled/hollow (**O** uppercased in hint when hollow is on)
+|**C**|Toggle rectangle/ellipse (**C** uppercased in hint when ellipse is on)
+|**RETURN**|Draw the shape with current toggles
+|**ESC**|Cancel without drawing
+
+Four shapes result from the combination of these toggles:
+- Filled box (default)
+- Hollow box (only the four border lines are drawn, interior unchanged)
+- Filled ellipse inscribed in the bounding box
+- Hollow ellipse outline
+
+**Note on character cells and ellipses:** Oric character cells are 6 pixels wide × 8 pixels tall. A square bounding box therefore produces a visually flattened ellipse, not a circle. Widen the box if you want a rounder result.
+
+|Key|Description
+|---|---|
+|**Cursor keys**|Expand/shrink in the selected direction (phase 1)
+|**O**|Toggle filled/hollow (phase 2)
+|**C**|Toggle rectangle/ellipse (phase 2)
+|**RETURN**|Accept (both phases)
 |**ESC**|Cancel and go back to main mode
 |**FUNCT+6**|Toggle statusbar visibility
 |**FUNCT+8**|Help screen
 
-## Write mode:
+## Write mode
 ([Back to contents](#contents))
 
-Pressing **W** in the main mode starts the Write mode. In this mode text can be freely entered by using the full keyboard, making text input way easier than selecting the appropriate screencodes one by one. The full keyboard is supported, as long as the characters entered are printable (screencodes higher than 32).
+Pressing **W** in main mode enters Write mode. Type characters freely with the keyboard — any printable key (screencode > 32) plots the character at the cursor and advances one cell to the right.
 
-Colors and attribute can be plotted while in write mode by first modifying the attributes desired, then by plotting an attribute code:
-- Pressing **CTRL+Z** or **CTRL+X** decreases resp. increases selected ink color
-- Pressing ***CTRL+C** or **CTRL+V** decreases resp. increases selected paper color
-- Pressing **CTRL+B**, **CTRL+A** or **CTRL+D** toggles alternate charset, double resp. blink attribute
-- Pressing **CTRL+R** toggles reverse mode
-- Pressing **FUNCT+1** plots ink
-- Pressing **FUNCT+2** plots paper
-- Pressing **FUNCT+3** plots character modifier.
-- **OSE-LOCI new:** Pressing **FUNCT+4** opens a popup to enter an
-  attribute directly as a hex digit: choose **1** for ink, **2** for
-  paper or **3** for character modifier, then type a value 0-7. This is
-  an alternative to cycling with CTRL+Z/X/C/V when you already know the
-  exact value you want.
+Colors and attributes can be set and plotted while typing:
 
-Leave Write mode by pressing **ESC**. **FUNCT+8** will show a help screen with the key commands for this mode.
+- **CTRL+Z** / **CTRL+X** — decrease / increase ink color
+- **CTRL+C** / **CTRL+V** — decrease / increase paper color
+- **CTRL+B** / **CTRL+A** / **CTRL+D** — toggle blink / alternate charset / double height
+- **CTRL+R** — toggle reverse video (XOR screencode with 128)
+- **FUNCT+1** — plot an ink modifier for the current ink color
+- **FUNCT+2** — plot a paper modifier for the current paper color
+- **FUNCT+3** — plot a character-set modifier for the current charset/double/blink settings
+- **FUNCT+4** — hex-direct attribute entry: choose **1** Ink / **2** Paper / **3** Modifier, then type a single hex digit 0–7. Useful when you already know the exact value you want and do not want to cycle with CTRL+Z/X/C/V.
+
+**DEL** moves the cursor one cell left and clears that cell (backspace-style). It does not wrap to the previous row.
+
+Leave Write mode with **ESC**. **FUNCT+8** shows the help screen for this mode.
 
 |Key|Description
 |---|---|
-|**Cursor keys**|Move in the selecOric direction
-|**DEL**|Clear present cursor position (plot white space)
-|**CTRL+A**|Toggles alternate charset attribute
-|**CTRL+B**|Toggles blink attribute
-|**CTRL+D**|Toggles double attribute
-|**CTRL+R**|Toggles reverse
-|**CTRL+Z**|Decreases ink color
-|**CTRL+X**|increases ink color
-|**CTRL+C**|Decreases paper color
-|**CTRL+V**|increases paper color
-|**FUNCT+1**|Plots ink
-|**FUNCT+2**|Plots paper
-|**FUNCT+3**|Plots character modifier
-|**FUNCT+4**|**OSE-LOCI new:** Enter ink/paper/modifier as a hex digit
-|**ESC** |Go back to main mode
+|**Cursor keys**|Move cursor (with auto-scroll)
+|**DEL**|Move left and clear that cell (backspace)
+|**CTRL+A**|Toggle alternate charset attribute
+|**CTRL+B**|Toggle blink attribute
+|**CTRL+D**|Toggle double height attribute
+|**CTRL+R**|Toggle reverse video
+|**CTRL+Z**|Decrease ink color
+|**CTRL+X**|Increase ink color
+|**CTRL+C**|Decrease paper color
+|**CTRL+V**|Increase paper color
+|**FUNCT+1**|Plot ink modifier
+|**FUNCT+2**|Plot paper modifier
+|**FUNCT+3**|Plot character-set modifier
+|**FUNCT+4**|Hex-direct attribute entry
+|**ESC**|Return to main mode
 |**FUNCT+6**|Toggle statusbar visibility
 |**FUNCT+8**|Help screen
-|**Other keys**|Plot corresponding character (if printable)
+|**Other printable keys**|Plot corresponding character and advance right
 
-## Color value reference:
+## Color value reference
 ([Back to contents](#contents))
 
-Below the overview of the 8 color values.
+The Oric uses 3-bit RGB color values (Red bit 0, Green bit 1, Blue bit 2):
 
-The values are calculated from the 3 bits used for the Red, Green and Blue (RGB) bits:
-- +1 for Red
-- +2 for Green
-- +4 for Blue
-
-|Number|Color|B-G-R|
+|Number|Color|B-G-R bits|
 |---|---|---|
 |0|Black|0-0-0|
 |1|Red|0-0-1|
@@ -798,198 +665,151 @@ The values are calculated from the 3 bits used for the Red, Green and Blue (RGB)
 |6|Cyan|1-1-0|
 |7|White|1-1-1|
 
-## Serial attribute code reference:
+## Serial attribute code reference
 ([Back to contents](#contents))
 
-The Oric does not have a separate attribute memory space, changing any attribute is done by plotting an attribute code where normally a character would go, with the effect of that attribute valid for the rest of the line until another attribute code overrides it in the rest of the line to the right.
-Also, an attribute code can either change the ink, change the paper, change character set modifiers or change video control attributes, not any combination of these four at the same time. If you want to change two or more of these four categories, you have to plot the same number of attribute code after each other. That is why they are called serial attributes.
-This rather complicates screen design in multi color as every color change does cost a spot where no normal character can go.
+The Oric does not have a separate attribute memory space. Instead, a byte in the character grid whose value is in the range 0–31 is interpreted as a serial attribute rather than a displayable character. Attributes take effect from their column to the right end of the same raster line; at the start of each new line the ULA resets ink to white and paper to black. Attributes in codes 8–15 (charset modifier) do **not** reset per line — they persist until the next charset-mode attribute byte.
 
-In Oric Screen Editor, all attributes but the video control attributes are supported. But OSE is not aware of attributes you have placed in the line, so proper attribute placement is something you as user should take care of in the design.
+Because a cell can be either a character or an attribute but not both, inserting an attribute displaces the character that was there. Screen designs with multiple colors require a column for each attribute change.
 
-Attributes codes are all plot codes from 0 to 31, codes from 32 to 127 are the printable characters according to standard ASCII codes, codes from 128 and up are the same but in reverse video.
+Only ink, paper, and charset-modifier attributes are fully supported by OSE. "Video control" attributes (not commonly used) are not handled.
 
-See for full background and reference:
-https://osdk.org/index.php?page=articles&ref=ART9
+For full background see: https://osdk.org/index.php?page=articles&ref=ART9
 
-Overview of possible attribute codes:
+*Codes 0–7: Change ink*
 
-*Codes 0-7: Change ink*
+|Code|Hex|Ink color|
+|---|---|---|
+|0|$00|Black|
+|1|$01|Red|
+|2|$02|Green|
+|3|$03|Yellow|
+|4|$04|Blue|
+|5|$05|Magenta|
+|6|$06|Cyan|
+|7|$07|White|
 
-To change the ink color, the codes are the basic color numbers as mentioned above in the [Color value reference](#color-value-reference), so basically just setting bits 0,1 and 2 for the RGB value, bit 3-7 at zero.
+Bit pattern: `0 0 0 0 0 Blue Green Red`
 
-Bitpattern:
+*Codes 8–15: Character set modifier*
 
-|Bit|7-6-5|4|3|2|1|0|
-|---|---|---|---|---|---|---|
-|Meaning|0|0|0|Blue|Green|Red|
+Bit 3 set. Bits 0–2 control Alternate charset (bit 0), Double height (bit 1), and Blink (bit 2).
 
+|Code|Hex|Effect|
+|---|---|---|
+|8|$08|Standard charset, no double, no blink|
+|9|$09|Alternate charset|
+|10|$0A|Standard, double height|
+|11|$0B|Alternate, double height|
+|12|$0C|Standard, blink|
+|13|$0D|Alternate, blink|
+|14|$0E|Standard, double height, blink|
+|15|$0F|Alternate, double height, blink|
 
-|Code|Hex|0-0-0-P-C-B-G-R|Ink Color|
-|---|---|---|---|
-|00|00|0-0-0-0-0-0-0-0|Black|
-|01|01|0-0-0-0-0-0-0-1|Red|
-|02|02|0-0-0-0-0-0-1-0|Green|
-|03|03|0-0-0-0-0-0-1-1|Yellow|
-|04|04|0-0-0-0-0-1-0-0|Blue|
-|05|05|0-0-0-0-0-1-0-1|Magenta|
-|06|06|0-0-0-0-0-1-1-0|Cyan|
-|07|07|0-0-0-0-0-1-1-1|White|
+*Codes 16–23: Change paper*
 
-*Codes 8-15: Character set modifier*
+Bit 4 set. Bits 0–2 are the RGB value (same as ink).
 
-With bit 3 enabled (so add 8) bits 0,1 and 2 are used to modify charset behavior. The different charset behaviors can be set at one time with one code.
-
-Bitpattern:
-
-|Bit|7-6-5|4|3|2|1|0|
-|---|---|---|---|---|---|---|
-|Meaning|0|0|Charset modifier on|Blink on|Double size on|Alternate on|
-
-|Code|Hex|0-0-0-P-C-B-D-A|Effect on charset|
-|---|---|---|---|
-|08|08|0-0-0-1-0-0-0-0|Use standard charset|
-|09|09|0-0-0-1-0-0-0-1|Use alternate charset|
-|10|0A|0-0-0-1-0-0-1-0|Use double size standard charset|
-|11|0B|0-0-0-1-0-0-1-1|Use double size alternate charset|
-|12|0C|0-0-0-1-0-1-0-0|Use blinking standard charset|
-|13|0D|0-0-0-1-0-1-0-1|Use blinking alternate charset|
-|14|0E|0-0-0-1-0-1-1-0|Use double size blinking standard charset|
-|15|0F|0-0-0-1-0-1-1-1|Use double size blinking alternate charset|
-
-*Codes 16-23: Change paper*
-
-To change the paper color, the codes are the basic color numbers as mentioned above in the [Color value reference](#color-value-reference), so basically just setting bits 0,1 and 2 for the RGB value, together with setting bit 4 (so adding 16). Bit 3, and bits 5,6 and 7 should be 0.
-
-Bitpattern:
-
-|Bit|7-6-5|4|3|2|1|0|
-|---|---|---|---|---|---|---|
-|Meaning|0|Paper modify on|0|Blue|Green|Red|
-
-|Code|Hex|0-0-0-P-C-B-G-R|Paper Color|
-|---|---|---|---|
-|16|10|0-0-0-1-0-0-0-0|Black|
-|17|11|0-0-0-1-0-0-0-1|Red|
-|18|12|0-0-0-1-0-0-1-0|Green|
-|19|13|0-0-0-1-0-0-1-1|Yellow|
-|20|14|0-0-0-1-0-1-0-0|Blue|
-|21|15|0-0-0-1-0-1-0-1|Magenta|
-|22|16|0-0-0-1-0-1-1-0|Cyan|
-|23|17|0-0-0-1-0-1-1-1|White|
-
-Note that in OSE calculation of these attribute codes by yourselves is not necessary, the program will do so for you given the selected attributes and color. In memory however this is how the codes are stored.
+|Code|Hex|Paper color|
+|---|---|---|
+|16|$10|Black|
+|17|$11|Red|
+|18|$12|Green|
+|19|$13|Yellow|
+|20|$14|Blue|
+|21|$15|Magenta|
+|22|$16|Cyan|
+|23|$17|White|
 
 ## File format reference
 ([Back to contents](#contents))
 
-All file formats used by OSE are headerless binary dumps — no magic
-numbers, no metadata fields, no padding. Files are written and read by
-`loci_write()`/`loci_read()` directly from/to the relevant Oric memory
-addresses. The one exception is `PJ.BIN` (Project header), which carries
-a `FILEIO_MAGIC` sentinel (`$4F53`) so V1 format is auto-detected.
+All file formats used by OSE-LOCI are headerless binary dumps — no magic bytes, no metadata, no padding. Files are read and written directly to the relevant Oric memory addresses. The one exception is `PJ.BIN` (project header), which carries a `FILEIO_MAGIC` sentinel (`$4F53`) so the V1 format can be auto-detected.
 
 ### Screen (`<name>.BIN` — File > Save/Load Screen)
 
-A flat raw dump of `screenmap[]`, the width*height canvas buffer.
-No header: width and height are not stored in the file. Load prompts
-you to enter them.
+A flat raw dump of `screenmap[]`.
 
 | Offset | Size | Content |
 |--------|------|---------|
-| 0 | width × height bytes | canvas screencodes (row-major, top to bottom) |
+| 0 | width × height bytes | Canvas screencodes, row-major (top to bottom) |
 
-Standard 40x28 screen = 1,120 bytes. Any canvas size is valid.
+No header: width and height are not stored in the file — Load screen asks you to enter them. A standard 40×28 screen = 1,120 bytes. Any canvas size is valid.
 
 ### Combined (`<name>.BIN` — File > Save/Load Combined)
 
-A direct memory-map dump covering both charset banks and the screen,
-laid out in the exact order they occupy in Oric RAM. Because the
-format mirrors a fixed memory region, only the two standard Oric
-screen heights are accepted: **40x28 or 40x27**. Other canvas
-dimensions are rejected on both Save and Load.
-
-Load does not prompt for dimensions — the height is auto-detected
-from the file size.
+A memory-map dump covering both charset banks and the canvas. Only **40×28** and **40×27** canvases are accepted (other dimensions are rejected). Load auto-detects height from file size.
 
 | Offset | Size | Load address | Content |
 |--------|------|-------------|---------|
 | 0 | 768 | $B500–$B7FF | Standard charset displayable range (codes $20–$7F, 96 glyphs × 8 bytes) |
-| 768 | 256 | $B800–$B8FF | Alternate charset non-displayable prefix (codes $00–$1F; not shown as glyphs but part of the contiguous Alt bank) |
-| 1,024 | 640 | $B900–$BB7F | Alternate charset displayable range (codes $20–$6F, 80 glyphs × 8 bytes; stops before screen RAM at $BB80) |
-| 1,664 | 40 × height | $BB80+ | Screen data (screencodes, row-major) |
+| 768 | 256 | $B800–$B8FF | Alternate charset non-displayable prefix (codes $00–$1F) |
+| 1,024 | 640 | $B900–$BB7F | Alternate charset displayable range (codes $20–$6F, 80 glyphs × 8 bytes) |
+| 1,664 | 40 × height | $BB80+ | Canvas screencodes, row-major |
 
-Total file size: **2,784 bytes** (40×28) or **2,744 bytes** (40×27).
+Total: **2,784 bytes** (40×28) or **2,744 bytes** (40×27).
 
 ### Project (four files — File > Save/Load Project)
 
-A project consists of up to four files sharing a base name:
-
 | File | Size | Content |
 |------|------|---------|
-| `<name>PJ.BIN` | 22 bytes | `ProjectHeader` struct: canvas size, cursor/offset position, plot attributes (`plotscreencode`/ink/paper/blink/double/altchar), `stdchanged`/`altchanged` flags, `FILEIO_MAGIC` sentinel (`$4F53`) |
-| `<name>SC.BIN` | width × height bytes | Canvas screencodes (bare, no header; size from `PJ.BIN`) |
+| `<name>PJ.BIN` | 22 bytes | `ProjectHeader`: canvas size, cursor/offset positions, plot attributes, `stdchanged`/`altchanged` flags, `FILEIO_MAGIC` sentinel ($4F53) |
+| `<name>SC.BIN` | width × height bytes | Canvas screencodes (bare, no header; size from PJ.BIN) |
 | `<name>CS.BIN` | 768 bytes | Standard charset displayable range (written/read only if `stdchanged` is set) |
-| `<name>CA.BIN` | 640 bytes | Alternate charset displayable range (codes $20–$6F only; written/read only if `altchanged` is set) |
+| `<name>CA.BIN` | 640 bytes | Alternate charset displayable range, codes $20–$6F (written/read only if `altchanged` is set) |
 
-Load Project also transparently accepts V1 (CC65 version) `.PJ.BIN`
-files — V1's 19-byte header is auto-detected via the magic field
-(V1's first two bytes can never equal `$4F53`).
+V1 (CC65 version) project files use a 19-byte header format, auto-detected via the magic field (V1's first two bytes can never equal $4F53).
 
 ### Charset files (Charset menu)
 
 | Format | File | Size | Content |
 |--------|------|------|---------|
 | Standard | `<name>.BIN` | 768 bytes | CHARSET_STD displayable range, $B500–$B7FF |
-| Alternate | `<name>.BIN` | 640 bytes | CHARSET_ALT displayable range, $B900–$BB7F (80 glyphs only; codes $70–$7F would overlap screen RAM) |
-| Combined | `<name>.BIN` | 1,664 bytes | **Charset menu only** — same layout as File > Combined but without the screen: 768 bytes Std displayable ($B500–$B7FF) + 256 bytes Alt non-displayable prefix ($B800–$B8FF) + 640 bytes Alt displayable ($B900–$BB7F). Loads both banks. |
+| Alternate | `<name>.BIN` | 640 bytes | CHARSET_ALT displayable range, $B900–$BB7F (codes $20–$6F only; codes $70–$7F overlap screen RAM) |
+| Combined | `<name>.BIN` | 1,664 bytes | Same layout as File > Combined but without the screen: 768 bytes Std + 256 bytes Alt non-displayable prefix + 640 bytes Alt displayable. Both banks loaded/saved together. |
 
 ## Credits
 ([Back to contents](#contents))
 
-Oric Screen Editor
+Oric Screen Editor for LOCI
 
 Screen editor for the Oric Atmos
 
-Written in 2022 by Xander Mol
+OSE-LOCI written in 2024–2026 by Xander Mol
 
-Based on VDC Screen Editor for the C128
+Based on OricScreenEditor V1 (2022) by Xander Mol
 
-https://github.com/xahmol/OricScreenEditor
+https://github.com/xahmol/OricScreenEditorLOCI
 
 https://www.idreamtin8bits.com/
 
 Code and resources from others used:
 
--   CC65 cross compiler:
+-   **Oscar64** cross-compiler by drmortalwombat (6502 C compiler used for this project)
 
-    https://cc65.github.io/
+    https://github.com/drmortalwombat/oscar64
 
--   6502.org: Practical Memory Move Routines: Starting point for memory move routines
+-   **LOCI mass-storage ROM and hardware** by Sodiumlightbaby and sodiumlb
 
-    http://6502.org/source/general/memory_move.html
+    https://github.com/sodiumlb/loci-rom
+    https://github.com/sodiumlb/loci-hardware
 
--   DraBrowse source code for DOS Command and text input routine
+-   **Phosphoric Oric emulator** by benedictemarty (used for the automated test suite)
 
-    DraBrowse (db*) is a simple file browser.
-    Originally created 2009 by Sascha Bader.
-    Used version adapted by Dirk Jagdmann (doj)
-    https://github.com/doj/dracopy
+    https://github.com/benedictemarty/Phosphoric
 
--   lib-sedoric from oricOpenLibrary (for SEDORIC file operations
-    By Raxiss, (c) 2021
-    https://github.com/iss000/oricOpenLibrary/blob/main/lib-sedoric/libsedoric.s
+-   **Raxiss IJK joystick driver** from oricOpenLibrary
 
--   Bart van Leeuwen and forum.defence-force.org: For inspiration and advice while coding.
+    https://github.com/iss000/oricOpenLibrary
 
--   jab / Artline Designs (Jaakko Luoto) for inspiration for Palette mode and PETSCII visual mode
+-   **jab / Artline Designs (Jaakko Luoto)** for inspiration for the Palette visual charmap mode
 
--   Original windowing system code on Commodore 128 by unknown author.
-   
--   Tested using real hardware Oric Atmos plus Cumana Reborn, and Oricutron for Windows and Linux
+-   **Bart van Leeuwen and forum.defence-force.org** for inspiration and advice
+
+-   Tested on real Oric Atmos hardware with LOCI, and with Phosphoric and Oricutron emulators
 
 The code can be used freely as long as you retain
-a notice describing original source and author.
+a notice describing the original source and author.
 
 THE PROGRAMS ARE DISTRIBUTED IN THE HOPE THAT THEY WILL BE USEFUL,
 BUT WITHOUT ANY WARRANTY. USE THEM AT YOUR OWN RISK!
