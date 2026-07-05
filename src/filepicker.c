@@ -158,11 +158,8 @@ static char    picker_save_match[64]; // app.filename + this action's
 // way (2026-06-22): reusing that same pattern at 0xA200/0xA300 for this
 // function's own workaround silently corrupted real static data and
 // hung the picker mid-session, with no compiler warning -- a fixed-size
-// static array sidesteps the whole class of bug by construction. The
-// pre-existing menu.c 0xA000 write happens to land on a byte that's
-// apparently harmless in practice, but is the same kind of landmine and
-// is flagged separately for follow-up, not fixed here (out of scope for
-// this change).
+// static array sidesteps the whole class of bug by construction.
+// menu.c has since been fixed the same way (menu_regpressure_scratch[100]).
 // Sized generously above the dummy sprintf's own worst-case formatted
 // length (title <=15 chars, path up to PICKER_PATH_MAXLEN-1=63 chars,
 // the rest are 1-3 digit numbers + ~66 bytes of literal text -- about

@@ -174,4 +174,10 @@
 #define MSG_MODE_MOVE     "Deplacer"
 #define MSG_MODE_LINEBOX  "Ligne/Bte"
 
+// ── Undo feedback (src/undo.c) ────────────────────────────────────────────
+// Shown in statusbar Mode field (statusbar_set_override(), 10-char budget)
+// when undo_snapshot() skips a canvas too large to fit in the undo region.
+// No accented characters (see CLAUDE.md "Localisation").
+#define MSG_UNDO_TOOBIG   "No Undo"
+
 #endif // STRINGS_FR_H

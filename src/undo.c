@@ -60,6 +60,7 @@
 #include "statusbar.h"
 #include "loci.h"
 #include "undo.h"
+#include "strings.h"
 
 #define UNDO_MAX_SLOTS    40       // matches vdcscreeneditor-v2's Undo[41]
                                    // (40 active slots; the "+1" there is
@@ -144,10 +145,15 @@ void undo_snapshot(uint16_t x, uint16_t y, uint16_t w, uint16_t h)
     uint16_t next_addr;
     uint16_t row;
 
+    statusbar_clear_override(); // clear any stale "No Undo" hint from a prior
+                                 // too-large snapshot -- this attempt may succeed
     if (!loci_present()) return;
-    if (bytes > UNDO_REGION_SIZE) return; // too big to ever fit -- skip
-                                           // gracefully (Clear/Fill on a
-                                           // large canvas, see file header)
+    if (bytes > UNDO_REGION_SIZE) // too big to ever fit -- skip gracefully
+    {                              // (Clear/Fill on a large canvas, see file header)
+        statusbar_set_override(MSG_UNDO_TOOBIG);
+        statusbar_draw();
+        return;
+    }
 
     undo_redopossible = 0;
     undo_undopossible  = 1;

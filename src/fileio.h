@@ -3,11 +3,6 @@
 
 #include <stdint.h>
 
-// Check whether a LOCI device is present (include/loci.h's loci_present()).
-// Shows MSG_LOCI_NOT_FOUND via menu_messagepopup() if not.
-// Returns 1 if present, 0 if absent (caller should abort the action).
-uint8_t loci_check_present(void);
-
 // Pick a Save target via the unified filepicker_run_save() (existing
 // file to overwrite, confirmed, or the "<new file>" entry, prompting
 // for a typed name). filter is PICKER_FILTER_PROJECT (Save Project) or

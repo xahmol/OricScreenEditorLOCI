@@ -107,16 +107,21 @@ DUMP2="$OUT/capture_undo_overflow_clear.bin"
 run_capture 29600000 "$RESIZE"'\p1\F1\p1\n\p1\d\p1\d\p1\n\p1\e' "$DUMP2"
 echo ""
 echo "Screen > Clear on the oversized canvas completes cleanly"
-check_not_found "bar gone" "Screen File  Charset  Information" "$DUMP2"
-check_found     "statusbar intact" "Main      XY 0, 0C40@ S20I7P0S" "$DUMP2"
+check_not_found "bar gone"              "Screen File  Charset  Information" "$DUMP2"
+# undo_snapshot() skips the too-large canvas and sets "No Undo" via
+# statusbar_set_override() -- check Mode field shows this feedback
+check_found     "No Undo shown in mode" "No Undo"                           "$DUMP2"
 
 # --- Scenario 3: 'z' after the oversized Clear is a graceful no-op --------
 DUMP3="$OUT/capture_undo_overflow_z.bin"
 run_capture 30700000 "$RESIZE"'\p1\F1\p1\n\p1\d\p1\d\p1\n\p1\e\p1z' "$DUMP3"
 echo ""
 echo "'z' after the oversized Clear -- no crash, no corruption"
-check_not_found "bar gone"        "Screen File  Charset  Information" "$DUMP3"
-check_found     "statusbar intact" "Main      XY 0, 0C40@ S20I7P0S" "$DUMP3"
+check_not_found "bar gone"                   "Screen File  Charset  Information" "$DUMP3"
+# "No Undo" override persists through 'z' (undo_perform returns early when
+# nothing to undo; statusbar_clear_override() is only called inside
+# undo_snapshot(), not from undo_perform())
+check_found     "No Undo persists through z" "No Undo"                           "$DUMP3"
 
 # --- Scenario 4: normal undo still works on the same oversized canvas -----
 DUMP4="$OUT/capture_undo_overflow_normal.bin"

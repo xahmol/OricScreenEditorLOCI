@@ -195,7 +195,9 @@ void menu_wininit(uint8_t ypos, uint8_t height)
         uint8_t *row = MENU_ROW(ypos + y);
         row[0] = A_FWBLACK;   // 0x00 -- must write directly (not in string literal)
         row[1] = A_BGWHITE;
-        for (uint8_t x = 2; x < SCREEN_COLS; x++)
+        row[2] = A_STD;       // reset charset-mode latch per row (persists across rows,
+                               // does not reset per scanline -- see CLAUDE.md screen model)
+        for (uint8_t x = 3; x < SCREEN_COLS; x++)
             row[x] = CH_SPACE;
     }
 }
@@ -235,7 +237,8 @@ void menu_placebar(uint8_t y)
     uint8_t *row = MENU_ROW(y);
     row[0] = A_FWBLACK;
     row[1] = A_BGGREEN;
-    for (uint8_t x = 2; x < SCREEN_COLS; x++) row[x] = CH_SPACE;
+    row[2] = A_STD;    // reset charset-mode latch (persists into all pulldown rows below)
+    for (uint8_t x = 3; x < SCREEN_COLS; x++) row[x] = CH_SPACE;
 
     menubar.ypos = y;
 
@@ -379,7 +382,8 @@ uint8_t menu_pulldown(uint8_t xpos, uint8_t ypos,
             uint8_t *row = MENU_ROW(ypos + y);
             row[0] = blankink;
             row[1] = endcolor;
-            for (uint8_t x = 2; x < SCREEN_COLS; x++)
+            row[2] = A_STD;    // reset charset-mode latch (doesn't reset per scanline)
+            for (uint8_t x = 3; x < SCREEN_COLS; x++)
                 row[x] = CH_SPACE;
         }
     }

@@ -4,15 +4,11 @@
 // previously #included from any src/ file) into OSE's File/Charset menus.
 // Calling-convention reference: locifilemanager-v2's loci_present()
 // startup gate and file_save()/file_load() single-blob convention
-// (src/dir.c config_save()/config_load() there) -- adapted here, at the
-// time this file was written, to a per-action presence check
-// (loci_check_present()) rather than a startup-blocking one, since LOCI
-// was still optional then. LOCI is now required to boot at all (the
-// canvas itself lives in overlay RAM -- see src/main.c, CLAUDE.md
-// "Canvas storage is overlay RAM, LOCI is required"), so this gate can
-// never actually fail in practice any more; left in place as harmless
-// defensiveness rather than removed, since it costs nothing. Byte-level
-// I/O correctness is exercised by tests/scripts/test_fileio_traffic.sh
+// (src/dir.c config_save()/config_load() there). LOCI is required to
+// boot at all (the canvas itself lives in overlay RAM -- see src/main.c,
+// CLAUDE.md "Canvas storage is overlay RAM, LOCI is required"), so all
+// file/charset actions can assume LOCI is present. Byte-level I/O
+// correctness is exercised by tests/scripts/test_fileio_traffic.sh
 // (Phosphoric's --loci-flash gives direct host-filesystem access to
 // what gets written).
 
@@ -190,21 +186,6 @@ static uint8_t fileio_get_dimensions(const char *title, uint16_t *outw, uint16_t
 }
 
 /**
- * Check whether a LOCI device is present, showing MSG_LOCI_NOT_FOUND via
- * menu_messagepopup() if not. Called as the first step of every File/
- * Charset menu action, so editing and every other OSE feature keep
- * working with no LOCI device attached.
- *
- * @return 1 if a LOCI device is present, 0 if absent.
- */
-uint8_t loci_check_present(void)
-{
-    if (loci_present()) return 1;
-    menu_messagepopup(MSG_LOCI_NOT_FOUND);
-    return 0;
-}
-
-/**
  * Pick a LOCI base filename to save to: one unified picker
  * (filepicker_run_save(), src/filepicker.c, 2026-06-22 redesign --
  * replaces the old two-stage "browse for a directory with 's', then
@@ -264,7 +245,6 @@ void fileio_save_screen(void)
 {
     int16_t fd;
 
-    if (!loci_check_present()) return;
     if (!fileio_get_filename(MSG_FILE_SAVE_SCREEN, PICKER_FILTER_NONE)) return;
 
     filedir_join_suffix(fullpath, ".BIN");
@@ -299,7 +279,6 @@ void fileio_load_screen(void)
     int16_t  fd;
     uint16_t neww, newh;
 
-    if (!loci_check_present()) return;
     if (!filepicker_run(MSG_FILE_LOAD_SCREEN, PICKER_FILTER_NONE)) return;
     if (!fileio_get_dimensions(MSG_FILE_LOAD_SCREEN, &neww, &newh)) return;
     if (!canvas_resize(neww, newh))
@@ -372,7 +351,6 @@ void fileio_save_combined(void)
 {
     int16_t fd;
 
-    if (!loci_check_present()) return;
     if (app.canvas_width != 40 ||
         (app.canvas_height != 28 && app.canvas_height != 27))
     {
@@ -408,7 +386,6 @@ void fileio_load_combined(void)
     int32_t  fsize;
     uint8_t  newh;
 
-    if (!loci_check_present()) return;
     if (!filepicker_run(MSG_FILE_LOAD_COMBINED, PICKER_FILTER_NONE)) return;
 
     filedir_join(fullpath, app.filename);
@@ -492,7 +469,6 @@ void fileio_save_project(void)
     ProjectHeader proj;
     int16_t       fd;
 
-    if (!loci_check_present()) return;
     if (!fileio_get_filename(MSG_FILE_SAVE_PROJECT, PICKER_FILTER_PROJECT)) return;
 
     proj.magic          = FILEIO_MAGIC;
@@ -605,7 +581,6 @@ void fileio_load_project(void)
     ProjectHeader proj;
     int16_t       fd;
 
-    if (!loci_check_present()) return;
     if (!filepicker_run(MSG_FILE_LOAD_PROJECT, PICKER_FILTER_PROJECT)) return;
 
     filedir_join_suffix(fullpath, "PJ.BIN");
@@ -726,7 +701,6 @@ void fileio_load_charset(uint8_t altorstd)
     int16_t  fd;
     const char *title = fileio_charset_title(altorstd, 0, &base);
 
-    if (!loci_check_present()) return;
     if (!filepicker_run(title, PICKER_FILTER_NONE)) return;
 
     filedir_join(fullpath, app.filename);
@@ -772,7 +746,6 @@ void fileio_save_charset(uint8_t altorstd)
     int16_t    fd;
     const char *title = fileio_charset_title(altorstd, 1, &base);
 
-    if (!loci_check_present()) return;
     if (!fileio_get_filename(title, PICKER_FILTER_NONE)) return;
 
     filedir_join_suffix(fullpath, ".BIN");

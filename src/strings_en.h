@@ -173,4 +173,10 @@
 #define MSG_MODE_MOVE     "Move"
 #define MSG_MODE_LINEBOX  "Line/Box"
 
+// ── Undo feedback (src/undo.c) ────────────────────────────────────────────
+// Shown in statusbar Mode field (statusbar_set_override(), 10-char budget)
+// when undo_snapshot() skips a canvas too large to fit in the undo region
+// (e.g. Screen > Clear/Fill on a canvas > UNDO_REGION_SIZE = 6144 cells).
+#define MSG_UNDO_TOOBIG   "No Undo"
+
 #endif // STRINGS_EN_H

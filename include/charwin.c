@@ -164,7 +164,9 @@ void cwin_clear_full(OricCharWin *w)
         uint8_t  row  = w->sy + y;
         uint8_t *base = (uint8_t *)row_base[row];
         row_setattr(row, w->ink, w->paper);
-        for (uint8_t x = 2; x < SCREEN_COLS; x++)
+        base[2] = A_STD;   // reset charset-mode latch (persists across rows, does not
+                            // reset per scanline -- col 2 is gap before sx>2 content)
+        for (uint8_t x = 3; x < SCREEN_COLS; x++)
             base[x] = 0x20;   // space character
     }
     w->cx = 0;
