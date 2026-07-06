@@ -172,6 +172,7 @@
 #define MSG_MODE_SELECT   "Select"
 #define MSG_MODE_MOVE     "Move"
 #define MSG_MODE_LINEBOX  "Line/Box"
+#define MSG_MODE_TRY      "Try"
 
 // ── Undo feedback (src/undo.c) ────────────────────────────────────────────
 // Shown in statusbar Mode field (statusbar_set_override(), 10-char budget)

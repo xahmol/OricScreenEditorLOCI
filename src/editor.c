@@ -271,11 +271,14 @@ void editor_run(void)
         {
             uint8_t *cell = (uint8_t *)TEXTVRAM + app.cursor_y * SCREEN_COLS + app.cursor_x;
             *cell = app.plotscreencode;
+            app.mode = MODE_TRY;
+            statusbar_draw();
             if (key_read() == KEY_SPACE)
             {
                 undo_snapshot(app.cursor_x + app.xoffset, app.cursor_y + app.yoffset, 1, 1);
                 canvas_put(app.cursor_x + app.xoffset, app.cursor_y + app.yoffset, app.plotscreencode);
             }
+            app.mode = MODE_MAIN;
             canvas_blit();
             break;
         }

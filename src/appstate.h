@@ -58,7 +58,8 @@ typedef enum {
     MODE_WRITE,
     MODE_SELECT,
     MODE_MOVE,
-    MODE_LINEBOX
+    MODE_LINEBOX,
+    MODE_TRY
 } EditorMode;
 
 typedef struct {

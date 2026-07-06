@@ -23,6 +23,7 @@ const char *mode_name(EditorMode mode)
     case MODE_SELECT:  return MSG_MODE_SELECT;
     case MODE_MOVE:    return MSG_MODE_MOVE;
     case MODE_LINEBOX: return MSG_MODE_LINEBOX;
+    case MODE_TRY:     return MSG_MODE_TRY;
     case MODE_MAIN:
     default:           return MSG_MODE_MAIN;
     }

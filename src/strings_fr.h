@@ -173,6 +173,7 @@
 #define MSG_MODE_SELECT   "Select"
 #define MSG_MODE_MOVE     "Deplacer"
 #define MSG_MODE_LINEBOX  "Ligne/Bte"
+#define MSG_MODE_TRY      "Essai"
 
 // ── Undo feedback (src/undo.c) ────────────────────────────────────────────
 // Shown in statusbar Mode field (statusbar_set_override(), 10-char budget)

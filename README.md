@@ -40,7 +40,7 @@ Screen editor for the Oric Atmos — Oscar64 rewrite with LOCI mass-storage supp
 [Credits](#credits)
 
 
-*(Title screen screenshot will be updated in a future release.)*
+![Title screen](docs/screenshots/ose_01_titlescreen.png)
 
 ## Version history and download
 ([Back to contents](#contents))
@@ -179,7 +179,9 @@ oscar64 -n -tf=bin -rt=include/oric_crt.c -i=include -i=src -O2 -dNOFLOAT
 
 After the title screen, the program starts in this mode. An inverted cursor showing the presently selected screencode is visible at the canvas origin.
 
-*(Screenshot pending — will be updated in a future release.)*
+![Main mode](docs/screenshots/ose_02_mainmode.png)
+
+![Demo canvas — colour swatch and pixel-art sun project](docs/screenshots/ose_37_democanvas.png)
 
 Press these keys in main mode for editing:
 
@@ -247,6 +249,8 @@ Press **SPACE** to plot the presently selected character at the cursor position.
 
 Press **T** to preview how the selected character would look when plotted. Press **SPACE** to confirm and commit it, or any other key to cancel.
 
+![Try mode — character preview at cursor, statusbar shows Try](docs/screenshots/ose_25_trymode.png)
+
 *Plotting serial attributes*
 
 Due to the way the Oric handles [color and attribute changes](#serial-attribute-code-reference), every screen position is either an attribute modifier or a character — never both. For this reason, plotting a character does not automatically plot any attribute.
@@ -269,6 +273,8 @@ Press **S** ([Select mode](#select-mode)), **M** ([Move mode](#move-mode)), **L*
 
 Press **J** to open a popup asking for an X then a Y canvas coordinate (both pre-filled with the cursor's current position). Confirming both jumps the cursor and viewport there in one step — much quicker than scrolling cell by cell on a canvas larger than the 40×28 screen. ESC at either field cancels with no change.
 
+![Goto dialog](docs/screenshots/ose_26_gotodialog.png)
+
 Press **H** to jump straight back to the canvas origin (0,0) without any popup.
 
 *Find/Replace*
@@ -278,6 +284,8 @@ Press **F** to open the Find/Replace popup. First choose what to search for: **1
 - Press **ESC** at the replacement step to instead jump the cursor to the next occurrence of the found value without changing the canvas.
 
 ESC at the first two steps cancels the whole operation.
+
+![Find/Replace — choose target prompt](docs/screenshots/ose_27_findreplace.png)
 
 *Undo and redo*
 
@@ -291,12 +299,14 @@ Press **FUNCT+6** to toggle the statusbar on/off in any mode.
 
 Press **FUNCT+8** to show a help screen with all keyboard commands for the current mode.
 
+![Help screen — main mode](docs/screenshots/ose_36_helpscreen.png)
+
 ## Statusbar
 ([Back to contents](#contents))
 
 If enabled, the statusbar occupies the last row of the screen (row 27). It auto-hides when the cursor moves to that row (showing the real canvas content there instead), and reappears when the cursor moves away.
 
-*(Screenshot pending — will be updated in a future release.)*
+![Statusbar](docs/screenshots/ose_03_statusbar.png)
 
 From left to right:
 
@@ -328,11 +338,15 @@ From main mode, press **FUNCT+1** to open the menu bar. Navigate with:
 
 **_Screen menu_**
 
-*(Screenshot pending — will be updated in a future release.)*
+![Screen menu](docs/screenshots/ose_04_screenmenu.png)
 
 *Width: Resize width*
 
+![Resize dialog](docs/screenshots/ose_30_resizedialog.png)
+
 Resize the canvas width by entering the new width. Any width from 1 upward is accepted, provided width×height does not exceed 10,240 bytes. Shrinking below the current width discards any columns to the right of the new boundary; a confirmation dialog appears before shrinking.
+
+![Are-you-sure confirmation dialog](docs/screenshots/ose_29_areyousure.png)
 
 *Height: Resize height*
 
@@ -348,11 +362,17 @@ Like Clear, but fills with the currently selected screencode rather than a space
 
 **_File menu_**
 
-*(Screenshot pending — will be updated in a future release.)*
+![File menu](docs/screenshots/ose_05_filemenu.png)
+
+![File picker](docs/screenshots/ose_06_filepicker.png)
 
 All File menu actions use the **LOCI mass-storage device** — no tape commands. Both Save and Load actions open the same XRAM-backed file picker directory browser first.
 
 **Save actions** present a `<new file>` entry at the top of the listing plus the existing files. Press ENTER on `<new file>` to type a fresh filename (up to 48 characters); press ENTER on an existing file to overwrite it (with a confirmation prompt).
+
+![File picker in save mode — \<new file\> entry at top](docs/screenshots/ose_31_savepicker.png)
+
+![Save filename input](docs/screenshots/ose_32_savefilename.png)
 
 **Load actions** let you browse and select the file directly from the listing. Load Project shows only project files (`*PJ.BIN`); all other Load actions (Screen, Combined, Charset) show every file in the directory with no filtering.
 
@@ -380,6 +400,8 @@ Copying, renaming and deleting files/directories are not supported — use a LOC
 
 Saves or loads just the canvas (no character sets) as `<filename>.BIN` on the LOCI device: a bare dump of the screen data with no header or metadata — matching V1 exactly for portability. Because there is no header, Load screen asks you to enter the canvas width and height (pre-filled with the current canvas size) before loading.
 
+![Load screen — width/height prompt](docs/screenshots/ose_33_loaddimensions.png)
+
 *Save project / Load project*
 
 Saves or loads the canvas together with all metadata: cursor position, viewport offsets, ink/paper/blink/double/altchar selection, and — if edited this session — either or both character sets. Up to four files share the base name:
@@ -397,7 +419,7 @@ Saves or loads both character sets and the canvas in a single `<filename>.BIN` f
 
 **_Charset menu_**
 
-*(Screenshot pending — will be updated in a future release.)*
+![Charset menu](docs/screenshots/ose_07_charsetmenu.png)
 
 Load or save the standard or alternate character set separately (`<filename>.BIN`: 768 bytes for the standard set, 640 bytes for the alternate set — the alternate charset only has 640 bytes of usable glyph space on real Oric hardware, since the rest of the bank physically overlaps the screen RAM), or "combined": 768 bytes standard + 256 bytes alternate non-displayable prefix + 640 bytes alternate displayable = 1,664 bytes total, both banks saved and loaded together. See the [File format reference](#file-format-reference) for the exact layout.
 
@@ -411,11 +433,15 @@ Restores the alternate (mosaic) character set from the snapshot taken when the p
 
 **_Information menu_**
 
-*(Screenshot pending — will be updated in a future release.)*
+![Information menu](docs/screenshots/ose_08_infomenu.png)
 
 *Information*
 
 Shows a 2-page popup: a page with the IDreamtIn8Bits logo, version number, and credits; followed by a page with a QR code linking to this project's GitHub page. Press any key to advance between pages and to return to the menu afterwards.
+
+![Information popup — page 1: logo and credits](docs/screenshots/ose_34_infopopup_p1.png)
+
+![Information popup — page 2: QR code](docs/screenshots/ose_35_infopopup_p2.png)
 
 *Exit program*
 
@@ -428,7 +454,7 @@ Pressing **E** from main mode opens the character editor as a narrow sidebar pop
 
 The popup header shows the current screencode (hex) and whether the Standard (Std) or Alternate (Alt) charset is active. Rows below the header show the 8×6 pixel grid, with the row's hex byte value shown immediately to the left of each grid row.
 
-*(Screenshot pending — will be updated in a future release.)*
+![Character editor](docs/screenshots/ose_09_charsetedit.png)
 
 Keyboard commands in this mode:
 
@@ -476,6 +502,8 @@ Press the **cursor keys** to move the cursor around the pixel grid. The current 
 
 Press **H** to edit the current row by typing its 8-bit value as two hex digits directly on screen at the row's position.
 
+![Character editor — hex row edit](docs/screenshots/ose_38_charsetedit_hexedit.png)
+
 *Restore from ROM*
 
 Press **S** (Standard charset only) to copy the ROM glyph for the current screencode into the live charset RAM, overwriting any edits. The ROM glyph covers codes $20–$7F (printable ASCII range). There is no ROM source for the Alternate charset — use **Charset > Reset Alt→Boot** from the main menu to restore the whole Alt bank from the boot-time snapshot.
@@ -485,7 +513,7 @@ Press **S** (Standard charset only) to copy the ROM glyph for the current screen
 
 Pressing **P** in main mode opens the Palette mode. A popup shows the 10 favorite slots as the first row, followed by the full Standard charset (codes $20–$7F, 6 rows of 16), then the full Alternate charset (or a visual-charmap reordering of it, see below).
 
-*(Screenshot pending — will be updated in a future release.)*
+![Palette mode](docs/screenshots/ose_10_palette.png)
 
 Keyboard commands:
 
@@ -502,7 +530,7 @@ Keyboard commands:
 
 Pressing **V** toggles visual charmap mode, which reorders the Alternate charset section so that characters are arranged in a logical drawing order (designed around the Oric's native mosaic/semigraphics font). This mode only makes sense for an unmodified Alternate charset. Visual charmap mode covers codes $20–$6F; codes $70–$7F always remain in their natural order.
 
-*(Visual charmap screenshot pending — will be updated in a future release.)*
+![Palette mode — visual charmap](docs/screenshots/ose_11_palette_visualmap.png)
 
 ## Colour picker
 ([Back to contents](#contents))
@@ -511,7 +539,7 @@ Pressing **C** in main mode opens the Colour picker, which provides a visual gri
 
 The popup shows all 64 Ink/Paper combinations as an 8×8 grid (one row per Paper value, one column per Ink value). Each cell shows a normal and an inverse color swatch side by side. Three rows below the grid show feedback for the currently highlighted Ink, Paper, and the resulting normal/inverse preview.
 
-*(Screenshot pending — will be updated in a future release.)*
+![Colour picker](docs/screenshots/ose_12_colourpicker.png)
 
 Keyboard commands:
 
@@ -528,11 +556,15 @@ Keyboard commands:
 
 Pressing **S** in main mode enters Select mode. Position the cursor at one corner of the area to select before entering.
 
-*(Screenshot pending — will be updated in a future release.)*
+![Select mode](docs/screenshots/ose_13_selectmode.png)
 
 **Phase 1 — grow the selection:** cursor keys expand or contract the rectangle from the starting corner. The selection is highlighted using the current screencode and attributes. Press **RETURN** to accept; **ESC** cancels and returns to main mode. **FUNCT+8** shows the help screen (only before the selection has started growing).
 
-**Phase 2 — choose action:** after accepting, the statusbar mode field shows the available actions. Press one of:
+**Phase 2 — choose action:** after accepting, the statusbar mode field shows the available actions.
+
+![Select mode — phase 2 action prompt](docs/screenshots/ose_22_select_phase2.png)
+
+Press one of:
 
 |Key|Description
 |---|---|
@@ -544,7 +576,11 @@ Pressing **S** in main mode enters Select mode. Position the cursor at one corne
 |**M**|Paint with character **M**odifier attribute
 |**ESC**|Cancel and return to main mode
 
-**Cut and copy:** after pressing **X** or **C**, move the cursor to the upper-left corner of the destination, then press **RETURN** to confirm or **ESC** to cancel. If the selection would extend past the canvas edge, a "Selection does not fit." message appears and nothing changes. Cut uses two undo slots (one for the destination, one for the source) — reverting a cut requires two **Z** presses.
+**Cut and copy:** after pressing **X** or **C**, move the cursor to the upper-left corner of the destination, then press **RETURN** to confirm or **ESC** to cancel.
+
+![Select mode — cut/copy destination phase](docs/screenshots/ose_23_select_destination.png)
+
+![Select mode — selection filled with ink attribute](docs/screenshots/ose_24_select_fillresult.png) If the selection would extend past the canvas edge, a "Selection does not fit." message appears and nothing changes. Cut uses two undo slots (one for the destination, one for the source) — reverting a cut requires two **Z** presses.
 
 **Delete and paint:** fill the selection immediately with no further input needed. These use one undo slot.
 
@@ -560,6 +596,8 @@ Other keys while in Select mode:
 
 ## Move mode
 ([Back to contents](#contents))
+
+![Move mode](docs/screenshots/ose_14_movemode.png)
 
 Pressing **M** in main mode enters Move mode. Use this mode to scroll the current viewport's content in any direction using the cursor keys. Each keypress shifts all cells in the 40×28 viewport area one step in that direction within `screenmap[]`; content that scrolls off the edge is lost.
 
@@ -579,9 +617,15 @@ Move mode operates on the viewport area only. On a canvas larger than 40×28, on
 
 Pressing **L** in main mode enters Line and box mode. Position the cursor at one corner of the box or at the start of the line before entering.
 
-**Phase 1 — grow the bounding box:** cursor keys expand or contract the rectangle. Leaving width or height at 1 draws a line; otherwise a box or ellipse is drawn. Press **RETURN** to accept; **ESC** cancels and returns to main mode.
+**Phase 1 — grow the bounding box:**
 
-**Phase 2 — shape options:** after accepting, the statusbar shows `o:Box c:El` (or with capitals indicating which toggles are active). Press:
+![Line/Box mode — phase 1: growing the bounding box](docs/screenshots/ose_15_linebox_phase1.png) cursor keys expand or contract the rectangle. Leaving width or height at 1 draws a line; otherwise a box or ellipse is drawn. Press **RETURN** to accept; **ESC** cancels and returns to main mode.
+
+**Phase 2 — shape options:** after accepting, the statusbar shows `o:Box c:El` (or with capitals indicating which toggles are active).
+
+![Line/Box mode — phase 2: shape options in statusbar](docs/screenshots/ose_16_linebox_phase2.png)
+
+Press:
 
 |Key|Description
 |---|---|
@@ -595,6 +639,14 @@ Four shapes result from the combination of these toggles:
 - Hollow box (only the four border lines are drawn, interior unchanged)
 - Filled ellipse inscribed in the bounding box
 - Hollow ellipse outline
+
+![Filled box](docs/screenshots/ose_18_linebox_filledbox.png)
+
+![Hollow box](docs/screenshots/ose_19_linebox_hollowbox.png)
+
+![Filled ellipse](docs/screenshots/ose_20_linebox_filledellipse.png)
+
+![Hollow ellipse](docs/screenshots/ose_21_linebox_hollowellipse.png)
 
 **Note on character cells and ellipses:** Oric character cells are 6 pixels wide × 8 pixels tall. A square bounding box therefore produces a visually flattened ellipse, not a circle. Widen the box if you want a rounder result.
 
@@ -611,6 +663,8 @@ Four shapes result from the combination of these toggles:
 ## Write mode
 ([Back to contents](#contents))
 
+![Write mode](docs/screenshots/ose_17_writemode.png)
+
 Pressing **W** in main mode enters Write mode. Type characters freely with the keyboard — any printable key (screencode > 32) plots the character at the cursor and advances one cell to the right.
 
 Colors and attributes can be set and plotted while typing:
@@ -623,6 +677,8 @@ Colors and attributes can be set and plotted while typing:
 - **FUNCT+2** — plot a paper modifier for the current paper color
 - **FUNCT+3** — plot a character-set modifier for the current charset/double/blink settings
 - **FUNCT+4** — hex-direct attribute entry: choose **1** Ink / **2** Paper / **3** Modifier, then type a single hex digit 0–7. Useful when you already know the exact value you want and do not want to cycle with CTRL+Z/X/C/V.
+
+![Write mode — FUNCT+4 hex attribute entry](docs/screenshots/ose_28_write_hexattr.png)
 
 **DEL** moves the cursor one cell left and clears that cell (backspace-style). It does not wrap to the previous row.
 
