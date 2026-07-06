@@ -40,7 +40,7 @@
 [Crédits](#crédits)
 
 
-*(Capture d'ecran de l'ecran-titre a venir dans une prochaine version.)*
+![Ecran titre](docs/screenshots/ose_fr_01_titlescreen.png)
 
 ## Historique des versions et téléchargement
 ([Retour au sommaire](#sommaire))
@@ -170,7 +170,9 @@ make zip          # créer le ZIP de distribution (les deux .tap + tous les asse
 
 Après l'écran-titre, le programme démarre dans ce mode. Un curseur inversé affichant le code écran actuellement sélectionné est visible à l'origine de la zone de dessin.
 
-*(Capture d'ecran a venir dans une prochaine version.)*
+![Mode principal](docs/screenshots/ose_fr_02_mainmode.png)
+
+![Toile de demonstration — echantillons de couleurs et soleil en pixel-art](docs/screenshots/ose_fr_37_democanvas.png)
 
 Appuyez sur ces touches en mode principal pour l'édition :
 
@@ -238,6 +240,8 @@ Appuyez sur **ESPACE** pour tracer le caractère actuellement sélectionné à l
 
 Appuyez sur **T** pour prévisualiser l'apparence du caractère sélectionné lorsque tracé. Appuyez sur **ESPACE** pour confirmer et le valider, ou sur toute autre touche pour annuler.
 
+![Mode essai — apercu du caractere](docs/screenshots/ose_fr_25_trymode.png)
+
 *Tracer des attributs sériels*
 
 En raison de la façon dont l'Oric gère les [changements de couleur et d'attribut](#référence-des-codes-dattribut-série), chaque position d'écran est soit un modificateur d'attribut, soit un caractère — jamais les deux. Pour cette raison, tracer un caractère ne trace aucun attribut.
@@ -260,6 +264,8 @@ Appuyez sur **S** ([Mode sélection](#mode-sélection)), **M** ([Mode déplaceme
 
 Appuyez sur **J** pour ouvrir une popup demandant une coordonnée X puis Y (toutes deux pré-remplies avec la position actuelle du curseur). Valider les deux déplace le curseur et la vue en une seule étape — bien plus rapide que de défiler case par case sur une zone de dessin plus grande que l'écran de 40×28. ESC à l'un ou l'autre des champs annule sans rien changer.
 
+![Dialogue Aller a](docs/screenshots/ose_fr_26_gotodialog.png)
+
 Appuyez sur **H** pour revenir directement à l'origine (0,0) de la zone de dessin, sans popup.
 
 *Rechercher/Remplacer*
@@ -269,6 +275,8 @@ Appuyez sur **F** pour ouvrir la popup Rechercher/Remplacer. Choisissez d'abord 
 - Appuyez sur **ESC** à l'étape de remplacement pour déplacer le curseur jusqu'à la prochaine occurrence sans modifier la zone de dessin.
 
 ESC aux deux premières étapes annule toute l'opération.
+
+![Chercher/Remplacer — choix de cible](docs/screenshots/ose_fr_27_findreplace.png)
 
 *Annuler et rétablir*
 
@@ -282,12 +290,14 @@ Appuyez sur **FUNCT+6** pour basculer la barre d'état dans n'importe quel mode.
 
 Appuyez sur **FUNCT+8** pour afficher un écran d'aide avec toutes les commandes clavier du mode actuel.
 
+![Ecran d'aide — mode principal](docs/screenshots/ose_fr_36_helpscreen.png)
+
 ## Barre d'état
 ([Retour au sommaire](#sommaire))
 
 Si elle est activée, la barre d'état occupe la dernière ligne de l'écran (ligne 27). Elle se masque automatiquement quand le curseur se déplace sur cette ligne (affichant à la place le contenu réel de la zone de dessin à cet endroit), et réapparaît quand le curseur s'éloigne.
 
-*(Capture d'ecran a venir dans une prochaine version.)*
+![Barre d'etat](docs/screenshots/ose_fr_03_statusbar.png)
 
 De gauche à droite :
 
@@ -319,11 +329,15 @@ Depuis le mode principal, appuyez sur **FUNCT+1** pour ouvrir la barre de menus.
 
 **_Menu Ecran_**
 
-*(Capture d'ecran a venir dans une prochaine version.)*
+![Menu Ecran](docs/screenshots/ose_fr_04_screenmenu.png)
 
 *Width : redimensionner la largeur*
 
+![Dialogue redimensionnement](docs/screenshots/ose_fr_30_resizedialog.png)
+
 Redimensionnez la largeur de la zone de dessin en saisissant la nouvelle valeur. Toute largeur à partir de 1 est acceptée, sous réserve que largeur×hauteur ne dépasse pas 10 240 octets. Réduire en dessous de la largeur actuelle supprime les colonnes à droite de la nouvelle limite ; une boîte de dialogue de confirmation apparaît avant de réduire.
+
+![Dialogue de confirmation](docs/screenshots/ose_fr_29_areyousure.png)
 
 *Height : redimensionner la hauteur*
 
@@ -339,11 +353,17 @@ Comme Effacer, mais remplit avec le code écran actuellement sélectionné plut�
 
 **_Menu Fichier_**
 
-*(Capture d'ecran a venir dans une prochaine version.)*
+![Menu Fichier](docs/screenshots/ose_fr_05_filemenu.png)
+
+![Selecteur de fichiers](docs/screenshots/ose_fr_06_filepicker.png)
 
 Toutes les actions du menu Fichier utilisent le **périphérique de stockage de masse LOCI** — pas de commandes cassette. Les actions de sauvegarde et de chargement ouvrent toutes les deux le même navigateur de fichiers basé sur la XRAM LOCI.
 
 **Les actions de sauvegarde** présentent une entrée `<nouveau fichier>` en haut de la liste, suivie des fichiers existants. Appuyez sur ENTRÉE sur `<nouveau fichier>` pour saisir un nouveau nom de fichier (48 caractères maximum) ; appuyez sur ENTRÉE sur un fichier existant pour l'écraser (avec une confirmation).
+
+![Selecteur de fichiers — mode sauvegarde](docs/screenshots/ose_fr_31_savepicker.png)
+
+![Saisie du nom de fichier](docs/screenshots/ose_fr_32_savefilename.png)
 
 **Les actions de chargement** permettent de naviguer et sélectionner directement le fichier dans la liste. Charger projet n'affiche que les fichiers de projet (`*PJ.BIN`) ; toutes les autres actions de chargement (Ecran, Combiné, Jeux de caractères) affichent tous les fichiers du dossier sans filtrage.
 
@@ -371,6 +391,8 @@ Copier, renommer et supprimer des fichiers/dossiers ne sont pas pris en charge �
 
 Sauvegarde ou charge uniquement la zone de dessin (sans les jeux de caractères) sous `<nomfichier>.BIN` sur le périphérique LOCI : un simple dump des données d'écran sans en-tête ni métadonnées — identique à V1 pour la portabilité. Comme il n'y a pas d'en-tête, Charger écran vous demande de saisir la largeur et la hauteur (pré-remplies avec la taille actuelle) avant de charger.
 
+![Chargement ecran — dimensions](docs/screenshots/ose_fr_33_loaddimensions.png)
+
 *Sauver/Charger projet*
 
 Sauvegarde ou charge la zone de dessin avec toutes les métadonnées : position du curseur, décalages de la vue, sélections encre/papier/clignotement/double/alternatif, et — si modifiés pendant cette session — l'un ou les deux jeux de caractères. Jusqu'à quatre fichiers partagent le nom de base :
@@ -388,7 +410,7 @@ Sauvegarde ou charge les deux jeux de caractères et la zone de dessin dans un s
 
 **_Menu Caract._**
 
-*(Capture d'ecran a venir dans une prochaine version.)*
+![Menu Caract.](docs/screenshots/ose_fr_07_charsetmenu.png)
 
 Chargez ou sauvegardez le jeu standard ou alternatif séparément (`<nomfichier>.BIN` : 768 octets pour le jeu standard, 640 octets pour le jeu alternatif — le jeu alternatif ne dispose que de 640 octets de mémoire utilisable sur l'Oric réel, le reste chevauchant la RAM écran), ou "combiné" : 768 octets standard + 256 octets préfixe non-affichable alternatif + 640 octets alternatif affichable = 1 664 octets au total. Voir la [Référence du format de fichier](#référence-du-format-de-fichier) pour la disposition exacte.
 
@@ -402,11 +424,15 @@ Restaure le jeu de caractères alternatif (mosaïque) depuis la capture prise au
 
 **_Menu Information_**
 
-*(Capture d'ecran a venir dans une prochaine version.)*
+![Menu Information](docs/screenshots/ose_fr_08_infomenu.png)
 
 *Information*
 
 Affiche une popup en 2 pages : une page avec le logo IDreamtIn8Bits, le numéro de version et les crédits ; suivie d'une page avec un code QR menant à la page GitHub de ce projet. Appuyez sur une touche pour avancer entre les pages, puis pour revenir au menu.
+
+![Popup Information — page 1 : logo et credits](docs/screenshots/ose_fr_34_infopopup_p1.png)
+
+![Popup Information — page 2 : QR code](docs/screenshots/ose_fr_35_infopopup_p2.png)
 
 *Quitter*
 
@@ -419,7 +445,7 @@ Appuyer sur **E** depuis le mode principal ouvre l'éditeur de caractères sous 
 
 L'en-tête de la popup affiche le code écran actuel (hex) et si le jeu Standard (Std) ou Alternatif (Alt) est actif. Les lignes en dessous affichent la grille de pixels 8×6, avec la valeur hexadécimale de chaque ligne affichée immédiatement à sa gauche.
 
-*(Capture d'ecran a venir dans une prochaine version.)*
+![Editeur de caracteres](docs/screenshots/ose_fr_09_charsetedit.png)
 
 Commandes clavier dans ce mode :
 
@@ -463,6 +489,8 @@ Commandes clavier dans ce mode :
 
 Appuyez sur **H** pour éditer la ligne actuelle en saisissant sa valeur 8 bits sous forme de deux chiffres hexadécimaux directement à l'écran.
 
+![Editeur de caracteres — saisie hexadecimale](docs/screenshots/ose_fr_38_charsetedit_hexedit.png)
+
 *Restaurer depuis la ROM*
 
 Appuyez sur **S** (jeu Standard uniquement) pour copier le glyphe ROM du code écran actuel dans la RAM charset, écrasant toutes les modifications. Il n'existe pas de source ROM pour le jeu Alternatif — utilisez **Caract. > Reinitialiser Alt→Boot** depuis le menu principal pour restaurer toute la banque Alt depuis la capture du démarrage.
@@ -472,7 +500,7 @@ Appuyez sur **S** (jeu Standard uniquement) pour copier le glyphe ROM du code é
 
 Appuyer sur **P** en mode principal ouvre le mode Palette. Une popup affiche les 10 emplacements favoris en première ligne, suivis du jeu Standard complet (codes $20–$7F, 6 lignes de 16), puis le jeu Alternatif complet (ou un réordonnancement en plan de caractères visuel, voir ci-dessous).
 
-*(Capture d'ecran a venir dans une prochaine version.)*
+![Mode palette](docs/screenshots/ose_fr_10_palette.png)
 
 Commandes clavier :
 
@@ -489,7 +517,7 @@ Commandes clavier :
 
 Appuyer sur **V** bascule le mode plan de caractères visuel, qui réordonne la section du jeu Alternatif de sorte que les caractères soient classés dans un ordre logique pour le dessin (conçu autour de la police mosaïque/semi-graphique native de l'Oric). Ce mode n'a de sens que pour un jeu Alternatif non modifié.
 
-*(Capture d'ecran du mode visuel a venir dans une prochaine version.)*
+![Mode palette — carte visuelle](docs/screenshots/ose_fr_11_palette_visualmap.png)
 
 ## Sélecteur de couleurs
 ([Retour au sommaire](#sommaire))
@@ -498,7 +526,7 @@ Appuyer sur **C** en mode principal ouvre le sélecteur de couleurs, qui fournit
 
 La popup affiche les 64 combinaisons Encre/Papier sous forme d'une grille 8×8 (une ligne par couleur de papier, une colonne par couleur d'encre). Chaque cellule montre un échantillon de couleur normal et un inversé côte à côte. Trois lignes sous la grille affichent l'encre et le papier actuellement en surbrillance, ainsi qu'un aperçu normal/inversé résultant.
 
-*(Capture d'ecran a venir dans une prochaine version.)*
+![Selecteur de couleurs](docs/screenshots/ose_fr_12_colourpicker.png)
 
 Commandes clavier :
 
@@ -515,11 +543,15 @@ Commandes clavier :
 
 Appuyer sur **S** en mode principal entre en mode Sélection. Positionnez le curseur sur un coin de la zone à sélectionner avant d'entrer.
 
-*(Capture d'ecran a venir dans une prochaine version.)*
+![Mode selection](docs/screenshots/ose_fr_13_selectmode.png)
 
 **Phase 1 — délimiter la sélection :** les touches curseur agrandissent ou contractent le rectangle depuis le coin de départ. La sélection est mise en surbrillance avec le code écran et les attributs actuels. Appuyez sur **ENTRÉE** pour accepter ; **ESC** annule et revient au mode principal. **FUNCT+8** affiche l'écran d'aide (uniquement avant que la sélection ait commencé à s'agrandir).
 
-**Phase 2 — choisir l'action :** après avoir accepté, le champ mode de la barre d'état affiche les actions disponibles. Appuyez sur :
+**Phase 2 — choisir l'action :** après avoir accepté, le champ mode de la barre d'état affiche les actions disponibles.
+
+![Mode selection — phase 2 (barre d'etat)](docs/screenshots/ose_fr_22_select_phase2.png)
+
+Appuyez sur :
 
 |Touche|Description
 |---|---|
@@ -531,7 +563,11 @@ Appuyer sur **S** en mode principal entre en mode Sélection. Positionnez le cur
 |**M**|Peindre avec l'attribut **M**odificateur de jeu de caractères
 |**ESC**|Annuler et revenir au mode principal
 
-**Couper et copier :** après avoir appuyé sur **X** ou **C**, déplacez le curseur jusqu'au coin supérieur gauche de la destination, puis appuyez sur **ENTRÉE** pour confirmer ou **ESC** pour annuler. Si la sélection dépasserait les limites de la zone de dessin, un message "Selection hors limites." apparaît et rien ne change. Couper utilise deux emplacements d'annulation — revenir sur une coupe nécessite deux pressions sur **Z**.
+**Couper et copier :** après avoir appuyé sur **X** ou **C**, déplacez le curseur jusqu'au coin supérieur gauche de la destination, puis appuyez sur **ENTRÉE** pour confirmer ou **ESC** pour annuler.
+
+![Mode selection — phase destination](docs/screenshots/ose_fr_23_select_destination.png)
+
+![Mode selection — resultat remplissage](docs/screenshots/ose_fr_24_select_fillresult.png) Si la sélection dépasserait les limites de la zone de dessin, un message "Selection hors limites." apparaît et rien ne change. Couper utilise deux emplacements d'annulation — revenir sur une coupe nécessite deux pressions sur **Z**.
 
 Autres touches en mode Sélection :
 
@@ -545,6 +581,8 @@ Autres touches en mode Sélection :
 
 ## Mode déplacement
 ([Retour au sommaire](#sommaire))
+
+![Mode deplacement](docs/screenshots/ose_fr_14_movemode.png)
 
 Appuyer sur **M** en mode principal entre en mode Déplacement. Utilisez ce mode pour faire défiler le contenu de la fenêtre visible actuelle dans n'importe quelle direction. Chaque pression sur une touche curseur décale toutes les cellules dans la zone de fenêtre de 40×28 d'un cran dans cette direction dans `screenmap[]` ; le contenu qui sort du bord est perdu.
 
@@ -564,9 +602,15 @@ Le mode Déplacement n'agit que sur la zone de la fenêtre visible. Sur une zone
 
 Appuyer sur **L** en mode principal entre en mode Ligne et boîte. Positionnez le curseur sur un coin de la boîte ou au début de la ligne avant d'entrer.
 
-**Phase 1 — délimiter le rectangle englobant :** les touches curseur agrandissent ou contractent le rectangle. Si la largeur ou la hauteur reste à 1, une ligne est tracée ; sinon, une boîte ou une ellipse est tracée. Appuyez sur **ENTRÉE** pour accepter ; **ESC** annule et revient au mode principal.
+**Phase 1 — délimiter le rectangle englobant :**
 
-**Phase 2 — options de forme :** après avoir accepté, la barre d'état affiche `o:Bte c:El` (avec des majuscules indiquant quelles bascules sont actives). Appuyez sur :
+![Mode ligne et boite — phase 1 : delimitation du rectangle englobant](docs/screenshots/ose_fr_15_linebox_phase1.png) les touches curseur agrandissent ou contractent le rectangle. Si la largeur ou la hauteur reste à 1, une ligne est tracée ; sinon, une boîte ou une ellipse est tracée. Appuyez sur **ENTRÉE** pour accepter ; **ESC** annule et revient au mode principal.
+
+**Phase 2 — options de forme :** après avoir accepté, la barre d'état affiche `o:Bte c:El` (avec des majuscules indiquant quelles bascules sont actives).
+
+![Mode ligne et boite — phase 2 (barre d'etat)](docs/screenshots/ose_fr_16_linebox_phase2.png)
+
+Appuyez sur :
 
 |Touche|Description
 |---|---|
@@ -580,6 +624,14 @@ Quatre formes résultent de la combinaison de ces bascules :
 - Boîte creuse (seules les quatre lignes de bordure sont tracées, l'intérieur reste intact)
 - Ellipse pleine inscrite dans le rectangle englobant
 - Contour d'ellipse creuse
+
+![Boite pleine](docs/screenshots/ose_fr_18_linebox_filledbox.png)
+
+![Boite creuse](docs/screenshots/ose_fr_19_linebox_hollowbox.png)
+
+![Ellipse pleine](docs/screenshots/ose_fr_20_linebox_filledellipse.png)
+
+![Ellipse creuse](docs/screenshots/ose_fr_21_linebox_hollowellipse.png)
 
 **Note sur les cellules de caractères et les ellipses :** les cellules de caractères Oric font 6 pixels de large × 8 pixels de haut. Un rectangle carré produit donc une ellipse visuellement aplatie, pas un cercle. Élargissez le rectangle si vous souhaitez un résultat plus rond.
 
@@ -596,6 +648,8 @@ Quatre formes résultent de la combinaison de ces bascules :
 ## Mode écriture
 ([Retour au sommaire](#sommaire))
 
+![Mode ecriture](docs/screenshots/ose_fr_17_writemode.png)
+
 Appuyer sur **W** en mode principal entre en mode Écriture. Tapez librement des caractères avec le clavier — toute touche imprimable (code écran > 32) trace le caractère au curseur et avance d'une cellule vers la droite.
 
 Les couleurs et attributs peuvent être réglés et tracés en mode écriture :
@@ -608,6 +662,8 @@ Les couleurs et attributs peuvent être réglés et tracés en mode écriture :
 - **FUNCT+2** — tracer un modificateur de papier pour la couleur de papier actuelle
 - **FUNCT+3** — tracer un modificateur de jeu de caractères pour les réglages actuels
 - **FUNCT+4** — saisie hexadécimale directe : choisissez **1** Encre / **2** Papier / **3** Modificateur, puis tapez un chiffre hexadécimal 0–7
+
+![Mode ecriture — FUNCT+4 saisie hexadecimale attribut](docs/screenshots/ose_fr_28_write_hexattr.png)
 
 **DEL** déplace le curseur d'une cellule vers la gauche et efface cette cellule (style retour arrière). Il ne passe pas à la ligne précédente.
 
